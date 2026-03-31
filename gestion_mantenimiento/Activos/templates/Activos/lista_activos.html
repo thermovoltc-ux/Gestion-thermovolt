@@ -1,0 +1,209 @@
+{% extends "solicitudes/indexpadre.html" %}
+
+{% block title %}
+Lista de Activos
+{% endblock %}
+
+{% block content %}
+<div class="container-arbol">
+    <h1>Lista de Activos</h1>
+
+    <div class="tree-view">
+        {% for ubicacion in ubicaciones %}
+            {% include 'Activos/ubicacion_node.html' with ubicacion=ubicacion %}
+        {% endfor %}
+    </div>
+</div>
+
+<div class="floating-button-container">
+    <a href="#" class="floating-button" onclick="toggleOptions()">
+        <span><ion-icon name="add-outline" class="icon-large"></ion-icon></span>
+    </a>
+    <div id="floating-options" class="floating-options">
+        <a href="{% url 'crear_equipo' %}" class="floating-option">Crear Equipo</a>
+        <a href="{% url 'crear_ubicacion' %}" class="floating-option">Crear Ubicación</a>
+    </div>
+</div>
+
+<style>
+    .tree-view {
+        font-size: 1rem;
+        font-family: Heebo, Arial;
+        font-weight: 400;
+        line-height: 1.5;
+        color: rgb(0, 0, 0);
+        user-select: none;
+        box-sizing: inherit;
+        position: relative;
+        height: 453px;
+        width: 1083px;
+        overflow: auto;
+        will-change: transform;
+        direction: ltr;
+    }
+
+    .tree-item {
+        margin: 10px 0;
+    }
+
+    .tree-node {
+        cursor: pointer;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px;
+        border-radius: 4px;
+        transition: background-color 0.3s ease;
+    }
+
+    .tree-node:hover {
+        background-color: #e0e0e0;
+    }
+
+    .tree-children {
+        display: none;
+        padding-left: 20px;
+        list-style-type: none;
+        margin: 5px 0;
+    }
+
+    .tree-sub-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 5px;
+        padding: 5px 0;
+        margin-left: 20px;
+        flex-wrap: nowrap;
+        flex-direction: column;
+    }
+
+    .icon-folder {
+        font-size: 1.2em;
+        transition: transform 0.3s ease;
+    }
+
+    .icon-leaf {
+        font-size: 0.9em;
+        color: rgb(0, 0, 0);
+        margin-right: 5px; /* Añade un margen derecho para separar el icono del texto */
+    }
+
+    .open .icon-folder {
+        transform: rotate(90deg);
+    }
+
+    .floating-button-container {
+        position: relative;
+    }
+
+    .floating-button {
+        display: inline-flex;
+        -webkit-box-align: center;
+        align-items: center;
+        -webkit-box-pack: center;
+        justify-content: center;
+        position: fixed; /* Cambiado a fixed para que flote sobre la página */
+        bottom: 20px; /* Ajusta la posición desde el fondo */
+        right: 20px; /* Ajusta la posición desde la derecha */
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+        cursor: pointer;
+        user-select: none;
+        vertical-align: middle;
+        appearance: none;
+        font-family: Heebo, Arial;
+        font-weight: 500;
+        font-size: 0.75rem;
+        line-height: 1.75;
+        text-transform: uppercase;
+        min-height: 36px;
+        min-width: 0px;
+        width: 56px;
+        height: 56px;
+        z-index: 1050;
+        box-shadow: rgba(0, 0, 0, 0.2) 0px 3px 5px -1px, rgba(0, 0, 0, 0.14) 0px 6px 10px 0px, rgba(0, 0, 0, 0.12) 0px 1px 18px 0px;
+        pointer-events: auto;
+        background-color: rgb(70, 135, 241);
+        color: rgb(255, 255, 255);
+        outline: 0px;
+        border-width: 0px;
+        border-style: initial;
+        border-color: initial;
+        border-image: initial;
+        margin: 0px;
+        text-decoration: none;
+        border-radius: 50%;
+        padding: 0px;
+    }
+
+    .floating-button:hover {
+        background-color: #1976D2;
+    }
+
+    .floating-button span {
+        font-weight: bold;
+        margin-top: -3px;
+    }
+
+    .floating-options {
+        display: none;
+        position: absolute;
+        bottom: 70px;
+        right: 0;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .floating-option {
+        display: block;
+        background-color: rgb(70, 135, 241);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 4px;
+        text-decoration: none;
+        text-align: center;
+    }
+
+    .floating-option:hover {
+        background-color: #1976D2;
+    }
+
+    select {
+        max-height: 200px; /* Ajusta la altura máxima del desplegable */
+        overflow-y: auto; /* Añade desplazamiento vertical */
+    }
+
+    select[multiple] {
+        height: auto; /* Ajusta la altura del campo de selección */
+    }
+
+    select option {
+        display: block; /* Asegura que las opciones se muestren en bloque */
+    }
+</style>
+
+<script>
+    function toggleChildren(id) {
+        const element = document.getElementById(id);
+        const toggleIcon = document.getElementById('toggle-icon-' + id);
+
+        if (element.style.display === "none" || element.style.display === "") {
+            element.style.display = "block";
+            toggleIcon.innerHTML = '<ion-icon name="remove-outline"></ion-icon>';
+        } else {
+            element.style.display = "none";
+            toggleIcon.innerHTML = '<ion-icon name="add-outline"></ion-icon>';
+        }
+    }
+
+    function toggleOptions() {
+        const options = document.getElementById('floating-options');
+        if (options.style.display === "none" || options.style.display === "") {
+            options.style.display = "flex";
+        } else {
+            options.style.display = "none";
+        }
+    }
+</script>
+{% endblock %}

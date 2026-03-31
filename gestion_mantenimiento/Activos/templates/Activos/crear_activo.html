@@ -1,0 +1,101 @@
+{% extends "solicitudes/indexpadre.html" %}
+
+{% block title %}Crear Activo{% endblock %}
+
+{% block content %}
+  <h2>Crear Nuevo Activo</h2>
+  <form id="form-activo" method="post" action="{% url 'crear_activo' %}">
+    {% csrf_token %}
+
+    <ul class="activo-list">
+      <!-- Subgrupo: Localización -->
+      <li class="activo-list-item">
+        <h3>Region</h3>
+        <div class="form-group">
+            <input type="text" id="id_regional_input" name="regional_input" placeholder=" ">
+            <label for="id_regional_input">Regional</label>
+        </div>
+      </li>
+
+      <!-- Subgrupo: Unidad de Negocio -->
+      <li class="activo-list-item">
+        <h3>Dependencia</h3>
+        <div class="form-group">
+            <input type="text" id="id_unidad_negocio_input" name="unidad_negocio_input" placeholder=" ">
+            <label for="id_unidad_negocio_input">Nombre</label>
+        </div>
+      </li>
+
+      <!-- Subgrupo: Ubicación -->
+      <li class="activo-list-item">
+        <h3>Localizacion</h3>
+        <div class="form-group">
+            <input type="text" id="id_ubicacion_input" name="ubicacion_input" placeholder=" ">
+            <label for="id_ubicacion_input">Ubicacion</label>
+        </div>
+    
+        <div class="form-group">
+            <input type="text" id="id_co_input" name="co_input" placeholder=" ">
+            <label for="id_co_input">CO</label>
+        </div>
+      </li>
+
+      <!-- Nueva entrada: Área -->
+      <li class="activo-list-item">
+        <h3>Área</h3>
+        <div class="form-group">
+            <input type="text" id="id_area_input" name="area_input" placeholder=" ">
+            <label for="id_area_input">Área</label>
+        </div>
+      </li>
+
+      <!-- Nueva entrada: Centro de Costos -->
+      <li class="activo-list-item">
+        <h3>Centro de Costos</h3>
+        <div class="form-group">
+            <input type="text" id="id_cc_input" name="cc_input" placeholder=" ">
+            <label for="id_cc_input">Centro de Costos</label>
+        </div>
+      </li>
+
+      <!-- Subgrupo: Equipos -->
+      <li class="activo-list-item">
+        <h3>Equipos</h3>
+        <div class="form-group">
+            <input type="text" id="id_nombre" name="nombre" placeholder=" ">
+            <label for="id_nombre">Equipo</label>
+        </div>
+
+        <div class="form-group">
+            <textarea id="id_descripcion" name="descripcion" placeholder=" "></textarea>
+            <label for="id_descripcion">Descripción</label>
+        </div>
+        
+        <div class="form-group">
+            <input type="text" id="id_numero_serie" name="numero_serie" placeholder=" ">
+            <label for="id_numero_serie">N° Activo</label>
+        </div>
+        
+        <div class="form-group">
+            <input type="date" id="id_fecha_adquisicion" name="fecha_adquisicion" placeholder=" ">
+            <label for="id_fecha_adquisicion">Fecha de Adquisición</label>
+        </div>
+        
+        <div class="form-group">
+            <select id="id_estado" name="estado">
+                <option value="operativo">Operativo</option>
+                <option value="mantenimiento">En Mantenimiento</option>
+                <option value="fuera_servicio">Fuera de Servicio</option>
+            </select>
+            <label for="id_estado">Estado</label>
+        </div>
+      </li>
+    </ul>
+
+    <!-- Contenedor de botones al final -->
+    <div class="form-buttons">
+      <button type="submit" class="btn btn-success">Crear Activo</button>
+      <a href="{% url 'lista_activos' %}" class="btn btn-danger">Cancelar</a>
+    </div>
+  </form>
+{% endblock %}

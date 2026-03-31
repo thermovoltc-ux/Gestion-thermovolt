@@ -1,0 +1,13 @@
+{% extends "solicitudes/indexpadre.html" %}
+
+{% block title %}Crear Ubicación{% endblock %}
+
+{% block content %}
+  <h2>Crear Nueva Ubicación</h2>
+  <form id="form-ubicacion" method="post" action="{% url 'crear_ubicacion' %}">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-success">Crear Ubicación</button>
+    <a href="{% url 'lista_activos' %}" class="btn btn-danger">Cancelar</a>
+  </form>
+{% endblock %}

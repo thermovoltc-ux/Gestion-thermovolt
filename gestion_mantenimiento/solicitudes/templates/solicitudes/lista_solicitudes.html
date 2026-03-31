@@ -1,0 +1,35 @@
+{% extends "solicitudes/indexpadre.html" %}
+
+{% block title %}Lista de Solicitudes{% endblock %}
+
+{% block content %}
+    <h1>Lista de Solicitudes</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>N°solicitud</th>
+                <th>CO</th>
+                <th>Ubicacion</th>
+                <th>Fecha de Creación</th>
+                <th>Solicitado por</th>
+                <th>Equipo</th>
+                <th>Prioridad</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for solicitud in solicitudes %}
+                <tr>
+                    <td>00{{ solicitud.consecutivo }}</td>
+                    <td>{{ solicitud.co }}</td>
+                    <td>{{ solicitud.PDV }}</td>
+                    <td>{{ solicitud.fecha_creacion }}</td>
+                    <td>{{ solicitud.solicitado_por }}</td>
+                    <td>{{ solicitud.equipo }}</td>
+                    <td>{{ solicitud.prioridad }}</td>
+                    <td>{{ solicitud.estado }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

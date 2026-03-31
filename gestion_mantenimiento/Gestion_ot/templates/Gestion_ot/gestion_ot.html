@@ -1,0 +1,246 @@
+{% extends "solicitudes/indexpadre.html" %}
+
+{% block title %}Gestión de OT's{% endblock %}
+
+{% block content %}
+<h1 class="ot-title">Gestión de OT's</h1>
+
+<div class="view-buttons-container">
+    <div class="view-buttons">
+        <button id="kanbanButton" class="view-button" title="Tablero">
+            <ion-icon name="grid-outline"></ion-icon>
+        </button>
+        <button id="calendarButton" class="view-button" title="Calendario">
+            <ion-icon name="calendar-outline"></ion-icon>
+        </button>
+        <button id="listButton" class="view-button" title="Lista">
+            <ion-icon name="list-outline"></ion-icon>
+        </button>
+    </div>
+    <!-- Botón de filtro (derecha) -->
+    <button class="filter-button" title="Filtrar" onclick="toggleFilterSidebar()" aria-expanded="false" aria-controls="filter-sidebar">
+        <ion-icon name="funnel-outline"></ion-icon>
+        <span class="filter-indicator" id="filterIndicator" style="display: none;"></span> <!-- Indicador del filtro aplicado -->
+    </button>
+</div>
+
+<!-- Barra lateral de filtros -->
+<div id="filter-sidebar" class="filter-sidebar">
+    <form id="filter-form" class="filter-form" action="{% url 'gestion_ot' %}" method="get">
+        <h2>Filtros</h2>
+        <div class="filter-form-group">
+            <label for="fecha_inicio">Fecha Inicio:</label>
+            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtro_fecha_inicio|date:'Y-m-d' }}">
+        </div>
+        <div class="filter-form-group">
+            <label for="fecha_fin">Fecha Fin:</label>
+            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtro_fecha_fin|date:'Y-m-d' }}">
+        </div>
+        <div class="filter-form-group">
+            <label for="pdv">PDV:</label>
+            <select id="pdv" name="pdv">
+                <option value="">Seleccione PDV</option>
+                {% for pdv in pdvs %}
+                <option value="{{ pdv }}" {% if pdv == filtro_pdv %}selected{% endif %}>{{ pdv }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit">Aplicar Filtros</button>
+    </form>
+</div>
+
+<!-- Añadimos un elemento con el atributo data-url que contiene la URL generada por Django -->
+<div id="django-url" data-url="{% url 'gestion_ot' %}"></div>
+
+<div class="kanban-container">
+    <div class="kanban-column" id="solicitudes" ondrop="drop(event)" ondragover="allowDrop(event)">
+        <h2>Solicitudes</h2>
+        <div class="kanban-content">
+            {% for solicitud in solicitudes %}
+                {% if solicitud.estado.nombre == 'solicitado' %}
+                    <div class="kanban-card" id="card-{{ solicitud.consecutivo }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, '{{ solicitud.consecutivo }}')"
+                    data-numero-activo="{{ solicitud.consecutivo }}"
+                    data-pdv="{{ solicitud.PDV }}"
+                    data-descripcion="{{ solicitud.descripcion_problema }}"
+                    data-fecha-creacion="{{ solicitud.fecha_creacion }}"
+                    data-estado="{{ solicitud.estado.nombre }}">
+                    <h3>Solicitud 00{{ solicitud.consecutivo }}</h3>
+                    <h4>Ubicacion: {{ solicitud.PDV }}</h4>
+                    <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
+                    <small>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="kanban-column" id="ot_en_proceso" ondrop="drop(event)" ondragover="allowDrop(event)">
+        <h2>OT en Proceso</h2>
+        <div class="kanban-content">
+            {% for solicitud in solicitudes %}
+                {% if solicitud.estado.nombre == 'en proceso' %}
+                    <div class="kanban-card" id="card-{{ solicitud.consecutivo }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, '{{ solicitud.consecutivo }}')"
+                    data-numero-activo="{{ solicitud.consecutivo }}"
+                    data-pdv="{{ solicitud.PDV }}"
+                    data-descripcion="{{ solicitud.descripcion_problema }}"
+                    data-fecha-creacion="{{ solicitud.fecha_creacion }}"
+                    data-estado="{{ solicitud.estado.nombre }}">
+                    <h3>Solicitud 00{{ solicitud.consecutivo }}</h3>
+                    <h4>Ubicacion: {{ solicitud.PDV }}</h4>
+                    <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
+                    <small>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="kanban-column" id="ot_en_revision" ondrop="drop(event)" ondragover="allowDrop(event)">
+        <h2>OT en Revisión</h2>
+        <div class="kanban-content">
+            {% for solicitud in solicitudes %}
+                {% if solicitud.estado.nombre == 'en revision' %}
+                    <div class="kanban-card" id="card-{{ solicitud.consecutivo }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, '{{ solicitud.consecutivo }}')"
+                         data-numero-activo="{{ solicitud.consecutivo }}"
+                         data-pdv="{{ solicitud.PDV }}"
+                         data-descripcion="{{ solicitud.descripcion_problema }}"
+                         data-fecha-creacion="{{ solicitud.fecha_creacion }}"
+                         data-estado="{{ solicitud.estado.nombre }}">
+                        <h3>Solicitud 00{{ solicitud.consecutivo }}</h3>
+                        <h4>Ubicacion: {{ solicitud.PDV }}</h4>
+                        <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
+                        <small>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="kanban-column" id="ot_finalizada" ondrop="drop(event)" ondragover="allowDrop(event)">
+        <h2>OT Finalizada</h2>
+        <div class="kanban-content">
+            {% for solicitud in solicitudes %}
+                {% if solicitud.estado.nombre == 'finalizada' %}
+                    <div class="kanban-card" id="card-{{ solicitud.consecutivo }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, '{{ solicitud.consecutivo }}')"
+                         data-numero-activo="{{ solicitud.consecutivo }}"
+                         data-pdv="{{ solicitud.PDV }}"
+                         data-descripcion="{{ solicitud.descripcion_problema }}"
+                         data-fecha-creacion="{{ solicitud.fecha_creacion }}"
+                         data-estado="{{ solicitud.estado.nombre }}">
+                        <h3>Solicitud 00{{ solicitud.consecutivo }}</h3>
+                        <h4>Ubicacion: {{ solicitud.PDV }}</h4>
+                        <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
+                        <small>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="calendar-container" style="display: none;">
+    <div id="calendar" data-events='[
+        {% for solicitud in solicitudes %}
+            {
+                "consecutivo": "{{ solicitud.consecutivo }}",
+                "fecha_creacion": "{{ solicitud.fecha_creacion | date:'Y-m-d' }}",
+                "estado": "{{ solicitud.estado.nombre }}"
+                
+            }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ]'></div>
+</div>
+
+<div class="list-container" style="display: none;" >
+    <table>
+        <thead>
+            <tr>
+                <th>Consecutivo</th>
+                <th>Creado por</th>
+                <th>Ubicacion</th>
+                <th>Descripción</th>
+                <th>Fecha de Creación</th>
+                <th>Estado</th>
+            
+            </tr>
+        </thead>
+        <tbody>
+            {% for solicitud in solicitudes %}
+            <tr class="ver-solicitud" data-consecutivo="{{ solicitud.consecutivo }}">
+                <td>{{ solicitud.consecutivo }}</td>
+                <td>{{ solicitud.creado_por }}</td>
+                <td>{{ solicitud.PDV }}</td>
+                <td>{{ solicitud.descripcion_problema|slice:":50" }}...</td>
+                <td>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                <td>{{ solicitud.estado.nombre }}</td>
+                
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal para ingresar nombre del técnico y fecha -->
+<div id="tecnicoModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">×</span>
+        <h2>Asignar Técnico</h2>
+        <form id="OrdenTrabajoForm" method="POST" action="{% url 'gestion_ot' %}">
+            {% csrf_token %}
+            <input type="hidden" id="consecutivo" name="consecutivo">
+            
+            <label for="fecha_actividad">Fecha de la Actividad:</label>
+            <input type="date" id="fecha_actividad" name="fecha_actividad" required>
+
+            <label for="tecnico_asignado">Nombre del Técnico:</label>
+            <select id="tecnico_asignado" name="tecnico_asignado" required>
+                {% for tecnico in tecnicos %}
+                <option value="{{ tecnico.username }}">{{ tecnico.username }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="estado">Estado:</label>
+            <input type="text" id="estado" name="estado" value="en proceso" required>
+    
+            <button type="submit" name="actualizar">Guardar</button>
+        </form>
+        <div id="modalError" style="color: red; display: none;">Error al actualizar la solicitud. Intente de nuevo.</div>
+    </div>
+</div>
+
+<!-- Modal para mostrar detalles de la solicitud -->
+<div id="solicitudModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeSolicitudModal()">×</span>
+      <h2>Detalles de la Solicitud</h2>
+      <div id="modalNumeroActivoContainer"><p><strong>Número de Solicitud:</strong> <span id="modalNumeroActivo"></span></p></div>
+      <div id="modalPDVContainer"><p><strong>Ubicacion:</strong> <span id="modalPDV"></span></p></div>
+      <div id="modalDescripcionContainer"><p><strong>Descripción:</strong> <span id="modalDescripcion"></span></p></div>
+      <div id="modalFechaCreacionContainer"><p><strong>Fecha de Creación:</strong> <span id="modalFechaCreacion"></span></p></div>
+      <div id="modalEstadoContainer"><p><strong>Estado:</strong> <span id="modalEstado"></span></p></div>
+
+      <div id="asignacionInfo" style="display:none;">
+          <h3>Asignación</h3>
+          <div id="modalTecnicoAsignadoContainer"><p><strong>Técnico Asignado:</strong> <span id="modalTecnicoAsignado"></span></p></div>
+          <div id="modalFechaActividadContainer"><p><strong>Fecha de Actividad:</strong> <span id="modalFechaActividad"></span></p></div>
+      </div>
+
+      <div id="cierreOTInfo" style="display:none;">
+          <h3>Detalles del Cierre de OT</h3>
+          <div id="modalTipoMantenimientoContainer"><p><strong>Tipo de Mantenimiento:</strong> <span id="modalTipoMantenimiento"></span></p></div>
+          <div id="modalMaterialesUtilizadosContainer"><p><strong>Materiales Utilizados:</strong> <span id="modalMaterialesUtilizados"></span></p></div>
+          <div id="modalCorreoTecnicoContainer"><p><strong>Correo Técnico:</strong> <span id="modalCorreoTecnico"></span></p></div>
+          <div id="modalDescripcionFallaContainer"><p><strong>Descripción de la Falla:</strong> <span id="modalDescripcionFalla"></span></p></div>
+          <div id="modalFechaInicioActividadContainer"><p><strong>Fecha de Inicio de Actividad:</strong> <span id="modalFechaInicioActividad"></span></p></div>
+          <div id="modalObservacionesContainer"><p><strong>Observaciones:</strong> <span id="modalObservaciones"></span></p></div>
+          <div id="modalNombreTecnicoContainer"><p><strong>Nombre del Técnico:</strong> <span id="modalNombreTecnico"></span></p></div>
+          <div id="modalCausaFallaContainer"><p><strong>Causa de la Falla:</strong> <span id="modalCausaFalla"></span></p></div>
+          <div id="modalHoraInicioContainer"><p><strong>Hora de Inicio:</strong> <span id="modalHoraInicio"></span></p></div>
+          <div id="modalDocumentoTecnicoContainer"><p><strong>Documento del Técnico:</strong> <span id="modalDocumentoTecnico"></span></p></div>
+          <div id="modalTipoIntervencionContainer"><p><strong>Tipo de Intervención:</strong> <span id="modalTipoIntervencion"></span></p></div>
+          <button id="finalizarOTBtn" style="display:none;">Finalizar OT</button>
+      </div>
+    </div>
+</div>
+
+{% endblock %}

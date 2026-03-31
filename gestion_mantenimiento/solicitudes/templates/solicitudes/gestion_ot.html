@@ -1,0 +1,277 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de OT's</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+   <!-- =============== Navigation ================ -->
+   <div class="container">
+    <div class="navigation">
+        <ul>
+            <li>
+                <a href="#">
+                    <span class="icon">
+                        <ion-icon name="ice-cream-outline"></ion-icon>
+                    </span>
+                    <span class="title">mimo's</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="#">
+                    <span class="icon">
+                        <ion-icon name="home-outline"></ion-icon>
+                    </span>
+                    <span class="title">Dashboard</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="{% url 'crear_solicitud' %}">
+                    <span class="icon">
+                        <ion-icon name="create-outline"></ion-icon>
+                    </span>
+                    <span class="title">Solicitud de Ot</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="{% url 'gestion_ot' %}">
+                    <span class="icon">
+                        <ion-icon name="document-text-outline"></ion-icon>
+                    </span>
+                    <span class="title">Gestion de Ot</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="#">
+                    <span class="icon">
+                        <ion-icon name="layers-outline"></ion-icon>
+                    </span>
+                    <span class="title">Activos</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="#">
+                    <span class="icon">
+                        <ion-icon name="people-outline"></ion-icon>
+                    </span>
+                    <span class="title">Recurso humano</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="{% url 'listar_ot' %}">
+                    <span class="icon">
+                        <ion-icon name="lock-closed-outline"></ion-icon>
+                    </span>
+                    <span class="title">Actividades</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="#">
+                    <span class="icon">
+                        <ion-icon name="log-out-outline"></ion-icon>
+                    </span>
+                    <span class="title">Sign Out</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+    
+ <!-- ========================= Main ==================== -->
+<div class="main">
+    <div class="topbar">
+        <div class="toggle">
+            <ion-icon name="menu-outline"></ion-icon>
+        </div>
+
+        <div class="search">
+            <label>
+                <input type="text" placeholder="Search here">
+                <ion-icon name="search-outline"></ion-icon>
+            </label>
+        </div>
+
+        <div class="user">
+            <img src="#" alt="">
+        </div>
+    </div>
+
+    <div class="view-buttons">
+        <button onclick="showKanban()">Tablero</button>
+        <button onclick="showCalendar()">Calendario</button>
+        <button onclick="showList()">Lista</button>
+        <input type="date" id="filter-date-start">
+        <input type="date" id="filter-date-end">
+        <button onclick="applyDateFilter()">Aplicar Filtro</button>
+    </div>
+    
+    <h1>Gestión de Órdenes de Trabajo</h1>
+{% comment %} <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Crear Solicitud</button>
+</form> {% endcomment %}
+
+<div class="kanban-container">
+    <div class="kanban-column" id="solicitudes" ondrop="drop(event)" ondragover="allowDrop(event)">
+        <h2>Solicitudes</h2>
+        {% for solicitud in solicitudes %}
+            <div class="kanban-card" id="card-{{ solicitud.numero_activo }}" draggable="true" ondragstart="drag(event)">
+                <h3>Solicitud 00{{ solicitud.numero_activo }}</h3>
+                <h4>PDV: {{ solicitud.PDV }}</h4>
+                <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
+                <small>{{ solicitud.fecha_creacion }}</small>
+            </div>
+        {% endfor %}
+    </div>
+    <div class="kanban-column" id="ot_en_proceso" ondrop="drop(event)" ondragover="allowDrop(event)">
+        <h2>OT en Proceso</h2>
+        {% for solicitud in solicitudes %}
+        <div class="kanban-card" id="card-{{ solicitud.numero_activo }}" draggable="true" ondragstart="drag(event)">
+            <h3>Solicitud 00{{ solicitud.numero_activo }}</h3>
+            <h4>PDV: {{ solicitud.PDV }}</h4>
+            <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
+            <small>{{ solicitud.fecha_creacion }}</small>
+        </div>
+    {% endfor %}
+    </div>
+    
+    <div class="kanban-column" id="ot_en_revision" ondrop="drop(event)" ondragover="allowDrop(event)">
+        <h2>OT en Revisión</h2>
+    </div>
+    <div class="kanban-column" id="ot_finalizada" ondrop="drop(event)" ondragover="allowDrop(event)">
+        <h2>OT Finalizada</h2>
+    </div>
+</div>
+<!-- Modal para ingresar nombre del técnico y fecha -->
+<div id="tecnicoModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h2>Asignar Técnico</h2>
+        <form id="OrdenTrabajoForm" method="POST" action="{% url 'gestion_ot' %}">
+            {% csrf_token %}
+            <input type="hidden" id="numero_activo" name="numero_activo">
+            
+            <label for="fecha_actividad">Fecha de la Actividad:</label>
+            <input type="date" id="fecha_actividad" name="fecha_actividad" required>
+
+            <label for="tecnico_asignado">Nombre del Técnico:</label>
+            <input type="text" id="tecnico_asignado" name="tecnico_asignado" required>
+
+            <label for="estado">Estado:</label>
+            <input type="text" id="estado" name="estado" value="OT en Proceso" required>
+    
+            <button type="submit" name="actualizar">Guardar</button>
+        </form>
+        <div id="modalError" style="color: red; display: none;">Error al actualizar la solicitud. Intente de nuevo.</div>
+    </div>
+</div>
+
+
+<script>
+    function allowDrop(event) {
+        event.preventDefault();
+    }
+
+    function drag(event) {
+        event.dataTransfer.setData("text", event.target.id);
+    }
+
+    function drop(event) {
+        event.preventDefault();
+        var data = event.dataTransfer.getData("text");
+        var card = document.getElementById(data);
+        var columnId = event.target.id;
+
+        if (event.target.classList.contains('kanban-column')) {
+            if (columnId === "ot_en_proceso") {
+                document.getElementById("solicitudNumero").value = card.id.split('-')[1];
+                document.getElementById("tecnicoModal").style.display = "block";
+            } else {
+                event.target.appendChild(card);
+                updateSolicitudState(card, columnId);
+            }
+        }
+    }
+
+    function closeModal() {
+        document.getElementById("tecnicoModal").style.display = "none";
+    }
+
+    document.getElementById("tecnicoForm").addEventListener("submit", function(event) {
+        event.preventDefault();  // Prevenir el comportamiento predeterminado
+    
+        const numeroSolicitud = document.getElementById("numero_solicitud").value;
+        const fechaActividad = document.getElementById("fecha_actividad").value;
+        const nombreTecnico = document.getElementById("tecnico_asignado").value;
+        const estado = document.getElementById("estado").value;
+    
+        fetch('/gestion_ot/', {  // Cambia a '/gestion_ot/' ya que la lógica está aquí
+            method: 'PUT',  // Usa PUT para la actualización
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'  // Asegúrate de que el CSRF token esté correcto
+            },
+            body: JSON.stringify({
+                numero: numeroSolicitud,
+                estado: estado,
+                tecnico: nombreTecnico,
+                fecha: fechaActividad
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error en la actualización');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Actualización exitosa:', data);
+            // Mueve la tarjeta y cierra el modal
+            var targetColumn = document.getElementById("ot_en_proceso");
+            var card = document.getElementById("card-" + numeroSolicitud);
+            targetColumn.appendChild(card);
+            closeModal();  // Cierra el modal
+        })
+        .catch((error) => {
+            document.getElementById("modalError").style.display = "block";  // Mostrar error en el modal
+            console.error('Error:', error);
+        });
+    });
+    
+
+    function applyDateFilter() {
+        // Lógica para filtrar las solicitudes por fecha
+    }
+
+    // Mostrar y ocultar columnas del Kanban
+    function showKanban() {
+        document.querySelector(".kanban-container").style.display = "block";
+        // Otras funciones para ocultar otras vistas
+    }
+
+    function showCalendar() {
+        // Lógica para mostrar la vista de calendario
+    }
+
+    function showList() {
+        // Lógica para mostrar la lista general
+    }
+</script>
+
+    
+    <script src="{% static 'js/main.js' %}"></script>
+    <!-- ====== ionicons ======= -->
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+</body>
+</html>

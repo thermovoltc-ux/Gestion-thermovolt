@@ -1,0 +1,45 @@
+{# filepath: Activos/templates/Activos/ubicacion_node.html #}
+<div class="tree-item">
+    <div class="tree-node">
+        <span class="toggle-icon" id="toggle-icon-ubicacion-{{ ubicacion.id }}" {% if ubicacion.children.exists or ubicacion.equipos.exists %}onclick="toggleChildren('ubicacion-{{ ubicacion.id }}')" {% endif %}>
+            {% if ubicacion.children.exists or ubicacion.equipos.exists %}
+                <ion-icon name="add-outline"></ion-icon>
+            {% else %}
+                <ion-icon name="remove-outline" style="visibility: hidden;"></ion-icon>
+            {% endif %}
+        </span>
+        <span class="icon-folder">
+            <ion-icon name="location-outline"></ion-icon>
+        </span>
+        {{ ubicacion.nombre }}
+    </div>
+
+    {% if ubicacion.children.exists or ubicacion.equipos.exists %}
+        <ul id="ubicacion-{{ ubicacion.id }}" class="tree-children">
+            {% for child in ubicacion.children.all %}
+                {% include 'Activos/ubicacion_node.html' with ubicacion=child %}
+            {% endfor %}
+            {% for equipo in ubicacion.equipos.all %}
+                <li class="tree-sub-item">
+                    <div class="tree-node">
+                        <span class="toggle-icon" id="toggle-icon-equipo-{{ equipo.id }}" {% if equipo.children.exists %}onclick="toggleChildren('equipo-{{ equipo.id }}')" {% endif %}>
+                            {% if equipo.children.exists %}
+                                <ion-icon name="add-outline"></ion-icon>
+                            {% else %}
+                                <ion-icon name="remove-outline" style="visibility: hidden;"></ion-icon>
+                            {% endif %}
+                        </span>
+                        <span class="icon-leaf">
+                            <ion-icon name="cube-outline"></ion-icon> {{ equipo.nombre }}
+                        </span>
+                    </div>
+                    {% if equipo.children.exists %}
+                        <ul id="equipo-{{ equipo.id }}" class="tree-children">
+                            {% include 'Activos/equipo_node.html' with equipo=equipo %}
+                        </ul>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</div>

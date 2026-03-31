@@ -1,0 +1,22 @@
+{# filepath: Activos/templates/Activos/equipo_node.html #}
+{% for child_equipo in equipo.children.all %}
+    <li class="tree-sub-item">
+        <div class="tree-node">
+            <span class="toggle-icon" id="toggle-icon-equipo-{{ child_equipo.id }}" {% if child_equipo.children.exists %}onclick="toggleChildren('equipo-{{ child_equipo.id }}')" {% endif %}>
+                {% if child_equipo.children.exists %}
+                    <ion-icon name="add-outline"></ion-icon>
+                {% else %}
+                    <ion-icon name="remove-outline" style="visibility: hidden;"></ion-icon>
+                {% endif %}
+            </span>
+            <span class="icon-leaf">
+                <ion-icon name="cube-outline"></ion-icon> {{ child_equipo.nombre }}
+            </span>
+        </div>
+        {% if child_equipo.children.exists %}
+            <ul id="equipo-{{ child_equipo.id }}" class="tree-children">
+                {% include 'Activos/equipo_node.html' with equipo=child_equipo %}
+            </ul>
+        {% endif %}
+    </li>
+{% endfor %}

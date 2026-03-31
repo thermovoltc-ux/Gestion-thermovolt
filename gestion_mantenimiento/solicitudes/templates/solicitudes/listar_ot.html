@@ -1,0 +1,136 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Órdenes de Trabajo</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+     <!-- =============== Navigation ================ -->
+   <div class="container">
+    <div class="navigation">
+        <ul>
+            <li>
+                <a href="#">
+                    <span class="icon">
+                        <ion-icon name="ice-cream-outline"></ion-icon>
+                    </span>
+                    <span class="title">mimo's</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="#">
+                    <span class="icon">
+                        <ion-icon name="home-outline"></ion-icon>
+                    </span>
+                    <span class="title">Dashboard</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="{% url 'crear_solicitud' %}">
+                    <span class="icon">
+                        <ion-icon name="create-outline"></ion-icon>
+                    </span>
+                    <span class="title">Solicitud de Ot</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="{% url 'gestion_ot' %}">
+                    <span class="icon">
+                        <ion-icon name="document-text-outline"></ion-icon>
+                    </span>
+                    <span class="title">Gestion de Ot</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="#">
+                    <span class="icon">
+                        <ion-icon name="layers-outline"></ion-icon>
+                    </span>
+                    <span class="title">Activos</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="#">
+                    <span class="icon">
+                        <ion-icon name="people-outline"></ion-icon>
+                    </span>
+                    <span class="title">Recurso humano</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="{% url 'listar_ot' %}">
+                    <span class="icon">
+                        <ion-icon name="lock-closed-outline"></ion-icon>
+                    </span>
+                    <span class="title">Actividades</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="#">
+                    <span class="icon">
+                        <ion-icon name="log-out-outline"></ion-icon>
+                    </span>
+                    <span class="title">Sign Out</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+    
+ <!-- ========================= Main ==================== -->
+<div class="main">
+    <div class="topbar">
+        <div class="toggle">
+            <ion-icon name="menu-outline"></ion-icon>
+        </div>
+
+        <div class="search">
+            <label>
+                <input type="text" placeholder="Search here">
+                <ion-icon name="search-outline"></ion-icon>
+            </label>
+        </div>
+
+        <div class="user">
+            <img src="#" alt="">
+        </div>
+    </div>
+
+    
+    <h1>Órdenes de Trabajo Asignadas</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Número de Solicitud</th>
+                <th>Técnico Asignado</th>
+                <th>Fecha de Actividad</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ot in ots %}
+            <tr>
+                <td>{{ ot.numero_solicitud }}</td>
+                <td>{{ ot.tecnico_asignado }}</td>
+                <td>{{ ot.fecha_actividad }}</td>
+                <td>{{ ot.estado }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <script src="{% static 'js/main.js' %}"></script>
+    <!-- ====== ionicons ======= -->
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+</body>
+</html>

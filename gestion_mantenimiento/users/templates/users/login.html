@@ -1,0 +1,67 @@
+<!-- filepath: /c:/Users/Juan Esteban/OneDrive - Divina Providencia/Documents/gestion_mantenimiento/users/templates/users/login.html -->
+{% load static %}
+{% load socialaccount %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio de Sesión</title>
+    <link rel="stylesheet" href="{% static 'css/login.css' %}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-form">
+            <h2>Inicio de Sesión</h2>
+            <form method="post" action="{% url 'custom_login' %}">
+                {% csrf_token %}
+                {{ form.non_field_errors }}
+                <div class="form-group">
+                    {{ form.tipo_cuenta.label_tag }}
+                    {{ form.tipo_cuenta }}
+                    {{ form.tipo_cuenta.errors }}
+                </div>
+                <div class="form-group" id="div_id_co" style="display: none;">
+                    {{ form.co.label_tag }}
+                    {{ form.co }}
+                    {{ form.co.errors }}
+                </div>
+                <div class="form-group">
+                    {{ form.username.label_tag }}
+                    {{ form.username }}
+                    {{ form.username.errors }}
+                </div>
+                <div class="form-group">
+                    {{ form.password.label_tag }}
+                    {{ form.password }}
+                    {{ form.password.errors }}
+                </div>
+                <button type="submit" class="btn">Iniciar Sesión</button>
+            </form>
+            <div class="social-login">
+                <p>O inicia sesión con:</p>
+                
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var tipoCuentaField = document.getElementById('id_tipo_cuenta');
+            var coFieldDiv = document.getElementById('div_id_co');
+
+            tipoCuentaField.addEventListener('change', function() {
+                if (tipoCuentaField.value == 'administrador') {
+                    coFieldDiv.style.display = 'block';
+                } else {
+                    coFieldDiv.style.display = 'none';
+                }
+            });
+
+            // Trigger change event on page load to set the initial state
+            tipoCuentaField.dispatchEvent(new Event('change'));
+        });
+    </script>
+</body>
+</html>

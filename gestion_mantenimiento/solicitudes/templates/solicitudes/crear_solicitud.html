@@ -1,0 +1,106 @@
+{% extends "solicitudes/indexpadre.html" %}
+
+{% block title %}Solicitudes{% endblock %}
+
+{% block content %}
+    <form id="solicitud-form" method="POST">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="form-errors">
+            <ul>
+            {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if form.errors %}
+        <div class="form-errors">
+            <ul>
+            {% for field, errors in form.errors.items %}
+                {% for error in errors %}
+                    <li>{{ field }}: {{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <div class="form-group">
+        <input type="text" id="codigo" name="codigo" placeholder="">
+        <label for="codigo">Código del Equipo</label>
+    </div>
+    <div class="form-group">
+        <input type="text" id="creado-por" name="creado_por" placeholder=" ">
+        <label for="creado-por">Creado por</label>
+    </div>
+    <div class="form-group">
+        <input type="text" id="nombre_ubicacion" name="nombre_ubicacion" placeholder="" readonly>
+        <label for="nombre_ubicacion">Nombre de la Ubicación</label>
+    </div>
+    <div class="form-group">
+        <select id="nombre_ubicacion_area" name="nombre_ubicacion_area">
+            <option value="">Seleccione una ubicación</option>
+        </select>
+        <label for="nombre_ubicacion_area">Ubicación (Opcional)</label>
+    </div>
+    <div class="form-group">
+        <input type="text" id="centro_costo" name="centro_costo" placeholder="" readonly>
+        <label for="centro_costo">Centro de Costos (Opcional)</label>
+    </div>
+    <div class="form-group">
+        <input type="text" id="nombre_equipo" placeholder="" readonly>
+        <label for="nombre_equipo">Nombre del Equipo</label>
+    </div>
+    <input type="hidden" name="equipo" id="equipo">
+    <div class="form-group">
+        <input type="text" id="numero_serie" name="numero_serie" placeholder="" readonly>
+        <label for="numero_serie">N° de activo</label>
+    </div>
+    <div class="form-group">
+        <textarea id="descripcion_problema" name="descripcion_problema" rows="2" placeholder=" "></textarea>
+        <label for="descripcion_problema">Descripción solicitud</label>
+    </div>
+    <div class="form-group" style="display:none;">
+        <input type="datetime-local" id="fecha-creacion" name="fecha_creacion" placeholder=" ">
+        <label for="fecha-creacion">Fecha de creación</label>
+    </div>
+    <div class="form-group">
+        <textarea id="observaciones" name="observaciones" rows="2" placeholder=" "></textarea>
+        <label for="observaciones">Observaciones</label>
+    </div>
+    <div class="form-group">
+        <select id="prioridad" name="prioridad">
+            <option value="baja">Baja</option>
+            <option value="media">Media</option>
+            <option value="alta">Alta</option>
+        </select>
+        <label for="prioridad">Prioridad</label>
+    </div>
+    <div class="form-group">
+        <input type="text" id="solicitado_por" name="solicitado_por" placeholder="">
+        <label for="solicitado_por">Solicitado por</label>
+    </div>
+    <div class="form-group">
+        <input type="email" id="email-solicitante" name="email_solicitante" placeholder="">
+        <label for="email-solicitante">Email del solicitante</label>
+    </div>
+    <div class="form-group">
+        <label for="enviar_email">¿Enviar correo de notificación?</label>
+        <input type="checkbox" id="enviar_email" name="enviar_email" value="1">
+    </div>
+
+    <!-- Campos ocultos para PDV y co -->
+    <input type="hidden" id="PDV" name="PDV">
+    <input type="hidden" id="co" name="co">
+
+    <button type="submit">Enviar</button>
+    </form>
+
+    <div id="myModal" class="modal">
+        <!-- Contenido del modal -->
+    </div>
+
+{% endblock %}

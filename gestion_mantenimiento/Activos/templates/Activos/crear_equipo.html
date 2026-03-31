@@ -1,0 +1,20 @@
+{% extends "solicitudes/indexpadre.html" %}
+
+{% block title %}
+Crear Equipo
+{% endblock %}
+
+{% block content %}
+<div class="container-crear_equipo">
+    <h1>Crear Equipo</h1>
+    <form id="form-equipo" method="post" action="{% url 'crear_equipo' %}">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <a href="{% url 'lista_activos' %}" class="btn btn-danger">Cancelar</a>
+    </form>
+</div>
+
+
+{% endblock %}
+

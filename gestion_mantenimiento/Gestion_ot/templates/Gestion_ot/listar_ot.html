@@ -1,0 +1,57 @@
+{% extends "solicitudes/indexpadre.html" %}
+
+{% block title %}Órdenes de Trabajo{% endblock %}
+
+{% block content %}
+<h1>Órdenes de Trabajo Asignadas</h1>
+
+<!-- Botones para alternar entre vistas -->
+<div>
+    <button id="table-view-button">Vista de Tabla</button>
+    <button id="calendar-view-button">Vista de Calendario</button>
+</div>
+
+<!-- Contenedor para la vista de tabla -->
+<div id="table-view">
+    <table>
+        <thead>
+            <tr>
+                <th>Número de OT</th>
+                <th>Técnico Asignado</th>
+                <th>Fecha de Actividad</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ot in ots %}
+            <tr>
+                <td>OT-00{{ ot.solicitud.consecutivo }}</td>
+                <td>{{ ot.tecnico_asignado }}</td>
+                <td>{{ ot.fecha_actividad }}</td>
+                <td>{{ ot.estado }}</td>
+                <td>
+                    <a href="{% url 'cierre_ot' ot.id %}">Gestionar</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Contenedor para la vista de calendario -->
+<div class="calendar-container" style="display: none;">
+    <div id="calendar-view" data-events='[
+        {% for ot in ots %}
+            {
+                "consecutivo": "OT-{{ ot.solicitud.consecutivo }}",
+                "fecha_actividad": "{{ ot.fecha_actividad | date:'Y-m-d' }}",
+                "tecnico_asignado": "{{ ot.tecnico_asignado }}",
+                "url": "{% url 'cierre_ot' ot.id %}"
+            }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ]'></div>
+</div>
+
+
+{% endblock %}
