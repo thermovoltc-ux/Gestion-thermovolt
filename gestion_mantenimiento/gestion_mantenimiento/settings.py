@@ -29,7 +29,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-h)pgul*0ogs%v!mo10*_=
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['web-production-990bf.up.railway.app']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'web-production-990bf.up.railway.app']
 
 CSRF_TRUSTED_ORIGINS = ['https://web-production-990bf.up.railway.app']
 
@@ -101,7 +101,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'gestion_mantenimiento.wsgi.application'
+WSGI_APPLICATION = 'gestion_mantenimiento.gestion_mantenimiento.wsgi.application'
 
 
 # Database
@@ -233,3 +233,5 @@ LOGGING = {
         },
     },
 }
+
+
