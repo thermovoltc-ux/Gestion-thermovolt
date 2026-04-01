@@ -5,5 +5,13 @@ django-crispy-forms==2.1
 django-mptt==0.16.0
 django-allauth==0.63.3
 psycopg2-binary==2.9.9
+requests==2.31.0
+oauthlib==3.2.2
+PyJWT==2.8.0
+cryptography==42.0.5
+python3-openid==3.2.0
+whitenoise==6.6.0
+reportlab==4.0.7
+python-dateutil==2.8.2
 # Agrega otras dependencias según tu proyecto
 # Instala con: pip install -r requirements.txt
