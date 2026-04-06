@@ -1,17 +1,33 @@
 {# filepath: Activos/templates/Activos/ubicacion_node.html #}
 <div class="tree-item">
-    <div class="tree-node">
-        <span class="toggle-icon" id="toggle-icon-ubicacion-{{ ubicacion.id }}" {% if ubicacion.children.exists or ubicacion.equipos.exists %}onclick="toggleChildren('ubicacion-{{ ubicacion.id }}')" {% endif %}>
+    <div class="tree-node" onclick="seleccionarNodo(event, 'ubicacion', {{ ubicacion.id }}, '{{ ubicacion.nombre }}', '{{ ubicacion.codigo }}', '{{ ubicacion.descripcion }}', '{% if ubicacion.imagen %}{{ ubicacion.imagen.url|escapejs }}{% endif %}')">
+        <span class="toggle-icon" id="toggle-icon-ubicacion-{{ ubicacion.id }}" {% if ubicacion.children.exists or ubicacion.equipos.exists %}onclick="toggleChildren('ubicacion-{{ ubicacion.id }}'); event.stopPropagation();" {% endif %}>
             {% if ubicacion.children.exists or ubicacion.equipos.exists %}
                 <ion-icon name="add-outline"></ion-icon>
             {% else %}
                 <ion-icon name="remove-outline" style="visibility: hidden;"></ion-icon>
             {% endif %}
         </span>
-        <span class="icon-folder">
-            <ion-icon name="location-outline"></ion-icon>
-        </span>
-        {{ ubicacion.nombre }}
+        <div class="tree-node-content">
+            <span class="icon-folder">
+                <ion-icon name="location-outline"></ion-icon>
+            </span>
+            <span>{{ ubicacion.nombre }}</span>
+            {% if ubicacion.codigo %}
+                <span style="font-size: 0.85em; color: #999;">({{ ubicacion.codigo }})</span>
+            {% endif %}
+        </div>
+        <div class="tree-node-actions">
+            <button class="tree-node-action-btn" onclick="abrirModalCrearHijo({{ ubicacion.id }}, 'ubicacion', '{{ ubicacion.nombre }}'); event.stopPropagation();" title="Agregar equipo">
+                <ion-icon name="add-circle-outline"></ion-icon>
+            </button>
+            <button class="tree-node-action-btn" onclick="abrirModalCrearSubUbicacion({{ ubicacion.id }}, '{{ ubicacion.nombre }}'); event.stopPropagation();" title="Agregar sub-ubicación">
+                <ion-icon name="add-outline"></ion-icon>
+            </button>
+            <button class="tree-node-action-btn" onclick="abrirModalCrearPlan({{ ubicacion.id }}, '{{ ubicacion.nombre }}'); event.stopPropagation();" title="Plan mantenimiento">
+                <ion-icon name="calendar-outline"></ion-icon>
+            </button>
+        </div>
     </div>
 
     {% if ubicacion.children.exists or ubicacion.equipos.exists %}
@@ -21,17 +37,31 @@
             {% endfor %}
             {% for equipo in ubicacion.equipos.all %}
                 <li class="tree-sub-item">
-                    <div class="tree-node">
-                        <span class="toggle-icon" id="toggle-icon-equipo-{{ equipo.id }}" {% if equipo.children.exists %}onclick="toggleChildren('equipo-{{ equipo.id }}')" {% endif %}>
+                    <div class="tree-node" onclick="seleccionarNodo(event, 'equipo', {{ equipo.id }}, '{{ equipo.nombre }}', '{{ equipo.codigo }}', '{{ equipo.descripcion }}', {{ ubicacion.id }}, '{% if equipo.imagen %}{{ equipo.imagen.url|escapejs }}{% endif %}', null)">
+                        <span class="toggle-icon" id="toggle-icon-equipo-{{ equipo.id }}" {% if equipo.children.exists %}onclick="toggleChildren('equipo-{{ equipo.id }}'); event.stopPropagation();" {% endif %}>
                             {% if equipo.children.exists %}
                                 <ion-icon name="add-outline"></ion-icon>
                             {% else %}
                                 <ion-icon name="remove-outline" style="visibility: hidden;"></ion-icon>
                             {% endif %}
                         </span>
-                        <span class="icon-leaf">
-                            <ion-icon name="cube-outline"></ion-icon> {{ equipo.nombre }}
-                        </span>
+                        <div class="tree-node-content">
+                            <span class="icon-leaf">
+                                <ion-icon name="cube-outline"></ion-icon>
+                            </span>
+                            <span>{{ equipo.nombre }}</span>
+                            {% if equipo.codigo %}
+                                <span style="font-size: 0.85em; color: #999;">({{ equipo.codigo }})</span>
+                            {% endif %}
+                        </div>
+                        <div class="tree-node-actions">
+                            <button class="tree-node-action-btn" onclick="abrirModalCrearHijo({{ equipo.id }}, 'equipo', '{{ equipo.nombre }}'); event.stopPropagation();" title="Agregar subequipo">
+                                <ion-icon name="add-circle-outline"></ion-icon>
+                            </button>
+                            <button class="tree-node-action-btn" onclick="abrirModalCrearPlan({{ equipo.id }}, '{{ equipo.nombre }}'); event.stopPropagation();" title="Plan mantenimiento">
+                                <ion-icon name="calendar-outline"></ion-icon>
+                            </button>
+                        </div>
                     </div>
                     {% if equipo.children.exists %}
                         <ul id="equipo-{{ equipo.id }}" class="tree-children">

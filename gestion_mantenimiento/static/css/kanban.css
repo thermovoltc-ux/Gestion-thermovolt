@@ -197,3 +197,46 @@
     font-size: 0.6rem;
   }
 }
+
+/* Estilos para tarjetas de mantenimiento preventivo */
+.kanban-card-preventivo {
+  background: linear-gradient(135deg, #f0fdf4 0%, #f1fdf5 100%);
+  border-left: 5px solid #22c55e;
+  position: relative;
+}
+
+.kanban-card-preventivo:hover {
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.25);
+  background: linear-gradient(135deg, #f0fdf4 0%, #e5f9ec 100%);
+}
+
+.kanban-card-preventivo h3 {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.kanban-card-preventivo h4 {
+  color: #4b5563;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin: 0.3rem 0;
+}
+
+.card-badge-preventivo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: #22c55e;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.card-badge-preventivo ion-icon {
+  font-size: 0.9rem;
+}

@@ -8,25 +8,28 @@ from django.utils import timezone
 from datetime import timedelta
 import datetime
 from dateutil.parser import isoparse
-from .models import  OrdenTrabajo, Estado, CierreOt, ImagenCierreOt
-from .forms import GestionOtForm, OrdenTrabajoForm, CierreOtForm, ImagenCierreOtForm
+from django.contrib import messages
+import os
+from .models import  OrdenTrabajo, Estado, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento
+from .forms import GestionOtForm, OrdenTrabajoForm, CierreOtForm, ImagenCierreOtForm, ImagenAntesForm, ImagenDespuesForm
 from solicitudes.models import Solicitud
 import logging
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.core.serializers.json import DjangoJSONEncoder
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
-from reportlab.lib.units import inch
-from django.core.mail import send_mail
+from docx import Document
+from docx2pdf import convert
+from docx.shared import Inches, Pt
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from django.core.mail import EmailMessage
 from django.conf import settings
 from io import BytesIO
-import os
-from PIL import Image as PILImage
-import base64
+import tempfile
 from django.forms import modelformset_factory
+import os
+import base64
+from PIL import Image as PILImage
+import pythoncom
 
 class CustomDjangoJSONEncoder(DjangoJSONEncoder):
     def default(self, obj):
@@ -42,7 +45,10 @@ logger = logging.getLogger(__name__)
 def gestion_ot(request):
     ordenes_trabajo = OrdenTrabajo.objects.all()
     solicitudes_pendientes = Solicitud.objects.filter(gestionot__isnull=True)
-    tecnicos = User.objects.filter(groups__name='Tecnico')  # Filtra los usuarios que pertenecen al grupo 'Tecnico'
+    tareas_mantenimiento = TareaMantenimiento.objects.filter(
+        estado__in=['pendiente', 'en_progreso']
+    ).select_related('plan', 'actividad', 'tecnico').order_by('fecha_programada')
+    tecnicos = User.objects.filter(groups__name='Tecnico')
 
     # Filtros
     filtro_fecha_inicio = request.GET.get('fecha_inicio')
@@ -65,6 +71,7 @@ def gestion_ot(request):
         if isinstance(filtro_fecha_fin, str):
             filtro_fecha_fin = timezone.make_aware(datetime.datetime.strptime(filtro_fecha_fin, '%Y-%m-%d'), timezone.get_current_timezone())
         solicitudes_pendientes = solicitudes_pendientes.filter(fecha_creacion__range=[filtro_fecha_inicio, filtro_fecha_fin])
+        tareas_mantenimiento = tareas_mantenimiento.filter(fecha_programada__range=[filtro_fecha_inicio, filtro_fecha_fin])
     if filtro_pdv:
         solicitudes_pendientes = solicitudes_pendientes.filter(PDV=filtro_pdv)
 
@@ -73,6 +80,7 @@ def gestion_ot(request):
         'form': form,
         'ordenes_trabajo': ordenes_trabajo,
         'solicitudes': solicitudes_pendientes,
+        'tareas_mantenimiento': tareas_mantenimiento,
         'pdvs': pdvs,
         'filtro_fecha_inicio': filtro_fecha_inicio,
         'filtro_fecha_fin': filtro_fecha_fin,
@@ -105,33 +113,54 @@ def actualizar_estado_solicitud(request):
             logger.error("Número y estado son requeridos.")
             return JsonResponse({'status': 'error', 'message': 'Número y estado son requeridos.'}, status=400)
 
-        if not fecha:
+        # Fecha es requerida solo si el estado no es "finalizada"
+        if not fecha and nuevo_estado_nombre != "finalizada":
             logger.error("Fecha de actividad es requerida.")
             return JsonResponse({'status': 'error', 'message': 'Fecha de actividad es requerida.'}, status=400)
 
         solicitud = Solicitud.objects.get(consecutivo=numero_solicitud)
         logger.debug(f"Solicitud encontrada: {solicitud}")
 
-        nuevo_estado = Estado.objects.get(nombre=nuevo_estado_nombre)
+        nuevo_estado, _ = Estado.objects.get_or_create(nombre=nuevo_estado_nombre)
         solicitud.estado = nuevo_estado
-        if tecnico:
-            solicitud.tecnico_asignado = tecnico
-        # Asegurarse de que fecha sea aware datetime
-        fecha = isoparse(fecha)
-        if timezone.is_naive(fecha):
-            fecha = timezone.make_aware(fecha, timezone.get_current_timezone())
-        solicitud.fecha_actividad = fecha
+        
+        if fecha:
+            try:
+                try:
+                    fecha_dt = isoparse(fecha)
+                except ValueError:
+                    fecha_dt = datetime.datetime.strptime(fecha, '%d/%m/%Y')
+                if timezone.is_naive(fecha_dt):
+                    fecha_dt = timezone.make_aware(fecha_dt, timezone.get_current_timezone())
+                solicitud.fecha_actividad = fecha_dt
+            except ValueError as parse_error:
+                logger.error(f"No se pudo parsear la fecha: {fecha}")
+                return JsonResponse({'status': 'error', 'message': f'Fecha inválida: {fecha}'}, status=400)
+
         solicitud.save()
         logger.debug(f"Solicitud actualizada: {solicitud}")
 
         # Crear o actualizar la Orden de Trabajo
+        orden_trabajo_data = {
+            'tecnico_asignado': tecnico or '',
+            'estado': nuevo_estado
+        }
+        if fecha:
+            try:
+                try:
+                    fecha_dt = isoparse(fecha)
+                except ValueError:
+                    fecha_dt = datetime.datetime.strptime(fecha, '%d/%m/%Y')
+                if timezone.is_naive(fecha_dt):
+                    fecha_dt = timezone.make_aware(fecha_dt, timezone.get_current_timezone())
+                orden_trabajo_data['fecha_actividad'] = fecha_dt
+            except ValueError as parse_error:
+                logger.error(f"No se pudo parsear la fecha para orden de trabajo: {fecha}")
+                return JsonResponse({'status': 'error', 'message': f'Fecha inválida: {fecha}'}, status=400)
+
         orden_trabajo, created = OrdenTrabajo.objects.update_or_create(
             solicitud=solicitud,
-            defaults={
-                'tecnico_asignado': tecnico,
-                'fecha_actividad': fecha,
-                'estado': nuevo_estado
-            }
+            defaults=orden_trabajo_data
         )
         logger.debug(f"Orden de Trabajo {'creada' if created else 'actualizada'}: {orden_trabajo}")
 
@@ -146,45 +175,161 @@ def actualizar_estado_solicitud(request):
 
     return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
 
+# Vista para asignar un técnico a un preventivo y crear una solicitud/OT vinculada
+@csrf_exempt
+@require_POST
+@login_required
+def asignar_tarea_preventiva(request, tarea_id):
+    try:
+        data = json.loads(request.body)
+        tecnico = data.get('tecnico')
+        fecha = data.get('fecha')
+        estado = data.get('estado', 'en_progreso')
+
+        if not tecnico or not fecha:
+            return JsonResponse({'status': 'error', 'message': 'Técnico y fecha son requeridos.'}, status=400)
+
+        tarea = TareaMantenimiento.objects.select_related('plan__equipo', 'actividad').get(id=tarea_id)
+        equipo = tarea.plan.equipo
+        if not equipo:
+            return JsonResponse({'status': 'error', 'message': 'La tarea no tiene equipo asociado.'}, status=400)
+
+        descripcion = f"Preventivo: {tarea.plan.nombre}"
+        if tarea.actividad:
+            descripcion += f" - {tarea.actividad.nombre}"
+
+        ubicacion = equipo.ubicacion
+        estado_nombre = 'en proceso' if estado == 'en_progreso' else estado
+        estado_obj, _ = Estado.objects.get_or_create(nombre=estado_nombre)
+
+        solicitud = Solicitud.objects.create(
+            creado_por=request.user.username,
+            descripcion_problema=descripcion,
+            equipo=equipo,
+            fecha_creacion=timezone.now(),
+            estado=estado_obj,
+            PDV=ubicacion.nombre if ubicacion else equipo.nombre,
+            solicitado_por=request.user.username,
+            prioridad='media',
+            ubicacion=ubicacion
+        )
+
+        fecha_dt = datetime.datetime.strptime(fecha, '%Y-%m-%d')
+        fecha_dt = timezone.make_aware(fecha_dt, timezone.get_current_timezone())
+
+        OrdenTrabajo.objects.create(
+            solicitud=solicitud,
+            tecnico_asignado=tecnico,
+            fecha_actividad=fecha_dt,
+            estado=estado_obj
+        )
+
+        tarea.tecnico = User.objects.filter(username=tecnico).first()
+        tarea.estado = 'convertido'
+        tarea.observaciones = f"Convertido en solicitud {solicitud.consecutivo}"
+        tarea.save()
+
+        return JsonResponse({'status': 'ok', 'message': 'Preventivo convertido en solicitud correctamente.', 'consecutivo': solicitud.consecutivo})
+
+    except TareaMantenimiento.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Tarea no encontrada.'}, status=404)
+    except Exception as e:
+        logger.exception('Error al asignar preventivo.')
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
 # Vista para listar todas las órdenes de trabajo
 @login_required
 def listar_ot(request):
+    equipo_id = request.GET.get('equipo_id')
+    ubicacion_id = request.GET.get('ubicacion_id')
+
     if request.user.groups.filter(name='Admin').exists():
         ots = OrdenTrabajo.objects.all()
     else:
         ots = OrdenTrabajo.objects.filter(tecnico_asignado=request.user.username)
-    
+
+    filter_label = None
+
+    if equipo_id:
+        ots = ots.filter(solicitud__equipo_id=equipo_id)
+        filter_label = f'Historial de OT para Equipo ID {equipo_id}'
+    elif ubicacion_id:
+        from Activos.models import Ubicacion
+
+        def get_descendant_ids(ubicacion):
+            ids = [ubicacion.id]
+            for child in ubicacion.children.all():
+                ids.extend(get_descendant_ids(child))
+            return ids
+
+        ubicacion = Ubicacion.objects.filter(id=ubicacion_id).first()
+        if ubicacion:
+            ubicacion_ids = get_descendant_ids(ubicacion)
+            ots = ots.filter(solicitud__equipo__ubicacion_id__in=ubicacion_ids)
+            filter_label = f'Historial de OT para Ubicación {ubicacion.nombre} (ID {ubicacion.id})'
+        else:
+            filter_label = f'Historial de OT para Ubicación ID {ubicacion_id}'
+
     return render(request, 'Gestion_ot/listar_ot.html', {
         'ots': ots,
+        'filter_label': filter_label,
     })
 
 # Vista para cerrar una OT
 @login_required
 def cierre_ot(request, ot_id):
+    print(f"Vista cierre_ot llamada para ot_id: {ot_id}, método: {request.method}")
     ot = get_object_or_404(OrdenTrabajo, id=ot_id)
     cierre_ot, created = CierreOt.objects.get_or_create(orden_trabajo=ot)
-    ImagenFormSet = modelformset_factory(ImagenCierreOt, form=ImagenCierreOtForm, extra=4, can_delete=True)
-    
+    form_antes = ImagenAntesForm()
+    form_despues = ImagenDespuesForm()
+
     if request.method == 'POST':
+        print(f"POST data keys: {list(request.POST.keys())}")
+        print(f"FILES keys: {list(request.FILES.keys())}")
+
         form = CierreOtForm(request.POST, request.FILES, instance=cierre_ot)
-        formset = ImagenFormSet(request.POST, request.FILES, queryset=ImagenCierreOt.objects.filter(cierre_ot=cierre_ot))
-        print(f"Form valid: {form.is_valid()}")
-        print(f"Form errors: {form.errors}")
-        print(f"Formset valid: {formset.is_valid()}")
-        print(f"Formset errors: {formset.errors}")
-        if form.is_valid() and formset.is_valid():
-            cierre_ot = form.save()
-            # Guardar imágenes nuevas
-            for imagen_form in formset:
-                if imagen_form.cleaned_data and not imagen_form.cleaned_data.get('DELETE', False):
-                    imagen = imagen_form.save(commit=False)
-                    imagen.cierre_ot = cierre_ot
-                    imagen.save()
-            # Eliminar imágenes marcadas para borrar
-            for imagen_form in formset.deleted_forms:
-                if imagen_form.instance.pk:
-                    imagen_form.instance.delete()
-            # Cambiar estados
+        form_antes = ImagenAntesForm(request.POST, request.FILES)
+        form_despues = ImagenDespuesForm(request.POST, request.FILES)
+
+        print(f"Form is_valid: {form.is_valid()}")
+        if not form.is_valid():
+            print(f"Form errors: {form.errors}")
+            messages.error(request, f"Errores en el formulario: {form.errors}")
+            return render(request, 'Gestion_ot/cierre_ot.html', {'form': form, 'form_antes': form_antes, 'form_despues': form_despues, 'ot': ot})
+
+        # Guardar las firmas desde los textareas ocultos
+        firma_tecnico = request.POST.get('firma_digital', '')
+        firma_receptor = request.POST.get('firma_receptor', '')
+
+        print(f"Firma técnico recibida: {firma_tecnico[:100] if firma_tecnico else 'None'}")
+        print(f"Firma receptor recibida: {firma_receptor[:100] if firma_receptor else 'None'}")
+
+        cierre_ot.firma_digital = firma_tecnico
+        cierre_ot.firma_receptor = firma_receptor
+
+        # Guardar el formulario
+        cierre_ot = form.save()
+        print(f"Cierre OT guardado con ID: {cierre_ot.id}")
+
+        # Guardar imágenes antes
+        imagenes_antes_count = 0
+        for file in request.FILES.getlist('imagenes_antes'):
+            if file:
+                ImagenCierreOt.objects.create(cierre_ot=cierre_ot, imagen=file, tipo='antes')
+                imagenes_antes_count += 1
+        print(f"Imágenes antes guardadas: {imagenes_antes_count}")
+
+        # Guardar imágenes después
+        imagenes_despues_count = 0
+        for file in request.FILES.getlist('imagenes_despues'):
+            if file:
+                ImagenCierreOt.objects.create(cierre_ot=cierre_ot, imagen=file, tipo='despues')
+                imagenes_despues_count += 1
+        print(f"Imágenes después guardadas: {imagenes_despues_count}")
+
+        # Cambiar estados
+        try:
             estado_revision = Estado.objects.get(nombre="en revision")
             ot.estado = estado_revision
             ot.save()
@@ -193,17 +338,41 @@ def cierre_ot(request, ot_id):
             solicitud = ot.solicitud
             solicitud.estado = estado_revision
             solicitud.save()
-            # Generar y enviar PDF
-            try:
-                pdf_buffer = generar_pdf_informe(cierre_ot)
-                enviar_pdf_por_email(pdf_buffer, cierre_ot)
-            except Exception as e:
-                print(f"Error generando/enviando PDF: {e}")
+            print("Estados actualizados correctamente")
+        except Exception as e:
+            print(f"Error actualizando estados: {e}")
+            messages.error(request, f"Error actualizando estados: {e}")
+            return render(request, 'Gestion_ot/cierre_ot.html', {'form': form, 'form_antes': form_antes, 'form_despues': form_despues, 'ot': ot})
+
+        # Generar y enviar PDF
+        try:
+            result = generar_pdf_informe(cierre_ot, request)
+            firma_tec_agregada = False
+            firma_rec_agregada = False
+            if isinstance(result, tuple) and len(result) == 3:
+                pdf_buffer, firma_tec_agregada, firma_rec_agregada = result
+            else:
+                pdf_buffer = result
+            print(f"PDF generado correctamente, tamaño: {len(pdf_buffer.getvalue())} bytes")
+
+            print(f"Correo técnico: {cierre_ot.correo_tecnico}")
+            enviar_pdf_por_email(pdf_buffer, cierre_ot)
+            print("Email enviado correctamente")
+
+            # Construir mensaje
+            success_msg = f"OT cerrada exitosamente. PDF generado. Email enviado. Firma tec agregada: {firma_tec_agregada}, Firma rec agregada: {firma_rec_agregada}"
+            messages.success(request, success_msg)
             return redirect('listar_ot')
+        except Exception as e:
+            print(f"Error generando PDF o enviando email: {e}")
+            messages.error(request, f"Error procesando cierre: {e}")
+            return render(request, 'Gestion_ot/cierre_ot.html', {'form': form, 'form_antes': form_antes, 'form_despues': form_despues, 'ot': ot})
+
     else:
         form = CierreOtForm(instance=cierre_ot)
-        formset = ImagenFormSet(queryset=ImagenCierreOt.objects.filter(cierre_ot=cierre_ot))
-    return render(request, 'Gestion_ot/cierre_ot.html', {'form': form, 'formset': formset, 'ot': ot})
+        form_antes = ImagenAntesForm()
+        form_despues = ImagenDespuesForm()
+    return render(request, 'Gestion_ot/cierre_ot.html', {'form': form, 'form_antes': form_antes, 'form_despues': form_despues, 'ot': ot})
 
 
 # Detalles de la solicitud
@@ -229,7 +398,7 @@ def detalles_solicitud(request, consecutivo):
                 'causa_falla': cierre_ot.causa_falla,
                 'correo_tecnico': cierre_ot.correo_tecnico,
                 'descripcion_falla': cierre_ot.descripcion_falla,
-                'documento_tecnico': cierre_ot.documento_tecnico.url if cierre_ot.documento_tecnico else None,
+                'documento_tecnico': cierre_ot.documento_tecnico or None,
                 'fecha_inicio_actividad': cierre_ot.fecha_inicio_actividad,
                 'hora_fin': cierre_ot.hora_fin,
                 'hora_inicio': cierre_ot.hora_inicio,
@@ -250,7 +419,174 @@ def detalles_solicitud(request, consecutivo):
     return JsonResponse(data, encoder=CustomDjangoJSONEncoder)
 
 
-def generar_pdf_informe(cierre_ot):
+def generar_pdf_informe(cierre_ot, request=None):
+    """Genera un PDF usando plantilla Word si existe, sino usa ReportLab"""
+    template_path = os.path.join(settings.BASE_DIR, 'gestion_mantenimiento', 'static', 'plantilla_ot.docx')
+    
+    if os.path.exists(template_path):
+        firma_tec = request.POST.get('firma_digital') if request else None
+        firma_rec = request.POST.get('firma_receptor') if request else None
+        return generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec, firma_rec)
+    else:
+        return generar_pdf_reportlab(cierre_ot)
+
+def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_rec=None):
+    """Genera PDF desde plantilla Word"""
+    doc = Document(template_path)
+    
+    # Inicializar variables de firmas
+    firma_tec_agregada = False
+    firma_rec_agregada = False
+    
+    # Usar firma_tec si proporcionado, sino de cierre_ot
+    firma_tec = firma_tec or cierre_ot.firma_digital
+    firma_rec = firma_rec or cierre_ot.firma_receptor
+    
+    # Datos para reemplazar
+    ot = cierre_ot.orden_trabajo
+    solicitud = ot.solicitud
+    
+    imagenes_antes = cierre_ot.imagenes.filter(tipo='antes')
+    imagenes_despues = cierre_ot.imagenes.filter(tipo='despues')
+    
+    replacements = {
+        '<<OT>>': str(solicitud.consecutivo),
+        '<<equipo>>': cierre_ot.orden_trabajo.solicitud.equipo.nombre if cierre_ot.orden_trabajo.solicitud.equipo else '',
+        '<<cliente>>': solicitud.PDV,
+        '<<fecha>>': cierre_ot.fecha_inicio_actividad.strftime('%d/%m/%Y') if cierre_ot.fecha_inicio_actividad else '',
+        '<<tipomtto>>': cierre_ot.tipo_mantenimiento or '',
+        '<<tipointervencion>>': cierre_ot.tipo_intervencion or '',
+        '<<causafalla>>': cierre_ot.causa_falla or '',
+        '<<sesoluciono>>': 'Sí' if cierre_ot.se_soluciono else 'No',
+        '<<descripcion>>': cierre_ot.descripcion_falla or '',
+        '<<observacion>>': cierre_ot.observaciones or '',
+        '<<recibido>>': cierre_ot.nombre_receptor or '',
+        '<<nombret>>': cierre_ot.nombre_tecnico or '',
+        '<<cc>>': cierre_ot.documento_receptor or '',
+        '<<cct>>': cierre_ot.documento_tecnico or '',
+    }
+    
+    # Reemplazar en párrafos manteniendo formato
+    for paragraph in doc.paragraphs:
+        for run in paragraph.runs:
+            for key, value in replacements.items():
+                if key in run.text:
+                    run.text = run.text.replace(key, value)
+    
+    # Reemplazar en tablas manteniendo formato
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        for key, value in replacements.items():
+                            if key in run.text:
+                                run.text = run.text.replace(key, value)
+    
+    # Agregar firmas al final del documento (siempre, sin depender de tags)
+    table_firmas = doc.add_table(rows=1, cols=2)
+    
+    # Firma técnico
+    cell_tec = table_firmas.cell(0, 0)
+    cell_tec.text = 'Firma Técnico'
+    cell_tec.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    if firma_tec:
+        try:
+            header, encoded = firma_tec.split(",", 1)
+            image_data = base64.b64decode(encoded)
+            temp_firma_path = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+            temp_firma_path.write(image_data)
+            temp_firma_path.close()
+            p = cell_tec.add_paragraph()
+            p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            run = p.add_run()
+            run.add_picture(temp_firma_path.name, width=Inches(2))
+            os.unlink(temp_firma_path.name)
+            firma_tec_agregada = True
+        except Exception as e:
+            firma_tec_agregada = False
+    
+    # Firma receptor
+    cell_rec = table_firmas.cell(0, 1)
+    cell_rec.text = 'Firma Receptor'
+    cell_rec.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    if firma_rec:
+        try:
+            header, encoded = firma_rec.split(",", 1)
+            image_data = base64.b64decode(encoded)
+            temp_firma_path = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+            temp_firma_path.write(image_data)
+            temp_firma_path.close()
+            p = cell_rec.add_paragraph()
+            p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            run = p.add_run()
+            run.add_picture(temp_firma_path.name, width=Inches(2))
+            os.unlink(temp_firma_path.name)
+            firma_rec_agregada = True
+        except Exception as e:
+            firma_rec_agregada = False
+    
+    # Agregar imágenes al final del documento
+    if imagenes_antes.exists():
+        heading_antes = doc.add_heading('Antes', level=2)
+        heading_antes.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        num_images = imagenes_antes.count()
+        num_rows = (num_images + 1) // 2
+        table = doc.add_table(rows=num_rows, cols=2)
+        row_idx = 0
+        col_idx = 0
+        for img in imagenes_antes:
+            cell = table.cell(row_idx, col_idx)
+            run = cell.paragraphs[0].add_run()
+            run.add_picture(img.imagen.path, width=Inches(2))
+            cell.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            col_idx += 1
+            if col_idx == 2:
+                col_idx = 0
+                row_idx += 1
+    
+    if imagenes_despues.exists():
+        heading_despues = doc.add_heading('Después', level=2)
+        heading_despues.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        num_images = imagenes_despues.count()
+        num_rows = (num_images + 1) // 2
+        table = doc.add_table(rows=num_rows, cols=2)
+        row_idx = 0
+        col_idx = 0
+        for img in imagenes_despues:
+            cell = table.cell(row_idx, col_idx)
+            run = cell.paragraphs[0].add_run()
+            run.add_picture(img.imagen.path, width=Inches(2))
+            cell.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            col_idx += 1
+            if col_idx == 2:
+                col_idx = 0
+                row_idx += 1
+    
+    # Guardar documento temporal
+    temp_docx = tempfile.NamedTemporaryFile(delete=False, suffix='.docx')
+    temp_docx.close()
+    doc.save(temp_docx.name)
+    
+    # Convertir a PDF
+    temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+    temp_pdf.close()
+    pythoncom.CoInitialize()
+    convert(temp_docx.name, temp_pdf.name)
+    pythoncom.CoUninitialize()
+    
+    # Leer PDF
+    with open(temp_pdf.name, 'rb') as f:
+        buffer = BytesIO(f.read())
+    
+    # Limpiar archivos temporales
+    os.unlink(temp_docx.name)
+    os.unlink(temp_pdf.name)
+    
+    buffer.seek(0)
+    return buffer, firma_tec_agregada, firma_rec_agregada
+
+def generar_pdf_reportlab(cierre_ot):
     """Genera un PDF de informe similar al de Google Docs"""
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
@@ -386,7 +722,7 @@ def generar_pdf_informe(cierre_ot):
     
     doc.build(story)
     buffer.seek(0)
-    return buffer
+    return buffer, False, False
 
 
 def enviar_pdf_por_email(pdf_buffer, cierre_ot):
@@ -400,11 +736,24 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     if hasattr(settings, 'EMAIL_ADICIONAL') and settings.EMAIL_ADICIONAL:
         recipient_list.append(settings.EMAIL_ADICIONAL)
     
+    print(f"Intentando enviar email a: {recipient_list}")
+    print(f"Asunto: {subject}")
+    print(f"Desde: {from_email}")
+    print(f"Tamaño del PDF: {len(pdf_buffer.getvalue())} bytes")
+    
     if recipient_list:
-        send_mail(
-            subject,
-            message,
-            from_email,
-            recipient_list,
-            attachments=[('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')]
-        )
+        try:
+            email = EmailMessage(
+                subject,
+                message,
+                from_email,
+                recipient_list,
+            )
+            email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
+            email.send()
+            print("Email enviado exitosamente via EmailMessage")
+        except Exception as e:
+            print(f"Error enviando email con EmailMessage: {e}")
+            raise
+    else:
+        print("No hay destinatarios para enviar el email")

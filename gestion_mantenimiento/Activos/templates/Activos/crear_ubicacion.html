@@ -4,7 +4,8 @@
 
 {% block content %}
   <h2>Crear Nueva Ubicación</h2>
-  <form id="form-ubicacion" method="post" action="{% url 'crear_ubicacion' %}">
+  <p>Si esta ubicación es una sub-ubicación dentro de otra, elige la ubicación padre. De lo contrario, deja el campo vacío para crear una ubicación raíz.</p>
+  <form id="form-ubicacion" method="post" action="{% url 'crear_ubicacion' %}" enctype="multipart/form-data">
     {% csrf_token %}
     {{ form.as_p }}
     <button type="submit" class="btn btn-success">Crear Ubicación</button>

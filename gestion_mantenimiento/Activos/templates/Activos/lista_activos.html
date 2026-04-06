@@ -1,17 +1,211 @@
 {% extends "solicitudes/indexpadre.html" %}
 
 {% block title %}
-Lista de Activos
+Lista de Activos - Gestión de Activos y Equipos
 {% endblock %}
 
 {% block content %}
-<div class="container-arbol">
-    <h1>Lista de Activos</h1>
+<div class="container-arbol-mejorado">
+    <h1>Árbol de Activos y Equipos</h1>
+    
+    <div class="arbol-layout">
+        <!-- Panel izquierdo: árbol -->
+        <div class="arbol-panel-izquierdo">
+            <div class="arbol-header">
+                <h3>Estructura de Activos</h3>
+                <button class="btn-crear-raiz" onclick="abrirModalCrearUbicacion()" title="Crear nueva ubicación raíz">
+                    <ion-icon name="add-circle-outline"></ion-icon> Crear Ubicación
+                </button>
+            </div>
+            
+            <div class="tree-view" id="tree-container">
+                {% for ubicacion in ubicaciones %}
+                    {% include 'Activos/ubicacion_node.html' with ubicacion=ubicacion %}
+                {% endfor %}
+            </div>
+        </div>
 
-    <div class="tree-view">
-        {% for ubicacion in ubicaciones %}
-            {% include 'Activos/ubicacion_node.html' with ubicacion=ubicacion %}
-        {% endfor %}
+        <!-- Panel derecho: detalles del nodo -->
+        <div class="arbol-panel-derecho">
+            <div id="node-details-container" class="node-details-empty">
+                <p>Selecciona un nodo para ver detalles</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para crear hijo dinámicamente -->
+<div id="modal-crear-hijo" class="modal-arbol">
+    <div class="modal-arbol-content">
+        <div class="modal-arbol-header">
+            <h2 id="modal-titulo-crear">Crear Equipo</h2>
+            <button class="modal-arbol-close" onclick="cerrarModalCrearHijo()">&times;</button>
+        </div>
+        <form id="form-crear-hijo" method="post" action="{% url 'crear_equipo_dinamico' %}" onsubmit="crearHijoDinamico(event)" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" id="parent-id" name="parent_id">
+            <input type="hidden" id="parent-type" name="parent_type">
+
+            <div class="form-group-modal" id="parent-equipo-display" style="display:none;">
+                <label>Parent</label>
+                <input type="text" id="parent-equipo-nombre" disabled>
+            </div>
+
+            <div class="modal-top-row">
+                <div class="image-upload-panel">
+                    <label class="upload-label" for="imagen-hijo">
+                        <div class="upload-preview">
+                            <span class="upload-plus">+</span>
+                            <span class="upload-text">Foto del equipo</span>
+                            <span class="upload-subtext">Haz clic para cargar</span>
+                            <img id="imagen-hijo-preview" class="upload-preview-img" src="" alt="Previsualización" style="display:none;">
+                        </div>
+                        <input type="file" id="imagen-hijo" name="imagen" accept="image/*" hidden onchange="updateImageUploadLabel(this)">
+                    </label>
+                    <span id="imagen-hijo-filename" class="upload-filename">Ningún archivo seleccionado</span>
+                </div>
+
+                <div class="top-right-fields">
+                    <div class="form-group-modal">
+                        <label>Nombre</label>
+                        <input type="text" id="nombre-hijo" name="nombre" required placeholder="Ej: Molino, Reductor, Bomba">
+                    </div>
+                    <div class="form-group-modal">
+                        <label>Código</label>
+                        <input type="text" id="codigo-hijo" name="codigo" required placeholder="Ej: MOL-001">
+                    </div>
+                    <div class="form-group-modal">
+                        <label>Ubicación</label>
+                        <input type="text" id="ubicacion-busqueda" name="ubicacion_busqueda" list="ubicaciones-list" placeholder="Buscar ubicación..." autocomplete="off">
+                        <datalist id="ubicaciones-list">
+                            {% for ubicacion in ubicaciones_all %}
+                                <option value="{{ ubicacion.nombre }}{% if ubicacion.codigo %} ({{ ubicacion.codigo }}){% endif %}"></option>
+                            {% endfor %}
+                        </datalist>
+                        <input type="hidden" id="ubicacion-hijo" name="ubicacion">
+                    </div>
+                    <div class="form-group-modal">
+                        <label>Descripción</label>
+                        <textarea id="descripcion-hijo" name="descripcion" placeholder="Descripción del equipo"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <details class="modal-advanced-section" id="advanced-equipo-section">
+                <summary>Datos adicionales si el equipo lo requiere</summary>
+                <div class="advanced-body">
+                    <div class="form-group-modal">
+                        <label>Fabricante</label>
+                        <input type="text" name="fabricante" placeholder="Ej: Siemens">
+                    </div>
+                    <div class="form-group-modal">
+                        <label>Modelo</label>
+                        <input type="text" name="modelo" placeholder="Ej: FX-200">
+                    </div>
+                    <div class="form-group-modal">
+                        <label>Serie</label>
+                        <input type="text" name="serie" placeholder="Ej: 12345ABC">
+                    </div>
+                    <div class="form-group-modal">
+                        <label>Prioridad</label>
+                        <input type="text" name="prioridad" placeholder="Ej: Alta">
+                    </div>
+                    <div class="form-group-modal">
+                        <label>Fecha de adquisición</label>
+                        <input type="date" name="fecha_adquisicion">
+                    </div>
+                    <div class="form-group-modal">
+                        <label>Horas de uso</label>
+                        <input type="number" min="0" name="horas_uso" placeholder="Ej: 120">
+                    </div>
+                    <div class="form-group-modal">
+                        <label>Valor de compra</label>
+                        <input type="number" min="0" step="0.01" name="valor_compra" placeholder="Ej: 1500.00">
+                    </div>
+                    <div class="form-group-modal">
+                        <label>Valor actual</label>
+                        <input type="number" min="0" step="0.01" name="valor_actual" placeholder="Ej: 1200.00">
+                    </div>
+                </div>
+            </details>
+
+            <div class="modal-arbol-buttons">
+                <button type="submit" class="btn-modal-success">Crear</button>
+                <button type="button" class="btn-modal-cancel" onclick="cerrarModalCrearHijo()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal para crear ubicación raíz -->
+<div id="modal-crear-ubicacion" class="modal-arbol">
+    <div class="modal-arbol-content">
+        <div class="modal-arbol-header">
+            <h2>Crear Nueva Ubicación</h2>
+            <button class="modal-arbol-close" onclick="cerrarModalCrearUbicacion()">&times;</button>
+        </div>
+        <form method="post" action="{% url 'crear_ubicacion' %}" onsubmit="crearUbicacionDinamica(event)" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="parent" id="parent-ubicacion-id" value="">
+
+            <div class="form-group-modal" id="parent-ubicacion-display" style="display:none;">
+                <label>Parent</label>
+                <input type="text" id="parent-ubicacion-nombre" disabled>
+            </div>
+            
+            <div class="modal-top-row">
+                <div class="image-upload-panel">
+                    <label class="upload-label" for="imagen-ubicacion">
+                        <div class="upload-preview">
+                            <span class="upload-plus">+</span>
+                            <span class="upload-text">Foto de ubicación</span>
+                            <span class="upload-subtext">Haz clic para cargar</span>
+                            <img id="imagen-ubicacion-preview" class="upload-preview-img" src="" alt="Previsualización" style="display:none;">
+                        </div>
+                        <input type="file" id="imagen-ubicacion" name="imagen" accept="image/*" hidden onchange="updateImageUploadLabel(this)">
+                    </label>
+                    <span id="imagen-ubicacion-filename" class="upload-filename">Ningún archivo seleccionado</span>
+                </div>
+
+                <div class="top-right-fields">
+                    <div class="form-group-modal">
+                        <label>Nombre de Ubicación</label>
+                        <input type="text" name="nombre" required placeholder="Ej: Bostauros, Planta Principal, Punto de Venta Placita">
+                    </div>
+                    <div class="form-group-modal">
+                        <label>Código</label>
+                        <input type="text" name="codigo" required placeholder="Ej: BOT-001">
+                    </div>
+                    <div class="form-group-modal">
+                        <label>Descripción</label>
+                        <textarea name="descripcion" placeholder="Descripción de la ubicación"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <details class="modal-advanced-section">
+                <summary>Más campos</summary>
+                <div class="advanced-body">
+                    <div class="form-group-modal">
+                        <label>Dirección</label>
+                        <input type="text" name="direccion" placeholder="Ej: Calle 123 #45-67">
+                    </div>
+                    <div class="form-group-modal">
+                        <label>País</label>
+                        <input type="text" name="pais" placeholder="Ej: Colombia">
+                    </div>
+                    <div class="form-group-modal">
+                        <label>Ciudad</label>
+                        <input type="text" name="ciudad" placeholder="Ej: Bogotá">
+                    </div>
+                </div>
+            </details>
+
+            <div class="modal-arbol-buttons">
+                <button type="submit" class="btn-modal-success">Crear Ubicación</button>
+                <button type="button" class="btn-modal-cancel" onclick="cerrarModalCrearUbicacion()">Cancelar</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -20,77 +214,706 @@ Lista de Activos
         <span><ion-icon name="add-outline" class="icon-large"></ion-icon></span>
     </a>
     <div id="floating-options" class="floating-options">
-        <a href="{% url 'crear_equipo' %}" class="floating-option">Crear Equipo</a>
-        <a href="{% url 'crear_ubicacion' %}" class="floating-option">Crear Ubicación</a>
+        <a href="javascript:abrirModalCrearUbicacion()" class="floating-option">+ Ubicación Raíz</a>
+        <a href="javascript:abrirModalCrearEquipo(null, null, null)" class="floating-option">+ Equipo Independiente</a>
     </div>
 </div>
 
 <style>
+    .container-arbol-mejorado {
+        padding: 20px;
+        background-color: #f5f5f5;
+        min-height: 100vh;
+    }
+
+    .arbol-layout {
+        display: grid;
+        grid-template-columns: minmax(280px, 40%) minmax(320px, 1fr);
+        gap: 20px;
+        margin-top: 20px;
+        min-height: calc(100vh - 200px);
+    }
+
+    .arbol-panel-izquierdo {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-height: 0;
+    }
+
+    .arbol-header {
+        padding: 15px;
+        border-bottom: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .arbol-header h3 {
+        margin: 0;
+        font-size: 1.1em;
+        color: #333;
+    }
+
+    .btn-crear-raiz {
+        background-color: #4687F1;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9em;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: background-color 0.3s;
+    }
+
+    .btn-crear-raiz:hover {
+        background-color: #1976D2;
+    }
+
     .tree-view {
-        font-size: 1rem;
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+        font-size: 0.95rem;
         font-family: Heebo, Arial;
-        font-weight: 400;
-        line-height: 1.5;
-        color: rgb(0, 0, 0);
         user-select: none;
-        box-sizing: inherit;
-        position: relative;
-        height: 453px;
-        width: 1083px;
-        overflow: auto;
-        will-change: transform;
-        direction: ltr;
+    }
+
+    .arbol-panel-derecho {
+        flex: 0 0 60%;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        overflow: hidden;
+        padding: 20px;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #node-details-container {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    .node-details-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #999;
+        font-size: 1.1em;
+    }
+
+    .node-details {
+        animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .node-details h2 {
+        margin-top: 0;
+        color: #333;
+        border-bottom: 2px solid #4687F1;
+        padding-bottom: 10px;
+    }
+
+    .node-details-info {
+        margin: 15px 0;
+    }
+
+    .node-details-content {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 24px;
+        align-items: flex-start;
+        margin-bottom: 18px;
+    }
+
+    .node-details-image {
+        flex: 0 0 260px;
+        margin: 0;
+        text-align: center;
+    }
+
+    .node-details-image img {
+        width: 100%;
+        max-width: 260px;
+        max-height: 260px;
+        border-radius: 16px;
+        border: 1px solid #dfe6f2;
+        box-shadow: 0 8px 20px rgba(16, 60, 109, 0.08);
+        object-fit: contain;
+    }
+
+    .node-details-info {
+        flex: 1 1 320px;
+        min-width: 260px;
+    }
+
+    @media (max-width: 900px) {
+        .node-details-content {
+            flex-direction: column;
+        }
+        .node-details-image {
+            width: 100%;
+            max-width: none;
+        }
+        .node-details-image img {
+            max-width: 100%;
+            max-height: 220px;
+        }
+    }
+
+    .node-details-info p {
+        margin: 8px 0;
+    }
+
+    .node-details-info strong {
+        color: #4687F1;
+    }
+
+    .node-details-actions {
+        margin-top: 20px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .btn-action {
+        padding: 8px 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9em;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .btn-action-primary {
+        background-color: #4687F1;
+        color: white;
+    }
+
+    .btn-action-primary:hover {
+        background-color: #1976D2;
+    }
+
+    .btn-action-secondary {
+        background-color: #f0f0f0;
+        color: #333;
+        border: 1px solid #ddd;
+    }
+
+    .btn-action-secondary:hover {
+        background-color: #e0e0e0;
     }
 
     .tree-item {
-        margin: 10px 0;
+        margin: 5px 0;
     }
 
     .tree-node {
         cursor: pointer;
-        font-weight: bold;
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 5px;
+        padding: 8px 10px;
         border-radius: 4px;
-        transition: background-color 0.3s ease;
+        transition: all 0.2s ease;
+        margin: 2px 0;
     }
 
     .tree-node:hover {
-        background-color: #e0e0e0;
+        background-color: #f0f0f0;
+    }
+
+    .tree-node.selected {
+        background-color: #e3f2fd;
+        border-left: 3px solid #4687F1;
+    }
+
+    .tree-node-content {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+    }
+
+    .tree-node-actions {
+        display: none;
+        flex: 0 0 auto;
+        gap: 5px;
+    }
+
+    .tree-node:hover .tree-node-actions {
+        display: flex;
+    }
+
+    .tree-node-action-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px;
+        color: #999;
+        transition: color 0.2s;
+        font-size: 1em;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+    }
+
+    .tree-node-action-btn:hover {
+        color: #4687F1;
+        opacity: 1;
+    }
+
+    .toggle-icon {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 24px;
+        height: 24px;
+        color: #4687F1;
+        transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+        font-size: 1.1em;
+    }
+
+    .toggle-icon.open {
+        transform: none;
+    }
+
+    /* Evita que reglas globales de árbol afecten el icono de ubicación dentro de este árbol */
+    .tree-view .open .icon-folder {
+        transform: none !important;
+    }
+
+    .toggle-icon ion-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .image-upload-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 14px 16px;
+        border: 1px dashed #b0c4de;
+        border-radius: 14px;
+        background: #f5f9ff;
+    }
+
+    .upload-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 16px;
+        border-radius: 10px;
+        border: 1px solid #bed7ff;
+        background: #e8f1ff;
+        color: #0f4a8a;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .upload-plus {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #0f4a8a;
+        color: white;
+        font-size: 1.1em;
+    }
+
+    .upload-filename {
+        color: #6c7a93;
+        font-size: 0.95em;
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .form-group-modal input:disabled {
+        background-color: #f3f3f3;
+        color: #666;
+    }
+
+    .icon-folder {
+        font-size: 1.2em;
+        color: #FF9800;
+    }
+
+    .icon-leaf {
+        font-size: 1em;
+        color: #2196F3;
+    }
+
+    .toggle-icon[style*="visibility"] {
+        opacity: 0;
     }
 
     .tree-children {
         display: none;
         padding-left: 20px;
         list-style-type: none;
-        margin: 5px 0;
+        margin: 0;
+    }
+
+    .tree-children.open {
+        display: block;
     }
 
     .tree-sub-item {
         display: flex;
-        align-items: flex-start;
-        gap: 5px;
-        padding: 5px 0;
-        margin-left: 20px;
-        flex-wrap: nowrap;
         flex-direction: column;
+        margin: 2px 0;
     }
 
-    .icon-folder {
+    /* Modales */
+    .modal-arbol {
+        display: none !important;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0,0,0,0.5);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-arbol.open {
+        display: flex !important;
+    }
+
+    .modal-arbol-content {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        max-width: 720px;
+        width: min(95%, 720px);
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
+        box-sizing: border-box;
+    }
+
+    .modal-arbol-header {
+        background-color: #4687F1;
+        color: white;
+        padding: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-radius: 8px 8px 0 0;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+    }
+
+    .modal-arbol-header h2 {
+        margin: 0;
         font-size: 1.2em;
-        transition: transform 0.3s ease;
     }
 
-    .icon-leaf {
+    .modal-arbol-close {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 1.5em;
+        cursor: pointer;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-arbol-close:hover {
+        opacity: 0.8;
+    }
+
+    #form-crear-hijo, #modal-crear-ubicacion form {
+        padding: 20px;
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+
+    details.modal-advanced-section {
+        margin-top: 20px;
+        width: 100%;
+        grid-column: 1 / -1;
+        background: #ffffff;
+        border: 1px solid #d6dfe9;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    details.modal-advanced-section summary {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f2f7ff;
+        padding: 16px 18px;
+        margin: 0;
+        cursor: pointer;
+        font-weight: 700;
+        color: #0f4a8a;
+        border-bottom: 1px solid #dbe8ff;
+    }
+
+    details.modal-advanced-section summary::marker,
+    details.modal-advanced-section summary::-webkit-details-marker {
+        display: none;
+    }
+
+    details.modal-advanced-section summary::after {
+        content: '▾';
+        transform: rotate(0deg);
+        transition: transform 0.25s ease;
+        color: #0f4a8a;
+        font-size: 1em;
+    }
+
+    details.modal-advanced-section[open] summary::after {
+        transform: rotate(180deg);
+    }
+
+    details.modal-advanced-section .advanced-body {
+        padding: 18px;
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        background: #fff;
+    }
+
+    .modal-arbol-buttons {
+        grid-column: 1 / -1;
+    }
+
+    .form-group-modal {
+        margin-bottom: 18px;
+        position: relative;
+    }
+
+    .form-group-modal label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #333;
+        position: relative;
+        z-index: 1;
+    }
+
+    .form-group-modal input,
+    .form-group-modal textarea {
+        width: 100%;
+        padding: 12px 10px;
+        border: 1.5px solid #ddd;
+        border-radius: 6px;
+        font-family: Arial, sans-serif;
+        font-size: 1em;
+        background-color: #fafafa;
+        box-sizing: border-box;
+        position: relative;
+        z-index: 2;
+    }
+
+    .form-group-modal input:focus,
+    .form-group-modal textarea:focus {
+        outline: none;
+        border-color: #4687F1;
+        background-color: #fff;
+        box-shadow: 0 0 0 3px rgba(70, 135, 241, 0.1);
+        z-index: 3;
+    }
+
+    .modal-top-row {
+        display: grid;
+        grid-template-columns: minmax(220px, 280px) 1fr;
+        gap: 18px;
+        align-items: start;
+        margin-top: 12px;
+    }
+
+    .modal-top-row .form-group-modal {
+        margin-bottom: 0;
+    }
+
+    .image-upload-panel {
+        display: grid;
+        gap: 10px;
+        min-width: 220px;
+    }
+
+    .upload-preview-img {
+        width: 100%;
+        max-height: 140px;
+        object-fit: contain;
+        border-radius: 14px;
+        border: 1px solid rgba(21, 86, 169, 0.14);
+    }
+
+    @media (max-width: 900px) {
+        .arbol-layout {
+            display: block;
+            min-height: auto;
+        }
+        .arbol-panel-izquierdo,
+        .arbol-panel-derecho {
+            width: 100%;
+        }
+        .arbol-panel-derecho {
+            max-height: none;
+        }
+        .modal-top-row {
+            grid-template-columns: 1fr;
+        }
+        .image-upload-panel {
+            justify-items: center;
+        }
+    }
+
+    .image-upload-panel {
+        display: grid;
+        gap: 10px;
+    }
+
+    .image-upload-card,
+    .upload-label {
+        width: 100%;
+    }
+
+    .upload-label {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 170px;
+        max-width: 240px;
+        border: 1.5px dashed #c9d8ef;
+        background: linear-gradient(180deg, #f7faff 0%, #edf4ff 100%);
+        border-radius: 18px;
+        padding: 16px;
+        color: #164d8f;
+        cursor: pointer;
+        text-align: center;
+    }
+
+    .upload-preview {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .upload-preview-img {
+        width: 100%;
+        max-height: 140px;
+        object-fit: contain;
+        border-radius: 14px;
+        border: 1px solid rgba(21, 86, 169, 0.14);
+    }
+
+    .upload-plus {
+        display: inline-flex;
+        width: 44px;
+        height: 44px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: #3273f4;
+        color: white;
+        font-size: 1.4em;
+        box-shadow: 0 8px 18px rgba(50, 115, 244, 0.18);
+    }
+
+    .upload-text {
+        font-weight: 700;
+        font-size: 0.98em;
+        color: #0f4a8a;
+    }
+
+    .upload-subtext {
+        font-size: 0.92em;
+        color: #607099;
+    }
+
+    .upload-filename {
+        color: #475d7a;
         font-size: 0.9em;
-        color: rgb(0, 0, 0);
-        margin-right: 5px; /* Añade un margen derecho para separar el icono del texto */
+        min-height: 1.4em;
+        display: none;
     }
 
-    .open .icon-folder {
-        transform: rotate(90deg);
+    .top-right-fields {
+        display: grid;
+        gap: 16px;
+    }
+
+    .form-group-modal textarea {
+        resize: vertical;
+        min-height: 80px;
+    }
+
+    .modal-arbol-buttons {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 20px;
+        padding-top: 15px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .btn-modal-success {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1em;
+    }
+
+    .btn-modal-success:hover {
+        background-color: #45a049;
+    }
+
+    .btn-modal-cancel {
+        background-color: #f44336;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1em;
+    }
+
+    .btn-modal-cancel:hover {
+        background-color: #da190b;
     }
 
     .floating-button-container {
@@ -99,51 +922,33 @@ Lista de Activos
 
     .floating-button {
         display: inline-flex;
-        -webkit-box-align: center;
         align-items: center;
-        -webkit-box-pack: center;
         justify-content: center;
-        position: fixed; /* Cambiado a fixed para que flote sobre la página */
-        bottom: 20px; /* Ajusta la posición desde el fondo */
-        right: 20px; /* Ajusta la posición desde la derecha */
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
         box-sizing: border-box;
-        -webkit-tap-highlight-color: transparent;
         cursor: pointer;
         user-select: none;
-        vertical-align: middle;
-        appearance: none;
-        font-family: Heebo, Arial;
-        font-weight: 500;
-        font-size: 0.75rem;
-        line-height: 1.75;
-        text-transform: uppercase;
-        min-height: 36px;
-        min-width: 0px;
         width: 56px;
         height: 56px;
         z-index: 1050;
         box-shadow: rgba(0, 0, 0, 0.2) 0px 3px 5px -1px, rgba(0, 0, 0, 0.14) 0px 6px 10px 0px, rgba(0, 0, 0, 0.12) 0px 1px 18px 0px;
-        pointer-events: auto;
         background-color: rgb(70, 135, 241);
         color: rgb(255, 255, 255);
-        outline: 0px;
-        border-width: 0px;
-        border-style: initial;
-        border-color: initial;
-        border-image: initial;
-        margin: 0px;
-        text-decoration: none;
+        border: none;
         border-radius: 50%;
         padding: 0px;
+        transition: all 0.3s;
     }
 
     .floating-button:hover {
         background-color: #1976D2;
+        transform: scale(1.1);
     }
 
     .floating-button span {
         font-weight: bold;
-        margin-top: -3px;
     }
 
     .floating-options {
@@ -155,6 +960,10 @@ Lista de Activos
         gap: 10px;
     }
 
+    .floating-options.open {
+        display: flex;
+    }
+
     .floating-option {
         display: block;
         background-color: rgb(70, 135, 241);
@@ -163,47 +972,354 @@ Lista de Activos
         border-radius: 4px;
         text-decoration: none;
         text-align: center;
+        transition: all 0.3s;
+        white-space: nowrap;
     }
 
     .floating-option:hover {
         background-color: #1976D2;
-    }
-
-    select {
-        max-height: 200px; /* Ajusta la altura máxima del desplegable */
-        overflow-y: auto; /* Añade desplazamiento vertical */
-    }
-
-    select[multiple] {
-        height: auto; /* Ajusta la altura del campo de selección */
-    }
-
-    select option {
-        display: block; /* Asegura que las opciones se muestren en bloque */
+        transform: translateX(-5px);
     }
 </style>
 
 <script>
+    let nodoSeleccionado = null;
+    const ubicacionesData = [
+        {% for ubicacion in ubicaciones_all %}
+            { id: '{{ ubicacion.id }}', label: '{{ ubicacion.nombre|escapejs }}{% if ubicacion.codigo %} ({{ ubicacion.codigo|escapejs }}){% endif %}' },
+        {% endfor %}
+    ];
+
+    function matchUbicacionLabel(label) {
+        return ubicacionesData.find(item => item.label === label);
+    }
+
+    function actualizarUbicacionSeleccionada() {
+        const buscador = document.getElementById('ubicacion-busqueda');
+        const hidden = document.getElementById('ubicacion-hijo');
+        if (!buscador || !hidden) return;
+        const selected = matchUbicacionLabel(buscador.value.trim());
+        hidden.value = selected ? selected.id : '';
+    }
+
     function toggleChildren(id) {
         const element = document.getElementById(id);
         const toggleIcon = document.getElementById('toggle-icon-' + id);
 
-        if (element.style.display === "none" || element.style.display === "") {
-            element.style.display = "block";
-            toggleIcon.innerHTML = '<ion-icon name="remove-outline"></ion-icon>';
-        } else {
-            element.style.display = "none";
-            toggleIcon.innerHTML = '<ion-icon name="add-outline"></ion-icon>';
+        if (element && toggleIcon) {
+            if (element.style.display === "none" || element.style.display === "") {
+                element.style.display = "block";
+                element.classList.add('open');
+                toggleIcon.classList.add('open');
+                toggleIcon.innerHTML = '<ion-icon name="remove-outline"></ion-icon>';
+            } else {
+                element.style.display = "none";
+                element.classList.remove('open');
+                toggleIcon.classList.remove('open');
+                toggleIcon.innerHTML = '<ion-icon name="add-outline"></ion-icon>';
+            }
         }
     }
 
     function toggleOptions() {
         const options = document.getElementById('floating-options');
-        if (options.style.display === "none" || options.style.display === "") {
-            options.style.display = "flex";
-        } else {
-            options.style.display = "none";
+        if (options) {
+            options.classList.toggle('open');
         }
     }
+
+    function seleccionarNodo(event, tipo, id, nombre, codigo = '', descripcion = '', ubicacionId = null, imagenUrl = '', equipoId = null) {
+        event.stopPropagation();
+        
+        // Remover selección anterior
+        document.querySelectorAll('.tree-node').forEach(node => node.classList.remove('selected'));
+        
+        // Agregar selección al nodo actual
+        const nodoElement = event.currentTarget;
+        nodoElement.classList.add('selected');
+        
+        nodoSeleccionado = { tipo, id, nombre, codigo, descripcion, ubicacionId, equipoId, imagenUrl };
+        mostrarDetallesNodo(tipo, id, nombre, codigo, descripcion, imagenUrl);
+    }
+
+    function mostrarDetallesNodo(tipo, id, nombre, codigo, descripcion, imagenUrl = '') {
+        const container = document.getElementById('node-details-container');
+        const tipoTexto = tipo === 'ubicacion' ? 'Ubicación' : 'Equipo';
+        const icono = tipo === 'ubicacion' ? 'location-outline' : 'cube-outline';
+        
+        let imageHtml = '';
+        if (imagenUrl) {
+            imageHtml = `
+                <div class="node-details-image">
+                    <img src="${imagenUrl}" alt="Imagen de ${tipoTexto}" />
+                </div>
+            `;
+        }
+        
+        let html = `
+            <div class="node-details">
+                <h2>
+                    <ion-icon name="${icono}"></ion-icon> ${tipoTexto}
+                </h2>
+                <div class="node-details-content">
+                    ${imageHtml}
+                    <div class="node-details-info">
+                        <p><strong>Nombre:</strong> ${nombre}</p>
+                        <p><strong>Código:</strong> ${codigo || 'N/A'}</p>
+                        <p><strong>Tipo:</strong> ${tipoTexto}</p>
+                        ${descripcion ? `<p><strong>Descripción:</strong> ${descripcion}</p>` : ''}
+                        <p><strong>ID:</strong> ${id}</p>
+                    </div>
+                </div>
+                <div class="node-details-actions">
+                    <button class="btn-action btn-action-primary" onclick="abrirModalCrearHijo('${tipo}', ${id})">
+                        <ion-icon name="add-circle-outline"></ion-icon> Agregar Equipo
+                    </button>
+                    ${tipo === 'ubicacion' ? `<button class="btn-action btn-action-primary" onclick="abrirModalCrearSubUbicacion(${id}, '${nombre}')">
+                        <ion-icon name="add-outline"></ion-icon> Agregar Sub-Ubicación
+                    </button>` : ''}
+                    <button class="btn-action btn-action-primary" onclick="abrirModalCrearPlan(${id}, '${nombre}')">
+                        <ion-icon name="calendar-outline"></ion-icon> Plan Mantenimiento
+                    </button>
+                    <button class="btn-action btn-action-secondary" onclick="verHistorial(${id}, '${tipo}')">
+                        <ion-icon name="history-outline"></ion-icon> Historial OT
+                    </button>
+                </div>
+            </div>
+        `;
+        container.innerHTML = html;
+    }
+
+    function abrirModalCrearHijo(arg1, arg2, arg3) {
+        const modal = document.getElementById('modal-crear-hijo');
+        const parentIdInput = document.getElementById('parent-id');
+        const parentTypeInput = document.getElementById('parent-type');
+        const modalTitulo = document.getElementById('modal-titulo-crear');
+        const parentDisplay = document.getElementById('parent-equipo-display');
+        const parentNameInput = document.getElementById('parent-equipo-nombre');
+        const ubicacionSearch = document.getElementById('ubicacion-busqueda');
+        const ubicacionHidden = document.getElementById('ubicacion-hijo');
+        const advancedSection = document.getElementById('advanced-equipo-section');
+
+        let tipo = arg2;
+        let id = arg1;
+        let nombre = arg3;
+
+        if (tipo === null || tipo === undefined) {
+            tipo = arg1;
+            id = arg2;
+            nombre = nodoSeleccionado ? nodoSeleccionado.nombre : '';
+        }
+
+        parentIdInput.value = id || '';
+        parentTypeInput.value = tipo || '';
+        modalTitulo.textContent = nombre ? `Crear Equipo bajo ${nombre}` : 'Crear Equipo';
+
+        if (tipo && nombre) {
+            parentDisplay.style.display = 'block';
+            parentNameInput.value = nombre;
+        } else {
+            parentDisplay.style.display = 'none';
+            parentNameInput.value = '';
+        }
+
+        if (ubicacionHidden) {
+            ubicacionHidden.value = '';
+        }
+        if (ubicacionSearch) {
+            ubicacionSearch.value = '';
+        }
+
+        if (tipo === 'ubicacion' && id) {
+            const found = ubicacionesData.find(item => item.id === String(id));
+            if (ubicacionHidden) {
+                ubicacionHidden.value = id;
+            }
+            if (ubicacionSearch && found) {
+                ubicacionSearch.value = found.label;
+            }
+        }
+
+        if (advancedSection) {
+            advancedSection.removeAttribute('open');
+        }
+
+        modal.classList.add('open');
+    }
+
+    function cerrarModalCrearHijo() {
+        const modal = document.getElementById('modal-crear-hijo');
+        modal.classList.remove('open');
+        document.getElementById('form-crear-hijo').reset();
+        const advancedSection = document.getElementById('advanced-equipo-section');
+        if (advancedSection) {
+            advancedSection.removeAttribute('open');
+        }
+    }
+
+    function abrirModalCrearUbicacion() {
+        const modal = document.getElementById('modal-crear-ubicacion');
+        const parentInput = document.getElementById('parent-ubicacion-id');
+        const parentDisplay = document.getElementById('parent-ubicacion-display');
+        const parentNameInput = document.getElementById('parent-ubicacion-nombre');
+        const title = modal.querySelector('.modal-arbol-header h2');
+        const advancedSection = modal.querySelector('details.modal-advanced-section');
+        parentInput.value = '';
+        parentDisplay.style.display = 'none';
+        parentNameInput.value = '';
+        title.textContent = 'Crear Nueva Ubicación';
+        if (advancedSection) {
+            advancedSection.removeAttribute('open');
+        }
+        modal.classList.add('open');
+    }
+
+    function abrirModalCrearSubUbicacion(parentId, parentName) {
+        const modal = document.getElementById('modal-crear-ubicacion');
+        const parentInput = document.getElementById('parent-ubicacion-id');
+        const parentDisplay = document.getElementById('parent-ubicacion-display');
+        const parentNameInput = document.getElementById('parent-ubicacion-nombre');
+        const title = modal.querySelector('.modal-arbol-header h2');
+        const advancedSection = modal.querySelector('details.modal-advanced-section');
+        parentInput.value = parentId;
+        parentDisplay.style.display = 'block';
+        parentNameInput.value = parentName || '';
+        title.textContent = `Crear Sub-Ubicación dentro de ${parentName}`;
+        if (advancedSection) {
+            advancedSection.removeAttribute('open');
+        }
+        modal.classList.add('open');
+    }
+
+    function cerrarModalCrearUbicacion() {
+        const modal = document.getElementById('modal-crear-ubicacion');
+        modal.classList.remove('open');
+        const advancedSection = modal.querySelector('details.modal-advanced-section');
+        if (advancedSection) {
+            advancedSection.removeAttribute('open');
+        }
+    }
+
+    function updateImageUploadLabel(input) {
+        const filenameSpan = document.getElementById(`${input.id}-filename`);
+        const previewImg = document.getElementById(`${input.id}-preview`);
+        const previewText = input.closest('.upload-label')?.querySelector('.upload-text');
+        const previewSubtext = input.closest('.upload-label')?.querySelector('.upload-subtext');
+
+        if (filenameSpan) {
+            if (input.files && input.files.length) {
+                filenameSpan.textContent = input.files[0].name;
+                filenameSpan.style.display = 'block';
+            } else {
+                filenameSpan.textContent = '';
+                filenameSpan.style.display = 'none';
+            }
+        }
+
+        if (previewImg) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    previewImg.style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+                if (previewText) previewText.textContent = 'Vista previa';
+                if (previewSubtext) previewSubtext.textContent = 'Cambia la imagen si quieres';
+            } else {
+                previewImg.src = '';
+                previewImg.style.display = 'none';
+                if (previewText) previewText.textContent = input.id === 'imagen-hijo' ? 'Foto del equipo' : 'Foto de ubicación';
+                if (previewSubtext) previewSubtext.textContent = 'Haz clic para cargar';
+            }
+        }
+    }
+
+    function crearHijoDinamico(event) {
+        event.preventDefault();
+        actualizarUbicacionSeleccionada();
+        const form = document.getElementById('form-crear-hijo');
+        form.submit();
+    }
+
+    function crearUbicacionDinamica(event) {
+        event.preventDefault();
+        const advancedSection = event.target.querySelector('details.modal-advanced-section');
+        if (advancedSection) {
+            advancedSection.removeAttribute('open');
+        }
+        event.target.submit();
+    }
+
+    function abrirModalCrearPlan(equipoId, nombreEquipo) {
+        // Redirigir a la vista de crear plan
+        window.location.href = `/Gestion_ot/planes/crear/?equipo_id=${equipoId}`;
+    }
+
+    function abrirModalCrearEquipo(parentId, parentType, parentName) {
+        const modal = document.getElementById('modal-crear-hijo');
+        const parentIdInput = document.getElementById('parent-id');
+        const parentTypeInput = document.getElementById('parent-type');
+        const modalTitulo = document.getElementById('modal-titulo-crear');
+        const parentDisplay = document.getElementById('parent-equipo-display');
+        const parentNameInput = document.getElementById('parent-equipo-nombre');
+        const ubicacionSelect = document.getElementById('ubicacion-hijo');
+
+        if (parentId === null || parentId === 'null' || !parentType) {
+            parentIdInput.value = '';
+            parentTypeInput.value = '';
+            modalTitulo.textContent = 'Crear Equipo Independiente';
+            parentDisplay.style.display = 'none';
+            if (ubicacionSelect) {
+                ubicacionSelect.value = '';
+            }
+        } else {
+            parentIdInput.value = parentId;
+            parentTypeInput.value = parentType;
+            modalTitulo.textContent = `Crear Equipo bajo ${parentName || 'este nodo'}`;
+            parentDisplay.style.display = 'block';
+            parentNameInput.value = parentName || '';
+            if (parentType === 'ubicacion' && ubicacionSelect) {
+                ubicacionSelect.value = parentId;
+            }
+        }
+
+        modal.classList.add('open');
+    }
+
+    function verHistorial(id, tipo) {
+        const params = new URLSearchParams();
+        if (tipo === 'equipo') {
+            params.set('equipo_id', id);
+        } else if (tipo === 'ubicacion') {
+            params.set('ubicacion_id', id);
+        }
+        window.location.href = `/Gestion_ot/listar_ot/?${params.toString()}`;
+    }
+
+    // Cerrar modales al hacer click fuera
+    document.addEventListener('click', function(event) {
+        const modalHijo = document.getElementById('modal-crear-hijo');
+        const modalUbicacion = document.getElementById('modal-crear-ubicacion');
+        
+        if (event.target === modalHijo) {
+            cerrarModalCrearHijo();
+        }
+        if (event.target === modalUbicacion) {
+            cerrarModalCrearUbicacion();
+        }
+    });
+
+    // Cerrar floating options al hacer click en otro lado
+    document.addEventListener('click', function(event) {
+        const floatingOptions = document.getElementById('floating-options');
+        const floatingButton = document.querySelector('.floating-button');
+        
+        if (floatingOptions && floatingButton && event.target !== floatingButton && !floatingButton.contains(event.target)) {
+            if (!floatingOptions.contains(event.target)) {
+                floatingOptions.classList.remove('open');
+            }
+        }
+    });
 </script>
 {% endblock %}

@@ -28,11 +28,12 @@ class UnidadNegocio(models.Model):
 class Ubicacion(models.Model):
     id = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=100, null=False, blank=False)
-    codigo = models.CharField(max_length=10, null=False, blank=False)
+    codigo = models.CharField(max_length=20, null=False, blank=False)
     descripcion = models.TextField(null=True, blank=True)
     direccion = models.CharField(max_length=255, null=True, blank=True)
     pais = models.CharField(max_length=100, null=True, blank=True)
     ciudad = models.CharField(max_length=100, null=True, blank=True)
+    imagen = models.ImageField(upload_to='ubicaciones/', null=True, blank=True)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
 
     def __str__(self):
@@ -88,7 +89,7 @@ class Item(MPTTModel):
 class Equipo(models.Model):
     id = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=100, null=False, blank=False)
-    codigo = models.CharField(max_length=10, null=False, blank=False)
+    codigo = models.CharField(max_length=20, null=False, blank=False)
     fabricante = models.CharField(max_length=100, null=True, blank=True)
     modelo = models.CharField(max_length=100, null=True, blank=True)
     serie = models.CharField(max_length=100, null=True, blank=True)
@@ -98,7 +99,17 @@ class Equipo(models.Model):
     horas_uso = models.IntegerField(null=True, blank=True)
     valor_compra = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     valor_actual = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    imagen = models.ImageField(upload_to='equipos/', null=True, blank=True)
     ubicacion = models.ForeignKey(Ubicacion, on_delete=models.CASCADE , null=True, blank=True, related_name='equipos')
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
+
+    @property
+    def display_label(self):
+        label_parts = [self.codigo]
+        if self.ubicacion and self.ubicacion.nombre:
+            label_parts.append(self.ubicacion.nombre)
+        label_parts.append(self.nombre)
+        return "/".join([part for part in label_parts if part])
+
     def __str__(self):
         return self.nombre

@@ -27,7 +27,7 @@ import os
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-h)pgul*0ogs%v!mo10*_=*_&-92aw5s!k%&0_9h5r2td4%_d_g')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'web-production-990bf.up.railway.app']
 
@@ -72,7 +72,6 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -81,6 +80,9 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
 ]
+
+if not DEBUG:
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
 ROOT_URLCONF = 'gestion_mantenimiento.urls'
 
@@ -163,12 +165,16 @@ TIME_INPUT_FORMATS = ['%H:%M']
 STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
-    BASE_DIR / "static",
+    BASE_DIR / "gestion_mantenimiento" / "static",
 ]
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage' if not DEBUG else 'django.contrib.staticfiles.storage.StaticFilesStorage'
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/topics/db/models/#default-auto-field
@@ -202,11 +208,11 @@ SOCIALACCOUNT_PROVIDERS = {
 # settings.py
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.office365.com'  # Servidor SMTP de Microsoft
+EMAIL_HOST = 'smtp.gmail.com'  # Servidor SMTP de Gmail
 EMAIL_PORT = 587  # Puerto SMTP para TLS
 EMAIL_USE_TLS = True  # Usar TLS
-EMAIL_HOST_USER = 'soportemantenimientomimosoriente@mimos.com.co'  # Tu dirección de correo electrónico de Microsoft
-EMAIL_HOST_PASSWORD = 'Juanes2207'  # Tu contraseña de correo electrónico de Microsoft
+EMAIL_HOST_USER = 'thermovoltc@gmail.com'  # Tu dirección de correo electrónico de Gmail
+EMAIL_HOST_PASSWORD = 'ayrgjfypucywrqbr'  # App password de Gmail
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER  # Dirección de correo electrónico predeterminada para enviar correos
 
 EMAIL_ADICIONAL = 'juanesteban01010@gmail.com'  # Email adicional para copias

@@ -1,0 +1,291 @@
+{% extends "solicitudes/indexpadre.html" %}
+
+{% block title %}
+Agregar Actividad
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <div class="form-header">
+        <h1>{{ titulo }}</h1>
+        <a href="{% url 'detalle_plan' plan.id %}" class="btn-back">
+            <ion-icon name="arrow-back-outline"></ion-icon> Volver
+        </a>
+    </div>
+
+    <form method="post" class="form-actividad">
+        {% csrf_token %}
+        
+        <div class="form-section">
+            <h2>Plan: <strong>{{ plan.nombre }}</strong></h2>
+            <p>{{ plan.equipo.nombre }}</p>
+        </div>
+
+        <div class="form-section">
+            <div class="form-group">
+                <label for="id_nombre">Nombre de la Actividad *</label>
+                {{ form.nombre }}
+                {% if form.nombre.errors %}
+                    <div class="error-message">{{ form.nombre.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="id_descripcion">Descripción</label>
+                {{ form.descripcion }}
+                {% if form.descripcion.errors %}
+                    <div class="error-message">{{ form.descripcion.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="id_orden">Orden de Ejecución *</label>
+                {{ form.orden }}
+                {% if form.orden.errors %}
+                    <div class="error-message">{{ form.orden.errors }}</div>
+                {% endif %}
+                <small>Número de orden para ejecutar esta actividad</small>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-submit">
+                <ion-icon name="checkmark-circle-outline"></ion-icon>
+                Agregar Actividad
+            </button>
+            <a href="{% url 'detalle_plan' plan.id %}" class="btn-cancel">
+                <ion-icon name="close-circle-outline"></ion-icon> Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+<style>
+    .form-container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+        min-height: 100vh;
+    }
+
+    .form-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .form-header h1 {
+        margin: 0;
+        font-size: 1.5em;
+        color: #333;
+    }
+
+    .btn-back {
+        background-color: #4687F1;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        transition: background-color 0.3s;
+    }
+
+    .btn-back:hover {
+        background-color: #1976D2;
+    }
+
+    .form-actividad {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+
+    .form-section {
+        padding: 25px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .form-section h2 {
+        margin: 0 0 10px 0;
+        font-size: 1.1em;
+        color: #333;
+    }
+
+    .form-section p {
+        margin: 5px 0 0 0;
+        color: #999;
+    }
+
+    .form-actividad .form-group {
+        position: relative;
+        margin-bottom: 20px;
+    }
+
+    .form-actividad .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #333;
+        position: static !important;
+        top: auto !important;
+        left: auto !important;
+        transform: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+        z-index: 1;
+    }
+
+    .form-actividad .form-group input,
+    .form-actividad .form-group textarea,
+    .form-actividad .form-group select {
+        width: 100%;
+        padding: 14px 16px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        font-size: 1rem;
+        box-sizing: border-box;
+        background: #fff;
+        position: relative;
+        z-index: 0;
+    }
+
+    .form-actividad .form-group input:focus,
+    .form-actividad .form-group textarea:focus,
+    .form-actividad .form-group select:focus {
+        outline: none;
+        border-color: #4687F1;
+        box-shadow: 0 0 0 3px rgba(70, 135, 241, 0.12);
+    }
+
+    .form-group textarea {
+        resize: vertical;
+        min-height: 60px;
+    }
+
+    .form-group small {
+        display: block;
+        margin-top: 5px;
+        color: #999;
+        font-size: 0.9em;
+    }
+
+    .error-message {
+        color: #f44336;
+        font-size: 0.9em;
+        margin-top: 5px;
+    }
+
+    .form-actions {
+        padding: 20px 25px;
+        background-color: #f9f9f9;
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .btn-submit,
+    .btn-cancel {
+        padding: 12px 22px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 1em;
+        font-weight: 500;
+        transition: all 0.3s;
+        min-width: 140px;
+        justify-content: center;
+    }
+
+    .btn-submit {
+        background-color: #4CAF50;
+        color: white;
+    }
+
+    .btn-submit:hover {
+        background-color: #45a049;
+    }
+
+    .btn-cancel {
+        background-color: #f44336;
+        color: white;
+    }
+
+    .btn-cancel:hover {
+        background-color: #da190b;
+    }
+
+    @media (max-width: 768px) {
+        .form-container {
+            padding: 16px;
+        }
+
+        .form-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 15px;
+            padding: 16px;
+        }
+
+        .form-header h1 {
+            font-size: 1.4em;
+        }
+
+        .form-actividad {
+            border-radius: 8px;
+        }
+
+        .form-section {
+            padding: 18px;
+        }
+
+        .form-actividad .form-group {
+            width: 100%;
+        }
+
+        .form-actions {
+            justify-content: stretch;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .btn-submit,
+        .btn-cancel {
+            width: 100%;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .form-container {
+            padding: 12px;
+        }
+
+        .form-header h1 {
+            font-size: 1.25em;
+        }
+
+        .form-section {
+            padding: 16px;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            padding: 12px;
+        }
+    }
+</style>
+{% endblock %}

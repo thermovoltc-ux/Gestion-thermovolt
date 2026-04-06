@@ -163,6 +163,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function openSolicitudModal(consecutivo) {
+        if (!consecutivo) {
+            console.warn('Intento de abrir solicitud sin consecutivo válido.');
+            return;
+        }
+
         fetch(`/Gestion_ot/detalles_solicitud/${consecutivo}/`)
             .then(response => {
                 if (!response.ok) {
@@ -235,10 +240,12 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('solicitudModal').style.display = 'none';
     };
 
-    document.querySelectorAll('.kanban-card').forEach(card => {
+    document.querySelectorAll('.kanban-card[data-numero-activo]').forEach(card => {
         card.addEventListener('click', function() {
             const consecutivo = this.getAttribute('data-numero-activo');
-            openSolicitudModal(consecutivo);
+            if (consecutivo) {
+                openSolicitudModal(consecutivo);
+            }
         });
     });
 
@@ -411,49 +418,70 @@ window.closeModal = closeModal;
 
 // Enviar el formulario del modal al servidor
 document.addEventListener("DOMContentLoaded", function() {
-    document.getElementById("OrdenTrabajoForm").addEventListener("submit", function(event) {
-        event.preventDefault();
-
-        const nombreTecnico = document.getElementById("tecnico_asignado").value;
-        const fechaActividad = document.getElementById("fecha_actividad").value;
-        const numeroSolicitud = document.getElementById("consecutivo").value;
-
-        console.log("Asignar Técnico - Datos enviados:");
-        console.log("Número de Solicitud:", numeroSolicitud);
-        console.log("Nombre del Técnico:", nombreTecnico);
-        console.log("Fecha de Actividad:", fechaActividad);
-
-        if (!fechaActividad) {
-            alert("La fecha de actividad es obligatoria.");
+        const ordenTrabajoForm = document.getElementById("OrdenTrabajoForm");
+        if (!ordenTrabajoForm) {
             return;
         }
 
-        fetch('/Gestion_ot/actualizar_estado_solicitud/', {  
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCSRFToken()
-            },
-            body: JSON.stringify({
+        ordenTrabajoForm.addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            const nombreTecnico = document.getElementById("tecnico_asignado").value;
+            const fechaActividad = document.getElementById("fecha_actividad").value;
+            const numeroSolicitud = document.getElementById("consecutivo").value;
+            const tareaId = document.getElementById("tarea_id").value;
+
+            console.log("Asignar Técnico - Datos enviados:");
+            console.log("Número de Solicitud:", numeroSolicitud);
+            console.log("Nombre del Técnico:", nombreTecnico);
+            console.log("Fecha de Actividad:", fechaActividad);
+            console.log("Tarea Preventiva ID:", tareaId);
+
+            if (!fechaActividad) {
+                alert("La fecha de actividad es obligatoria.");
+                return;
+            }
+
+            const url = tareaId ? `/Gestion_ot/tarea/${tareaId}/asignar/` : '/Gestion_ot/actualizar_estado_solicitud/';
+            const payload = tareaId ? {
+                tecnico: nombreTecnico,
+                fecha: fechaActividad,
+                estado: "en_progreso"
+            } : {
                 numero: numeroSolicitud,
                 estado: "en proceso",
                 tecnico: nombreTecnico,
                 fecha: fechaActividad
+            };
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify(payload)
             })
-        })
-        .then(response => {
-            console.log("Respuesta del servidor:", response);
-            if (!response.ok) {
-                throw new Error('Error en la actualización');
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Actualización exitosa:', data);
-            const targetColumn = document.getElementById("ot_en_proceso");
-            const card = document.getElementById("card-" + numeroSolicitud);
-            targetColumn.appendChild(card);
-            closeModal();
+            .then(response => {
+                console.log("Respuesta del servidor:", response);
+                if (!response.ok) {
+                    throw new Error('Error en la actualización');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Actualización exitosa:', data);
+                if (tareaId) {
+                    closeModal();
+                    window.location.reload();
+                    return;
+                }
+
+                const targetColumn = document.getElementById("ot_en_proceso");
+                const card = document.getElementById("card-" + numeroSolicitud);
+                if (card && targetColumn) {
+                    targetColumn.appendChild(card);
+                }
         })
         .catch((error) => {
             console.error('Error:', error);

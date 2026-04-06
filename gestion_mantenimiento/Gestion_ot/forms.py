@@ -1,7 +1,7 @@
 from django import forms
 from django.utils import timezone
 from django.contrib.auth.models import User
-from .models import  GestionOt, OrdenTrabajo, CierreOt, ImagenCierreOt
+from .models import GestionOt, OrdenTrabajo, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento
 
 # Formulario para GestionOt
 class GestionOtForm(forms.ModelForm):
@@ -34,26 +34,131 @@ class OrdenTrabajoForm(forms.ModelForm):
         return fecha_actividad
 
 class CierreOtForm(forms.ModelForm):
+    causa_falla = forms.CharField(
+        required=False,
+        widget=forms.TextInput(),
+        label="Causa de la falla"
+    )
     firma_digital = forms.CharField(
         required=False,
-        widget=forms.HiddenInput(),
+        widget=forms.Textarea(attrs={'hidden': 'hidden'}),
         label="Firma Digital"
+    )
+    firma_receptor = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+        label="Firma Receptor"
     )
     se_soluciono = forms.BooleanField(
         required=False,
+        widget=forms.RadioSelect(choices=[(True, 'Sí'), (False, 'No')]),
         label="¿Se solucionó la falla?"
     )
 
     class Meta:
         model = CierreOt
         fields = [
-            'tipo_mantenimiento', 'materiales_utilizados', 'correo_tecnico', 
-            'descripcion_falla', 'fecha_inicio_actividad', 'observaciones', 
-            'nombre_tecnico', 'causa_falla', 'hora_inicio', 'documento_tecnico', 
-            'tipo_intervencion', 'hora_fin', 'firma_digital', 'se_soluciono'
+            'tipo_mantenimiento', 'materiales_utilizados', 'correo_tecnico',
+            'descripcion_falla', 'fecha_inicio_actividad', 'observaciones',
+            'nombre_tecnico', 'causa_falla', 'hora_inicio', 'documento_tecnico',
+            'tipo_intervencion', 'hora_fin', 'firma_digital', 'firma_receptor', 'se_soluciono',
+            'nombre_receptor', 'documento_receptor'
         ]
+        widgets = {
+            'fecha_inicio_actividad': forms.DateInput(attrs={'type': 'date'}),
+            'hora_inicio': forms.TimeInput(attrs={'type': 'time'}),
+            'hora_fin': forms.TimeInput(attrs={'type': 'time'}),
+        }
 
 class ImagenCierreOtForm(forms.ModelForm):
     class Meta:
         model = ImagenCierreOt
         fields = ['imagen', 'tipo', 'descripcion']
+
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+# ============================================================================
+# FORMULARIOS PARA MANTENIMIENTO PREVENTIVO
+# ============================================================================
+
+class PlanMantenimientoForm(forms.ModelForm):
+    class Meta:
+        model = PlanMantenimiento
+        fields = ['nombre', 'descripcion', 'cantidad', 'unidad', 'fecha_inicio', 'activo']
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Lubricación mensual, Inspección trimestral'
+            }),
+            'descripcion': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Describe el propósito y detalles del plan'
+            }),
+            'cantidad': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1'
+            }),
+            'unidad': forms.Select(attrs={'class': 'form-control'}),
+            'fecha_inicio': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date'
+            }),
+            'activo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class ActividadMantenimientoForm(forms.ModelForm):
+    class Meta:
+        model = ActividadMantenimiento
+        fields = ['nombre', 'descripcion', 'orden']
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nombre de la actividad'
+            }),
+            'descripcion': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Instrucciones o detalles'
+            }),
+            'orden': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1'
+            }),
+        }
+
+
+class ActividadMantenimientoFormSet(forms.BaseInlineFormSet):
+    """FormSet para manejar múltiples actividades en un plan"""
+    pass
+
+
+class TareaMantenimientoForm(forms.ModelForm):
+    class Meta:
+        model = TareaMantenimiento
+        fields = ['actividad', 'fecha_programada', 'fecha_ejecutada', 'tecnico', 'estado', 'observaciones']
+        widgets = {
+            'fecha_programada': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date'
+            }),
+            'fecha_ejecutada': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date'
+            }),
+            'tecnico': forms.Select(attrs={'class': 'form-control'}),
+            'estado': forms.Select(attrs={'class': 'form-control'}),
+            'observaciones': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3
+            }),
+        }
+
+class ImagenAntesForm(forms.Form):
+    imagenes_antes = forms.ImageField(widget=MultipleFileInput(attrs={'multiple': True}), required=False, label="Imágenes Antes")
+
+class ImagenDespuesForm(forms.Form):
+    imagenes_despues = forms.ImageField(widget=MultipleFileInput(attrs={'multiple': True}), required=False, label="Imágenes Después")

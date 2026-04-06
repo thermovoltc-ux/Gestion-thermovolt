@@ -1,17 +1,31 @@
 {# filepath: Activos/templates/Activos/equipo_node.html #}
 {% for child_equipo in equipo.children.all %}
     <li class="tree-sub-item">
-        <div class="tree-node">
-            <span class="toggle-icon" id="toggle-icon-equipo-{{ child_equipo.id }}" {% if child_equipo.children.exists %}onclick="toggleChildren('equipo-{{ child_equipo.id }}')" {% endif %}>
+        <div class="tree-node" onclick="seleccionarNodo(event, 'equipo', {{ child_equipo.id }}, '{{ child_equipo.nombre }}', '{{ child_equipo.codigo }}', '{{ child_equipo.descripcion }}', null, null, '{% if child_equipo.imagen %}{{ child_equipo.imagen.url|escapejs }}{% endif %}')">
+            <span class="toggle-icon" id="toggle-icon-equipo-{{ child_equipo.id }}" {% if child_equipo.children.exists %}onclick="toggleChildren('equipo-{{ child_equipo.id }}'); event.stopPropagation();" {% endif %}>
                 {% if child_equipo.children.exists %}
                     <ion-icon name="add-outline"></ion-icon>
                 {% else %}
                     <ion-icon name="remove-outline" style="visibility: hidden;"></ion-icon>
                 {% endif %}
             </span>
-            <span class="icon-leaf">
-                <ion-icon name="cube-outline"></ion-icon> {{ child_equipo.nombre }}
-            </span>
+            <div class="tree-node-content">
+                <span class="icon-leaf">
+                    <ion-icon name="cube-outline"></ion-icon>
+                </span>
+                <span>{{ child_equipo.nombre }}</span>
+                {% if child_equipo.codigo %}
+                    <span style="font-size: 0.85em; color: #999;">({{ child_equipo.codigo }})</span>
+                {% endif %}
+            </div>
+            <div class="tree-node-actions">
+                <button class="tree-node-action-btn" onclick="abrirModalCrearHijo('equipo', {{ child_equipo.id }}); event.stopPropagation();" title="Agregar subequipo">
+                    <ion-icon name="add-circle-outline"></ion-icon>
+                </button>
+                <button class="tree-node-action-btn" onclick="abrirModalCrearPlan({{ child_equipo.id }}, '{{ child_equipo.nombre }}'); event.stopPropagation();" title="Plan mantenimiento">
+                    <ion-icon name="calendar-outline"></ion-icon>
+                </button>
+            </div>
         </div>
         {% if child_equipo.children.exists %}
             <ul id="equipo-{{ child_equipo.id }}" class="tree-children">

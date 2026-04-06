@@ -7,7 +7,8 @@ Crear Equipo
 {% block content %}
 <div class="container-crear_equipo">
     <h1>Crear Equipo</h1>
-    <form id="form-equipo" method="post" action="{% url 'crear_equipo' %}">
+    <p>Selecciona la ubicación donde se encuentra este equipo y, si corresponde, el equipo padre dentro del cual depende.</p>
+    <form id="form-equipo" method="post" action="{% url 'crear_equipo' %}" enctype="multipart/form-data">
         {% csrf_token %}
         {{ form.as_p }}
         <button type="submit" class="btn btn-primary">Guardar</button>

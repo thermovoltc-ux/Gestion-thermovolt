@@ -39,7 +39,7 @@
                 </li>
 
                 <li>
-                    <a href="#">
+                    <a href="{% url 'dashboard' %}">
                         <span class="icon">
                             <ion-icon name="home-outline"></ion-icon>
                         </span>
@@ -78,13 +78,42 @@
                             </a>
                         </li>
 
-                        <li>
-                            <a href="{% url 'gestion_ot' %}">
+                        <li class="has-submenu">
+                            <a href="#" class="menu-link">
                                 <span class="icon">
-                                    <ion-icon name="document-text-outline"></ion-icon>
+                                    <ion-icon name="bar-chart-outline"></ion-icon>
                                 </span>
-                                <span class="title">Gestion de Ot</span>
+                                <span class="title">Tareas</span>
+                                <span class="submenu-icon">
+                                    <ion-icon name="chevron-down-outline"></ion-icon>
+                                </span>
                             </a>
+                            <ul class="submenu">
+                                <li>
+                                    <a href="{% url 'gestion_ot' %}">
+                                        <span class="icon">
+                                            <ion-icon name="document-text-outline"></ion-icon>
+                                        </span>
+                                        <span class="title">Gestion de OT</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{% url 'lista_planes' %}">
+                                        <span class="icon">
+                                            <ion-icon name="document-outline"></ion-icon>
+                                        </span>
+                                        <span class="title">Plan de Trabajo</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{% url 'listar_ot' %}">
+                                        <span class="icon">
+                                            <ion-icon name="lock-closed-outline"></ion-icon>
+                                        </span>
+                                        <span class="title">Actividades</span>
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
 
                         <li>
@@ -102,15 +131,6 @@
                                     <ion-icon name="people-outline"></ion-icon>
                                 </span>
                                 <span class="title">Recurso humano</span>
-                            </a>
-                        </li>
-
-                        <li>
-                            <a href="{% url 'listar_ot' %}">
-                                <span class="icon">
-                                    <ion-icon name="lock-closed-outline"></ion-icon>
-                                </span>
-                                <span class="title">Actividades</span>
                             </a>
                         </li>
                     {% elif request.session.tipo_cuenta == 'tecnico' %}
@@ -136,7 +156,7 @@
                 {% endif %}
 
                 <li>
-                    <a href="#">
+                    <a href="{% url 'logout' %}">
                         <span class="icon">
                             <ion-icon name="log-out-outline"></ion-icon>
                         </span>

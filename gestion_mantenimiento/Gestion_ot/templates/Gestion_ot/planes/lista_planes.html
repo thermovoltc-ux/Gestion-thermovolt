@@ -1,0 +1,363 @@
+{% extends "solicitudes/indexpadre.html" %}
+
+{% block title %}
+Planes de Mantenimiento Preventivo
+{% endblock %}
+
+{% block content %}
+<div class="planes-container">
+    <div class="planes-header">
+        <h1>Planes de Mantenimiento Preventivo</h1>
+        <a href="{% url 'crear_plan' %}" class="btn btn-primary">
+            <ion-icon name="add-circle-outline"></ion-icon> Crear Plan
+        </a>
+    </div>
+
+    <!-- Filtro por equipo -->
+    <div class="planes-filtros">
+        <form method="get" class="filtro-form">
+            <select name="equipo_id" onchange="this.form.submit()" class="form-control">
+                <option value="">Todos los Equipos</option>
+                {% for equipo in equipos %}
+                    <option value="{{ equipo.id }}" {% if equipo.id == equipo_id_selected %}selected{% endif %}>
+                        {{ equipo.display_label }}
+                    </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+
+    <!-- Tabla de planes -->
+    <div class="planes-tabla">
+        {% if planes %}
+            <table class="tabla-planes">
+                <thead>
+                    <tr>
+                        <th>Equipo</th>
+                        <th>Nombre del Plan</th>
+                        <th>Periodicidad</th>
+                        <th>Próxima Fecha</th>
+                        <th>Estado</th>
+                        <th>Actividades</th>
+                        <th>Próximas Tareas</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for plan in planes %}
+                        <tr class="plan-row">
+                            <td><strong>{{ plan.equipo.display_label }}</strong></td>
+                            <td>{{ plan.nombre }}</td>
+                            <td>{{ plan.get_periodo_display }}</td>
+                            <td>
+                                {% if plan.proxima_fecha %}
+                                    {{ plan.proxima_fecha|date:"d/m/Y" }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if plan.activo %}
+                                    <span class="badge badge-success">Activo</span>
+                                {% else %}
+                                    <span class="badge badge-danger">Inactivo</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ plan.actividades.count }}</td>
+                            <td>
+                                <span class="badge badge-info">
+                                    {{ plan.tareas_pendientes }}
+                                </span>
+                            </td>
+                            <td class="acciones-cell">
+                                <a href="{% url 'detalle_plan' plan.id %}" class="btn-accion btn-info" title="Ver detalles">
+                                    <ion-icon name="eye-outline"></ion-icon>
+                                </a>
+                                <a href="{% url 'editar_plan' plan.id %}" class="btn-accion btn-warning" title="Editar">
+                                    <ion-icon name="create-outline"></ion-icon>
+                                </a>
+                                <a href="{% url 'eliminar_plan' plan.id %}" class="btn-accion btn-danger" title="Eliminar">
+                                    <ion-icon name="trash-outline"></ion-icon>
+                                </a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="planes-empty">
+                <ion-icon name="calendar-outline"></ion-icon>
+                <p>No hay planes de mantenimiento creados</p>
+                <a href="{% url 'crear_plan' %}" class="btn btn-primary">Crear el primer plan</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .planes-container {
+        padding: 20px;
+        background-color: #f5f5f5;
+        min-height: 100vh;
+    }
+
+    .planes-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .planes-header h1 {
+        margin: 0;
+        font-size: 1.8em;
+        color: #333;
+    }
+
+    .planes-filtros {
+        margin-bottom: 20px;
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .filtro-form {
+        display: flex;
+        gap: 10px;
+    }
+
+    .filtro-form select {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .planes-tabla {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+
+    .tabla-planes {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .tabla-planes thead {
+        background-color: #4687F1;
+        color: white;
+    }
+
+    .tabla-planes th {
+        padding: 12px;
+        text-align: left;
+        font-weight: 500;
+    }
+
+    .tabla-planes tbody tr {
+        border-bottom: 1px solid #e0e0e0;
+        transition: background-color 0.3s;
+    }
+
+    .tabla-planes tbody tr:hover {
+        background-color: #f9f9f9;
+    }
+
+    .tabla-planes td {
+        padding: 12px;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        font-weight: 500;
+    }
+
+    .badge-success {
+        background-color: #4CAF50;
+        color: white;
+    }
+
+    .badge-danger {
+        background-color: #f44336;
+        color: white;
+    }
+
+    .badge-info {
+        background-color: #2196F3;
+        color: white;
+    }
+
+    .acciones-cell {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-accion {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 1.1em;
+        transition: all 0.3s;
+    }
+
+    .btn-info {
+        background-color: #2196F3;
+        color: white;
+    }
+
+    .btn-info:hover {
+        background-color: #1976D2;
+    }
+
+    .btn-warning {
+        background-color: #FF9800;
+        color: white;
+    }
+
+    .btn-warning:hover {
+        background-color: #F57C00;
+    }
+
+    .btn-danger {
+        background-color: #f44336;
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background-color: #da190b;
+    }
+
+    .planes-empty {
+        text-align: center;
+        padding: 60px 20px;
+        color: #999;
+    }
+
+    .planes-empty ion-icon {
+        font-size: 3em;
+        color: #ddd;
+        margin-bottom: 10px;
+    }
+
+    .planes-empty p {
+        font-size: 1.1em;
+        margin: 10px 0;
+    }
+
+    .btn-primary {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        transition: background-color 0.3s;
+    }
+
+    .btn-primary:hover {
+        background-color: #45a049;
+    }
+
+    .btn-control {
+        background-color: #4687F1;
+        color: white;
+        padding: 8px 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.9em;
+    }
+
+    .btn-control:hover {
+        background-color: #1976D2;
+    }
+
+    .form-control {
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1em;
+    }
+
+    @media (max-width: 900px) {
+        .planes-header,
+        .planes-filtros {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .planes-header h1 {
+            margin-bottom: 1rem;
+        }
+
+        .planes-filtros {
+            padding: 12px;
+        }
+
+        .filtro-form {
+            flex-direction: column;
+        }
+
+        .filtro-form select {
+            width: 100%;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .planes-container {
+            padding: 12px;
+        }
+
+        .planes-header,
+        .planes-filtros {
+            padding: 12px;
+        }
+
+        .planes-tabla {
+            overflow-x: auto;
+        }
+
+        .tabla-planes {
+            min-width: 720px;
+        }
+
+        .tabla-planes th,
+        .tabla-planes td {
+            padding: 10px;
+            white-space: normal;
+        }
+
+        .acciones-cell {
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
