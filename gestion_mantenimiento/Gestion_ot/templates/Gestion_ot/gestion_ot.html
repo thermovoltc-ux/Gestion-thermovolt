@@ -329,9 +329,9 @@ input[type="time"]::-webkit-calendar-picker-indicator {
             <!-- Tareas de mantenimiento preventivo -->
             {% for tarea in tareas_mantenimiento %}
                 {% if tarea.estado == 'pendiente' %}
-                    <div class="kanban-card kanban-card-preventivo" id="tarea-{{ tarea.id }}" data-tarea-id="{{ tarea.id }}" data-plan-nombre="{{ tarea.plan.nombre|escape }}" data-equipo-nombre="{{ tarea.plan.equipo.display_label|escape }}" data-actividad-nombre="{{ tarea.actividad.nombre|default:''|escape }}" data-fecha-programada="{{ tarea.fecha_programada|date:'Y-m-d' }}" data-observaciones="{{ tarea.observaciones|default:''|escape }}" data-estado="{{ tarea.estado }}" data-tecnico="{% if tarea.tecnico %}{{ tarea.tecnico.username|escape }}{% endif %}">
+                    <div class="kanban-card kanban-card-preventivo" id="tarea-{{ tarea.id }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, 'tarea-{{ tarea.id }}')" data-tarea-id="{{ tarea.id }}" data-plan-nombre="{{ tarea.plan.nombre|escape }}" data-equipo-nombre="{{ tarea.plan.equipo.display_label|escape }}" data-actividad-nombre="{{ tarea.actividad.nombre|default:''|escape }}" data-fecha-programada="{{ tarea.fecha_programada|date:'Y-m-d' }}" data-observaciones="{{ tarea.observaciones|default:''|escape }}" data-estado="{{ tarea.estado }}" data-tecnico="{% if tarea.tecnico %}{{ tarea.tecnico.username|escape }}{% endif %}">
                         <div class="card-badge-preventivo">
-                            <ion-icon name="build-outline"></ion-icon> PREVENTIVO
+                            🔧 PREVENTIVO
                         </div>
                         <h3>{{ tarea.plan.nombre }}</h3>
                         <h4>Equipo: {{ tarea.plan.equipo.display_label }}</h4>
@@ -370,9 +370,9 @@ input[type="time"]::-webkit-calendar-picker-indicator {
             <!-- Tareas de mantenimiento preventivo en progreso -->
             {% for tarea in tareas_mantenimiento %}
                 {% if tarea.estado == 'en_progreso' %}
-                    <div class="kanban-card kanban-card-preventivo">
+                    <div class="kanban-card kanban-card-preventivo" id="tarea-{{ tarea.id }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, 'tarea-{{ tarea.id }}')" data-tarea-id="{{ tarea.id }}" data-plan-nombre="{{ tarea.plan.nombre|escape }}" data-equipo-nombre="{{ tarea.plan.equipo.display_label|escape }}" data-actividad-nombre="{{ tarea.actividad.nombre|default:''|escape }}" data-fecha-programada="{{ tarea.fecha_programada|date:'Y-m-d' }}" data-observaciones="{{ tarea.observaciones|default:''|escape }}" data-estado="{{ tarea.estado }}" data-tecnico="{% if tarea.tecnico %}{{ tarea.tecnico.username|escape }}{% endif %}">
                         <div class="card-badge-preventivo">
-                            <ion-icon name="wrench-outline"></ion-icon> PREVENTIVO
+                            🔧 PREVENTIVO
                         </div>
                         <h3>{{ tarea.plan.nombre }}</h3>
                         <h4>Equipo: {{ tarea.plan.equipo.display_label }}</h4>

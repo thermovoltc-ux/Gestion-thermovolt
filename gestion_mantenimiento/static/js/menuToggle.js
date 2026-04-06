@@ -49,6 +49,25 @@ document.addEventListener("click", function (event) {
     }
 });
 
+// Dropdown del usuario
+const userIcon = document.querySelector(".user-icon");
+const userDropdown = document.getElementById("user-dropdown-content");
+
+if (userIcon && userDropdown) {
+    userIcon.addEventListener("click", function(event) {
+        event.stopPropagation();
+        const isVisible = userDropdown.style.display === "block";
+        userDropdown.style.display = isVisible ? "none" : "block";
+    });
+
+    // Cerrar dropdown si se hace clic fuera
+    document.addEventListener("click", function(event) {
+        if (!userIcon.contains(event.target) && !userDropdown.contains(event.target)) {
+            userDropdown.style.display = "none";
+        }
+    });
+}
+
 // Abrir/cerrar submenú de la barra lateral
 const submenuLinks = document.querySelectorAll(".navigation .has-submenu > a");
 submenuLinks.forEach((link) => {

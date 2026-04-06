@@ -45,12 +45,24 @@ function touchEnd(event) {
 
         if (column) {
             const columnId = column.id;
+            const isPrevention = draggedElement.id.startsWith('tarea-'); // Detectar si es preventivo
 
+            // Abrir modal cuando se arrastra a "ot_en_proceso"
             if (columnId === "ot_en_proceso") {
-                const numeroSolicitud = draggedElement.id.split('-')[1];
-                const solicitud = { numero: numeroSolicitud };
-                window.openModal(solicitud); // Usar window para acceder a función de modals
-                return;
+                if (isPrevention) {
+                    // Para preventivos
+                    const tareaId = draggedElement.id.split('-')[1];
+                    window.openPreventivoModalForDragDrop(tareaId);
+                    draggedElement = null;
+                    return;
+                } else {
+                    // Para solicitudes
+                    const numeroSolicitud = draggedElement.id.split('-')[1];
+                    const solicitud = { numero: numeroSolicitud };
+                    window.openModal(solicitud);
+                    draggedElement = null;
+                    return;
+                }
             }
 
             column.appendChild(draggedElement);
@@ -76,12 +88,22 @@ function dropDesktop(event) {
 
     if (column) {
         const columnId = column.id;
+        const isPrevention = card.id.startsWith('tarea-'); // Detectar si es preventivo
 
+        // Abrir modal cuando se arrastra a "ot_en_proceso"
         if (columnId === "ot_en_proceso") {
-            const numeroSolicitud = card.id.split('-')[1];
-            const solicitud = { numero: numeroSolicitud };
-            window.openModal(solicitud); // Usar window para acceder a función de modals
-            return;
+            if (isPrevention) {
+                // Para preventivos
+                const tareaId = card.id.split('-')[1];
+                window.openPreventivoModalForDragDrop(tareaId);
+                return;
+            } else {
+                // Para solicitudes
+                const numeroSolicitud = card.id.split('-')[1];
+                const solicitud = { numero: numeroSolicitud };
+                window.openModal(solicitud);
+                return;
+            }
         }
 
         column.appendChild(card);
@@ -98,12 +120,22 @@ function drop(event) {
 
     if (column) {
         const columnId = column.id;
+        const isPrevention = card.id.startsWith('tarea-'); // Detectar si es preventivo
 
+        // Abrir modal cuando se arrastra a "ot_en_proceso"
         if (columnId === "ot_en_proceso") {
-            const numeroSolicitud = card.id.split('-')[1];
-            const solicitud = { numero: numeroSolicitud };
-            window.openModal(solicitud); // Usar window para acceder a función de modals
-            return;
+            if (isPrevention) {
+                // Para preventivos
+                const tareaId = card.id.split('-')[1];
+                window.openPreventivoModalForDragDrop(tareaId);
+                return;
+            } else {
+                // Para solicitudes
+                const numeroSolicitud = card.id.split('-')[1];
+                const solicitud = { numero: numeroSolicitud };
+                window.openModal(solicitud);
+                return;
+            }
         }
 
         column.appendChild(card);
@@ -111,42 +143,84 @@ function drop(event) {
     }
 }
 
-// Actualiza el estado de la solicitud en el backend
+// Actualiza el estado de la solicitud o tarea en el backend
 function updateSolicitudState(card, columnId) {
-    const numeroSolicitud = card.id.split('-')[1];
-    let nuevoEstado = "";
-
-    if (columnId === "solicitado") {
-        nuevoEstado = "solicitado";
-    } else if (columnId === "ot_en_proceso") {
-        nuevoEstado = "en proceso";
-    } else if (columnId === "ot_en_revision") {
-        nuevoEstado = "en revision";
-    } else if (columnId === "ot_finalizada") {
-        nuevoEstado = "finalizada";
-    }
-
-    fetch('/Gestion_ot/actualizar_estado_solicitud/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCSRFToken()
-        },
-        body: JSON.stringify({
-            numero: numeroSolicitud,
-            estado: nuevoEstado,
-            fecha_creacion: fechaActividad,
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'ok') {
-            console.log('Estado actualizado exitosamente');
-        } else {
-            console.log('Error al actualizar el estado:', data.message);
+    const cardId = card.id;
+    const isPrevention = cardId.startsWith('tarea-'); // Detectar si es preventivo
+    
+    if (isPrevention) {
+        // Manejar actualización de tarea de mantenimiento preventivo
+        const tareaId = cardId.split('-')[1];
+        let nuevoEstado = "";
+        
+        if (columnId === "solicitudes") {
+            nuevoEstado = "pendiente";
+        } else if (columnId === "ot_en_proceso") {
+            nuevoEstado = "en_progreso";
+        } else if (columnId === "ot_en_revision") {
+            nuevoEstado = "completada";
+        } else if (columnId === "ot_finalizada") {
+            nuevoEstado = "completada";
         }
-    })
-    .catch(error => console.log('Error:', error));
+        
+        if (!nuevoEstado) return; // No hacer nada si no hay estado válido
+        
+        fetch(`/Gestion_ot/tarea/${tareaId}/actualizar/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: new URLSearchParams({
+                'estado': nuevoEstado
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('Tarea actualizada exitosamente:', data.message);
+            } else {
+                console.log('Error al actualizar la tarea:', data.error);
+            }
+        })
+        .catch(error => console.log('Error:', error));
+    } else {
+        // Manejar actualización de solicitud (lógica original)
+        const numeroSolicitud = cardId.split('-')[1];
+        let nuevoEstado = "";
+
+        if (columnId === "solicitudes") {
+            nuevoEstado = "solicitado";
+        } else if (columnId === "ot_en_proceso") {
+            nuevoEstado = "en proceso";
+        } else if (columnId === "ot_en_revision") {
+            nuevoEstado = "en revision";
+        } else if (columnId === "ot_finalizada") {
+            nuevoEstado = "finalizada";
+        }
+
+        fetch('/Gestion_ot/actualizar_estado_solicitud/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({
+                numero: numeroSolicitud,
+                estado: nuevoEstado,
+                fecha_creacion: fechaActividad,
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                console.log('Estado actualizado exitosamente');
+            } else {
+                console.log('Error al actualizar el estado:', data.message);
+            }
+        })
+        .catch(error => console.log('Error:', error));
+    }
 }
 
 // Función para manejar vistas y filtros

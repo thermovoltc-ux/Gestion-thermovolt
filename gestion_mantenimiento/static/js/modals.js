@@ -333,6 +333,37 @@ function openModal(solicitud) {
     openTecnicoModal({ numero: solicitud.numero, tareaId: '' });
 }
 
+window.openModal = openModal;
+
+// Función para abrir el modal de preventivo (para drag-drop)
+function openPreventivoModalForDragDrop(tareaId) {
+    const tarjeta = document.getElementById(`tarea-${tareaId}`);
+    if (!tarjeta) {
+        console.error(`No se encontró la tarjeta con ID: tarea-${tareaId}`);
+        return;
+    }
+
+    const preventivoModal = document.getElementById('preventivoModal');
+    if (!preventivoModal) {
+        console.error('No se encontró el modal de preventivos');
+        return;
+    }
+
+    // Rellenar los datos del modal con los atributos de la tarjeta
+    preventivoModal.dataset.tareaId = tarjeta.dataset.tareaId;
+    document.getElementById('preventivoPlan').textContent = tarjeta.dataset.planNombre || 'N/A';
+    document.getElementById('preventivoEquipo').textContent = tarjeta.dataset.equipoNombre || 'N/A';
+    document.getElementById('preventivoActividad').textContent = tarjeta.dataset.actividadNombre || 'N/A';
+    document.getElementById('preventivoFecha').textContent = tarjeta.dataset.fechaProgramada || 'N/A';
+    document.getElementById('preventivoEstado').textContent = tarjeta.dataset.estado || 'N/A';
+    document.getElementById('preventivoTecnico').textContent = tarjeta.dataset.tecnico || 'N/A';
+    document.getElementById('preventivoObservaciones').textContent = tarjeta.dataset.observaciones || 'N/A';
+    
+    preventivoModal.style.display = 'block';
+}
+
+window.openPreventivoModalForDragDrop = openPreventivoModalForDragDrop;
+
 window.addEventListener('click', function(event) {
     const tecnicoModal = document.getElementById('tecnicoModal');
     const solicitudModal = document.getElementById('solicitudModal');
