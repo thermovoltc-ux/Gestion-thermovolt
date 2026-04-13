@@ -319,6 +319,24 @@ body {
 .navigation ul li a .icon ion-icon {
   font-size: 1.75rem;
 }
+.navigation ul li.brand-item a .icon.brand-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: transparent;
+  padding: 0;
+}
+.navigation ul li.brand-item a .icon.brand-icon img,
+.navigation ul li.brand-item a .icon.brand-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.navigation ul li.brand-item a .icon.brand-icon svg {
+  background-color: transparent;
+}
 
 .navigation ul li a .title {
   position: relative;
