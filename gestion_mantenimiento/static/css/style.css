@@ -590,7 +590,7 @@ body {
   width: 100%;
   padding: 20px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   grid-gap: 30px;
 }
 
@@ -1419,6 +1419,119 @@ tr:hover {
   background-color: #f1f1f1;
 }
 
+.assigned-ot-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem 1.5rem;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1.5rem 1.5rem 1.25rem;
+  background: linear-gradient(180deg, #e9f0ff 0%, #f6f9ff 100%);
+  border-radius: 20px;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.05);
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 1.85rem;
+  color: #0f172a;
+}
+
+.subtitle {
+  margin: 0.5rem 0 0;
+  color: #475569;
+  max-width: 560px;
+}
+
+.page-note {
+  margin: 0.85rem 0 0;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.view-toggle-group {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.view-toggle {
+  min-width: 150px;
+  border: none;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 0.95rem 1.3rem;
+  border-radius: 14px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.view-toggle:hover,
+.view-toggle.active {
+  background-color: #2563eb;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.table-card,
+.calendar-panel {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.06);
+  padding: 1.25rem;
+}
+
+.table-card table {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.action-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.action-link:hover {
+  text-decoration: underline;
+}
+
+.empty-row {
+  text-align: center;
+  color: #64748b;
+  padding: 2rem 0;
+}
+
+.calendar-panel {
+  min-height: 640px;
+}
+
+.calendar-panel #calendar {
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  padding: 1rem;
+}
+
+@media (max-width: 900px) {
+  .page-header {
+    padding: 1rem;
+  }
+
+  .view-toggle {
+    width: 100%;
+  }
+}
+
 @media (max-width: 768px) {
   .list-container {
     overflow-x: hidden;
@@ -1696,6 +1809,17 @@ tr:hover {
 
 .filter-button.filter-applied .filter-indicator {
   display: block; /* Muestra el indicador cuando hay un filtro activo */
+}
+
+.filter-status-bar {
+  margin: 0 0 20px;
+  padding: 16px 18px;
+  background-color: #eef6ff;
+  color: #0f172a;
+  font-size: 0.95rem;
+  border-radius: 16px;
+  border: none;
+  box-shadow: none;
 }
 
 /* Barra lateral de filtro */

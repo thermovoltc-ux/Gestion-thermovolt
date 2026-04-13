@@ -294,7 +294,9 @@ input[type="time"]::-webkit-calendar-picker-indicator {
             <select id="pdv" name="pdv">
                 <option value="">Seleccione PDV</option>
                 {% for pdv in pdvs %}
-                <option value="{{ pdv }}" {% if pdv == filtro_pdv %}selected{% endif %}>{{ pdv }}</option>
+                    {% if pdv %}
+                        <option value="{{ pdv }}" {% if pdv == filtro_pdv %}selected{% endif %}>{{ pdv }}</option>
+                    {% endif %}
                 {% endfor %}
             </select>
         </div>

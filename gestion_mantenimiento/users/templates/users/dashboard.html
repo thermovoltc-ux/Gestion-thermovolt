@@ -3,6 +3,115 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<h2>Dashboard</h2>
-<p>Bienvenido, {{ user.username }}!</p>
+<div class="dashboard-welcome" style="margin-bottom: 30px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:16px;">
+        <div>
+            <h1 style="margin:0; font-size:2rem; color:#0f172a;">Bienvenido, {{ user.username }}!</h1>
+            <p style="margin:8px 0 0; color:#475569; max-width:640px;">Este es tu panel principal. Aquí puedes ver el estado de las órdenes de trabajo, tareas preventivas y cumplimiento general.</p>
+        </div>
+        <div style="background: linear-gradient(135deg, #eef2ff 0%, #eff6ff 100%); border-radius:18px; padding:14px 20px; box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05); min-width:220px;">
+            <p style="margin:0; color:#475569; font-size:0.95rem;">Porcentaje de cumplimiento</p>
+            <p style="margin:8px 0 0; font-size:2.4rem; font-weight:700; color:#3730a3;">{{ porcentaje_cumplimiento }}%</p>
+        </div>
+    </div>
+</div>
+
+<div class="cardBox">
+    <a href="{% url 'gestion_ot' %}?estado=solicitado" class="card" style="display:flex; text-decoration:none; color:inherit;">
+        <div>
+            <div class="numbers">{{ solicitudes_solicitadas }}</div>
+            <div class="cardName">Solicitudes</div>
+        </div>
+        <div class="iconBx">📥</div>
+    </a>
+    <a href="{% url 'listar_ot' %}?estado=en%20proceso" class="card" style="display:flex; text-decoration:none; color:inherit;">
+        <div>
+            <div class="numbers">{{ ot_en_proceso }}</div>
+            <div class="cardName">OTs en Proceso</div>
+        </div>
+        <div class="iconBx">🟦</div>
+    </a>
+    <a href="{% url 'listar_ot' %}?estado=en%20revision" class="card" style="display:flex; text-decoration:none; color:inherit;">
+        <div>
+            <div class="numbers">{{ ot_en_revision }}</div>
+            <div class="cardName">OTs en Revisión</div>
+        </div>
+        <div class="iconBx">🟣</div>
+    </a>
+    <a href="{% url 'listar_ot' %}?estado=finalizada" class="card" style="display:flex; text-decoration:none; color:inherit;">
+        <div>
+            <div class="numbers">{{ ot_finalizada }}</div>
+            <div class="cardName">OTs Finalizadas</div>
+        </div>
+        <div class="iconBx">🟢</div>
+    </a>
+    <a href="{% url 'gestion_ot' %}?estado=pendiente&atrasadas=1" class="card" style="display:flex; text-decoration:none; color:inherit;">
+        <div>
+            <div class="numbers">{{ tareas_atrasadas }}</div>
+            <div class="cardName">Tareas en atraso</div>
+        </div>
+        <div class="iconBx">⚠️</div>
+    </a>
+</div>
+
+<div class="details" style="margin-top: 30px;">
+    <div class="recentOrders">
+        <div class="cardHeader">
+            <h2>Órdenes de Trabajo</h2>
+            <a href="#" class="btn">Ver detalle</a>
+        </div>
+        <div style="display:grid; gap: 12px; margin-top: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; padding:18px 20px; background:#f8fafc; border-radius:16px;">
+                <span style="color:#334155; font-weight:600;">En proceso</span>
+                <span style="color:#1d4ed8; font-size:1.2rem; font-weight:700;">{{ ot_en_proceso }}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; padding:18px 20px; background:#f8fafc; border-radius:16px;">
+                <span style="color:#334155; font-weight:600;">En revisión</span>
+                <span style="color:#7c3aed; font-size:1.2rem; font-weight:700;">{{ ot_en_revision }}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; padding:18px 20px; background:#f8fafc; border-radius:16px;">
+                <span style="color:#334155; font-weight:600;">Finalizadas</span>
+                <span style="color:#059669; font-size:1.2rem; font-weight:700;">{{ ot_finalizada }}</span>
+            </div>
+        </div>
+        <div style="margin-top: 24px; display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px;">
+            <div style="background:#eff6ff; border-radius:16px; padding:18px; text-align:center;">
+                <p style="margin:0; color:#475569;">Solicitudes</p>
+                <p style="margin:10px 0 0; font-size:1.6rem; font-weight:700; color:#1d4ed8;">{{ solicitudes_totales }}</p>
+            </div>
+            <div style="background:#eef2ff; border-radius:16px; padding:18px; text-align:center;">
+                <p style="margin:0; color:#475569;">Tareas planificadas</p>
+                <p style="margin:10px 0 0; font-size:1.6rem; font-weight:700; color:#2563eb;">{{ tareas_planificadas }}</p>
+            </div>
+            <div style="background:#ecfdf5; border-radius:16px; padding:18px; text-align:center;">
+                <p style="margin:0; color:#475569;">Activos detenidos</p>
+                <p style="margin:10px 0 0; font-size:1.6rem; font-weight:700; color:#16a34a;">{{ activos_detenidos }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="recentOrders">
+        <div class="cardHeader">
+            <h2>Planificadas vs No planificadas</h2>
+            <a href="#" class="btn">Actualizar</a>
+        </div>
+        <div style="margin-top: 25px; display:grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items:center;">
+            <div style="position:relative; width:100%; min-height:220px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:20px;">
+                <div style="width:180px; height:180px; border-radius:50%; background:linear-gradient(180deg, #eff6ff 0%, #e0f2fe 100%); display:flex; align-items:center; justify-content:center; font-size:1.6rem; font-weight:700; color:#1e3a8a; box-shadow: inset 0 0 0 18px rgba(37,99,235,0.2);">
+                    {{ tareas_planificadas }}
+                </div>
+            </div>
+            <div style="display:grid; gap: 16px;">
+                <div style="background:#eff6ff; border-radius:18px; padding:18px; box-shadow:0 8px 24px rgba(15,23,42,0.06);">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;"><span style="width:10px; height:10px; border-radius:50%; background:#2563eb;"></span><span style="color:#475569; font-weight:600;">Planificadas</span></div>
+                    <p style="margin:0; font-size:1.6rem; font-weight:700; color:#2563eb;">{{ tareas_planificadas }}</p>
+                </div>
+                <div style="background:#f8fafc; border-radius:18px; padding:18px; box-shadow:0 8px 24px rgba(15,23,42,0.06);">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;"><span style="width:10px; height:10px; border-radius:50%; background:#94a3b8;"></span><span style="color:#475569; font-weight:600;">No planificadas</span></div>
+                    <p style="margin:0; font-size:1.6rem; font-weight:700; color:#0f172a;">{{ tareas_no_planificadas }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

@@ -1,70 +1,135 @@
 {% extends "solicitudes/indexpadre.html" %}
 
-{% block title %}Órdenes de Trabajo{% endblock %}
+{% block title %}Órdenes de Trabajo Asignadas{% endblock %}
 
 {% block content %}
-<h1>Órdenes de Trabajo Asignadas</h1>
+<div class="assigned-ot-page">
+    <div class="page-header">
+        <div>
+            <h1>Órdenes de Trabajo Asignadas</h1>
+            <p class="subtitle">Revisa las órdenes asignadas en tabla o en calendario.</p>
+            {% if filter_label %}
+                <p class="page-note">{{ filter_label }}</p>
+            {% endif %}
+        </div>
+        <div class="view-toggle-group">
+            <button id="table-view-button" class="view-toggle active">Vista de Tabla</button>
+            <button id="calendar-view-button" class="view-toggle">Vista de Calendario</button>
+        </div>
+    </div>
 
-{% if filter_label %}
-    <p><strong>{{ filter_label }}</strong></p>
-{% endif %}
-
-{% if messages %}
-<div class="messages">
-    {% for message in messages %}
-    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-    <script>console.log("{{ message }}");</script>
-    {% endfor %}
-</div>
-{% endif %}
-
-<!-- Botones para alternar entre vistas -->
-<div>
-    <button id="table-view-button">Vista de Tabla</button>
-    <button id="calendar-view-button">Vista de Calendario</button>
-</div>
-
-<!-- Contenedor para la vista de tabla -->
-<div id="table-view">
-    <table>
-        <thead>
-            <tr>
-                <th>Número de OT</th>
-                <th>Técnico Asignado</th>
-                <th>Fecha de Actividad</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for ot in ots %}
-            <tr>
-                <td>OT-00{{ ot.solicitud.consecutivo }}</td>
-                <td>{{ ot.tecnico_asignado }}</td>
-                <td>{{ ot.fecha_actividad }}</td>
-                <td>{{ ot.estado }}</td>
-                <td>
-                    <a href="{% url 'cierre_ot' ot.id %}">Gestionar</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<!-- Contenedor para la vista de calendario -->
-<div class="calendar-container" style="display: none;">
-    <div id="calendar-view" data-events='[
-        {% for ot in ots %}
-            {
-                "consecutivo": "OT-{{ ot.solicitud.consecutivo }}",
-                "fecha_actividad": "{{ ot.fecha_actividad | date:'Y-m-d' }}",
-                "tecnico_asignado": "{{ ot.tecnico_asignado }}",
-                "url": "{% url 'cierre_ot' ot.id %}"
-            }{% if not forloop.last %},{% endif %}
+    {% if messages %}
+    <div class="messages-wrapper">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
         {% endfor %}
-    ]'></div>
+    </div>
+    {% endif %}
+
+    <div id="table-view" class="list-container table-card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Número de OT</th>
+                    <th>Técnico</th>
+                    <th>Fecha de actividad</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ot in ots %}
+                <tr>
+                    <td>OT-00{{ ot.solicitud.consecutivo }}</td>
+                    <td>{{ ot.tecnico_asignado }}</td>
+                    <td>{{ ot.fecha_actividad|date:'d/m/Y' }}</td>
+                    <td>{{ ot.estado }}</td>
+                    <td>
+                        <a class="action-link" href="{% url 'cierre_ot' ot.id %}">Gestionar</a>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not ots %}
+                <tr>
+                    <td colspan="5" class="empty-row">No hay órdenes de trabajo asignadas.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <div id="calendar-view" class="calendar-panel" style="display: none;">
+        <div id="calendar"></div>
+    </div>
+    <script id="calendar-events-data" type="application/json">{{ calendar_events_json|safe }}</script>
 </div>
 
+<script>
+window.addEventListener('load', function() {
+    const tableButton = document.getElementById('table-view-button');
+    const calendarButton = document.getElementById('calendar-view-button');
+    const tableView = document.getElementById('table-view');
+    const calendarView = document.getElementById('calendar-view');
+    const calendarElement = document.getElementById('calendar');
+    const calendarEventsData = document.getElementById('calendar-events-data');
+
+    let events = [];
+    try {
+        events = JSON.parse(calendarEventsData.textContent || '[]');
+    } catch (error) {
+        console.error('Error parsing calendar events:', error);
+    }
+
+    let calendar = null;
+    if (window.FullCalendar && calendarElement) {
+        calendar = new FullCalendar.Calendar(calendarElement, {
+            initialView: 'dayGridMonth',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            selectable: true,
+            events: events,
+            eventColor: '#2563eb',
+            eventTextColor: '#fff',
+            eventClick: function(info) {
+                info.jsEvent.preventDefault();
+                if (info.event.url) {
+                    window.location.href = info.event.url;
+                }
+            }
+        });
+    }
+
+    function setActiveView(view) {
+        if (view === 'calendar') {
+            tableView.style.display = 'none';
+            calendarView.style.display = 'block';
+            calendarButton.classList.add('active');
+            tableButton.classList.remove('active');
+            if (calendar) {
+                calendar.render();
+                calendar.updateSize();
+            }
+        } else {
+            tableView.style.display = 'block';
+            calendarView.style.display = 'none';
+            tableButton.classList.add('active');
+            calendarButton.classList.remove('active');
+        }
+    }
+
+    tableButton.addEventListener('click', function() {
+        setActiveView('table');
+    });
+
+    calendarButton.addEventListener('click', function() {
+        setActiveView('calendar');
+    });
+
+    setActiveView('table');
+});
+</script>
 
 {% endblock %}

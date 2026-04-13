@@ -16,6 +16,7 @@ from solicitudes.models import Solicitud
 import logging
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
+from django.urls import reverse
 from django.core.serializers.json import DjangoJSONEncoder
 from docx import Document
 from docx2pdf import convert
@@ -54,6 +55,8 @@ def gestion_ot(request):
     filtro_fecha_inicio = request.GET.get('fecha_inicio')
     filtro_fecha_fin = request.GET.get('fecha_fin')
     filtro_pdv = request.GET.get('pdv')
+    filtro_estado = request.GET.get('estado')
+    filtro_atrasadas = request.GET.get('atrasadas')
 
     pdvs = Solicitud.objects.values_list('PDV', flat=True).distinct()
 
@@ -75,6 +78,18 @@ def gestion_ot(request):
     if filtro_pdv:
         solicitudes_pendientes = solicitudes_pendientes.filter(PDV=filtro_pdv)
 
+    filter_label = None
+    if filtro_estado:
+        solicitudes_pendientes = solicitudes_pendientes.filter(estado__nombre=filtro_estado)
+        tarea_estado = filtro_estado
+        if filtro_estado == 'en proceso':
+            tarea_estado = 'en_progreso'
+        tareas_mantenimiento = tareas_mantenimiento.filter(estado=tarea_estado)
+        filter_label = f'Filtrado por estado: {filtro_estado}'
+    elif filtro_atrasadas:
+        tareas_mantenimiento = tareas_mantenimiento.filter(fecha_programada__lt=timezone.now().date())
+        filter_label = 'Tareas con atraso'
+
     form = GestionOtForm()
     return render(request, 'Gestion_ot/gestion_ot.html', {
         'form': form,
@@ -85,9 +100,11 @@ def gestion_ot(request):
         'filtro_fecha_inicio': filtro_fecha_inicio,
         'filtro_fecha_fin': filtro_fecha_fin,
         'filtro_pdv': filtro_pdv,
+        'filtro_estado': filtro_estado,
+        'filtro_atrasadas': filtro_atrasadas,
+        'filter_label': filter_label,
         'tecnicos': tecnicos,
     })
-
 
 
 # Vista para actualizar el estado de una solicitud
@@ -249,6 +266,12 @@ def listar_ot(request):
         ots = OrdenTrabajo.objects.filter(tecnico_asignado=request.user.username)
 
     filter_label = None
+    estado = request.GET.get('estado')
+
+    if estado:
+        estado_nombre = 'en proceso' if estado == 'en_proceso' else estado
+        ots = ots.filter(estado__nombre=estado_nombre)
+        filter_label = f'Filtrado por estado: {estado_nombre}'
 
     if equipo_id:
         ots = ots.filter(solicitud__equipo_id=equipo_id)
@@ -270,9 +293,19 @@ def listar_ot(request):
         else:
             filter_label = f'Historial de OT para Ubicación ID {ubicacion_id}'
 
+    calendar_events = []
+    for ot in ots:
+        if ot.fecha_actividad:
+            calendar_events.append({
+                'title': f"OT-{ot.solicitud.consecutivo} - {ot.tecnico_asignado}",
+                'start': ot.fecha_actividad.date().isoformat(),
+                'url': reverse('cierre_ot', args=[ot.id]),
+            })
+
     return render(request, 'Gestion_ot/listar_ot.html', {
         'ots': ots,
         'filter_label': filter_label,
+        'calendar_events_json': json.dumps(calendar_events),
     })
 
 # Vista para cerrar una OT
