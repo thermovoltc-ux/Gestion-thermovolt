@@ -109,13 +109,17 @@ def detalle_plan_mantenimiento(request, plan_id):
         estado__in=['pendiente', 'en_progreso']
     ).order_by('fecha_programada')
     
+    tareas_completadas = tareas.filter(estado__in=['completada', 'convertido']).count()
+    tareas_convertidas = tareas.filter(estado='convertido').count()
+
     context = {
         'plan': plan,
         'actividades': actividades,
         'tareas_proximas': tareas_proximas,
         'tareas_atrasadas': tareas_atrasadas,
         'total_tareas': tareas.count(),
-        'tareas_completadas': tareas.filter(estado='completada').count(),
+        'tareas_completadas': tareas_completadas,
+        'tareas_convertidas': tareas_convertidas,
     }
     return render(request, 'Gestion_ot/planes/detalle_plan.html', context)
 

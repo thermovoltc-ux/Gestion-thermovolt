@@ -217,32 +217,41 @@ document.addEventListener('DOMContentLoaded', function() {
     let overlayPad;
     let currentSignType = null;
 
+    function resizeOverlayCanvas() {
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        const width = overlayCanvas.offsetWidth;
+        const height = overlayCanvas.offsetHeight;
+        overlayCanvas.width = Math.round(width * ratio);
+        overlayCanvas.height = Math.round(height * ratio);
+        const ctx = overlayCanvas.getContext('2d');
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    }
+
     function openSignatureOverlay(type) {
         currentSignType = type;
         overlayTitle.textContent = type === 'tecnico' ? 'Firma del Técnico' : 'Firma de la Persona que Recibe';
 
-        const isPortrait = window.innerHeight > window.innerWidth;
-
-        overlayCanvas.width = window.innerWidth;
-        overlayCanvas.height = window.innerHeight;
-        overlayCanvas.style.transform = 'none';
-        overlayCanvas.style.width = '100%';
-        overlayCanvas.style.height = '100%';
-
-        overlayPad = new SignaturePad(overlayCanvas, {
-            minWidth: 2,
-            maxWidth: 4,
-            penColor: 'rgb(0,0,0)'
-        });
-
-        const sourcePad = type === 'tecnico' ? signaturePadTecnico : signaturePadReceptor;
-        if (!sourcePad.isEmpty()) {
-            overlayPad.fromDataURL(sourcePad.toDataURL());
-        } else {
-            overlayPad.clear();
-        }
-
         signatureOverlay.style.display = 'flex';
+
+        requestAnimationFrame(() => {
+            overlayCanvas.style.transform = 'none';
+            overlayCanvas.style.width = '100%';
+            overlayCanvas.style.height = '100%';
+            resizeOverlayCanvas();
+
+            overlayPad = new SignaturePad(overlayCanvas, {
+                minWidth: 2,
+                maxWidth: 4,
+                penColor: 'rgb(0,0,0)'
+            });
+
+            const sourcePad = type === 'tecnico' ? signaturePadTecnico : signaturePadReceptor;
+            if (!sourcePad.isEmpty()) {
+                overlayPad.fromDataURL(sourcePad.toDataURL());
+            } else {
+                overlayPad.clear();
+            }
+        });
     }
 
     function closeSignatureOverlay() {

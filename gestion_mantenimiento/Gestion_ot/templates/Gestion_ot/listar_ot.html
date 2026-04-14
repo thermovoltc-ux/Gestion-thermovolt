@@ -40,11 +40,11 @@
             <tbody>
                 {% for ot in ots %}
                 <tr>
-                    <td>OT-00{{ ot.solicitud.consecutivo }}</td>
-                    <td>{{ ot.tecnico_asignado }}</td>
-                    <td>{{ ot.fecha_actividad|date:'d/m/Y' }}</td>
-                    <td>{{ ot.estado }}</td>
-                    <td>
+                    <td data-label="Número de OT">OT-00{{ ot.solicitud.consecutivo }}</td>
+                    <td data-label="Técnico">{{ ot.tecnico_asignado }}</td>
+                    <td data-label="Fecha de actividad">{{ ot.fecha_actividad|date:'d/m/Y' }}</td>
+                    <td data-label="Estado">{{ ot.estado }}</td>
+                    <td data-label="Acciones">
                         <a class="action-link" href="{% url 'cierre_ot' ot.id %}">Gestionar</a>
                     </td>
                 </tr>

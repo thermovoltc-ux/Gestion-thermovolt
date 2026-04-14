@@ -463,12 +463,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
         <tbody>
             {% for solicitud in solicitudes %}
             <tr class="ver-solicitud" data-consecutivo="{{ solicitud.consecutivo }}">
-                <td>{{ solicitud.consecutivo }}</td>
-                <td>{{ solicitud.creado_por }}</td>
-                <td>{{ solicitud.PDV }}</td>
-                <td>{{ solicitud.descripcion_problema|slice:":50" }}...</td>
-                <td>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</td>
-                <td>{{ solicitud.estado.nombre }}</td>
+                <td data-label="Consecutivo">{{ solicitud.consecutivo }}</td>
+                <td data-label="Creado por">{{ solicitud.creado_por }}</td>
+                <td data-label="Ubicación">{{ solicitud.PDV }}</td>
+                <td data-label="Descripción">{{ solicitud.descripcion_problema|slice:":50" }}...</td>
+                <td data-label="Fecha de Creación">{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                <td data-label="Estado">{{ solicitud.estado.nombre }}</td>
                 
             </tr>
             {% endfor %}

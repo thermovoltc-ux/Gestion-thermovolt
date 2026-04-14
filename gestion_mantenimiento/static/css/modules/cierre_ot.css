@@ -114,15 +114,19 @@ form {
 }
 
 .cierre-ot-form-group textarea {
-    height: 15px !important;
-    resize: none;
-    line-height: 15px;
-    padding: 5px 8px !important;
+    min-height: 70px;
+    max-height: 100px;
+    resize: vertical;
+    line-height: 1.4;
+    padding: 10px 12px !important;
+    overflow-y: auto;
 }
 
 .cierre-ot-large-textarea textarea {
-    height: 15px !important;
-    resize: none;
+    min-height: 70px;
+    max-height: 100px;
+    resize: vertical;
+    overflow-y: auto;
 }
 
 /* CHECKBOX */
@@ -191,6 +195,7 @@ form {
     cursor: crosshair;
     width: 100%;
     max-width: 400px;
+    touch-action: none;
 }
 
 /* BOTONES */

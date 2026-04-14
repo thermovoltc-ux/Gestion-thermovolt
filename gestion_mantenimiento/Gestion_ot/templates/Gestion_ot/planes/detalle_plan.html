@@ -69,6 +69,10 @@
                     <span class="stat-number">{{ tareas_completadas }}</span>
                     <span class="stat-label">Completadas</span>
                 </div>
+                <div class="stat">
+                    <span class="stat-number">{{ tareas_convertidas }}</span>
+                    <span class="stat-label">Convertidas</span>
+                </div>
             </div>
 
             <a href="{% url 'agregar_actividad' plan.id %}" class="btn btn-primary btn-block">
@@ -253,7 +257,7 @@
 
     .stats {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
         margin: 20px 0;
         padding: 15px;
