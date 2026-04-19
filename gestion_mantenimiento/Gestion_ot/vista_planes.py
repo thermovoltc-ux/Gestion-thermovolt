@@ -7,6 +7,7 @@ from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.urls import reverse, reverse_lazy
 from django.http import JsonResponse
 from django.utils import timezone
+from django.contrib.auth.models import User
 from datetime import date, timedelta
 from .models import PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento
 from Activos.models import Equipo
@@ -112,6 +113,8 @@ def detalle_plan_mantenimiento(request, plan_id):
     tareas_completadas = tareas.filter(estado__in=['completada', 'convertido']).count()
     tareas_convertidas = tareas.filter(estado='convertido').count()
 
+    tecnicos = User.objects.filter(groups__name='Tecnico')
+
     context = {
         'plan': plan,
         'actividades': actividades,
@@ -120,6 +123,7 @@ def detalle_plan_mantenimiento(request, plan_id):
         'total_tareas': tareas.count(),
         'tareas_completadas': tareas_completadas,
         'tareas_convertidas': tareas_convertidas,
+        'tecnicos': tecnicos,
     }
     return render(request, 'Gestion_ot/planes/detalle_plan.html', context)
 

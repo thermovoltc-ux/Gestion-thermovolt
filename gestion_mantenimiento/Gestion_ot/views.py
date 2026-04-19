@@ -10,8 +10,8 @@ import datetime
 from dateutil.parser import isoparse
 from django.contrib import messages
 import os
-from .models import  OrdenTrabajo, Estado, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento
-from .forms import GestionOtForm, OrdenTrabajoForm, CierreOtForm, ImagenCierreOtForm, ImagenAntesForm, ImagenDespuesForm
+from .models import OrdenTrabajo, Estado, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad
+from .forms import GestionOtForm, OrdenTrabajoForm, CierreOtForm, ImagenCierreOtForm, ImagenAntesForm, ImagenDespuesForm, CierreOtActividadFormSet
 from solicitudes.models import Solicitud
 import logging
 from django.contrib.auth.models import User
@@ -37,6 +37,22 @@ class CustomDjangoJSONEncoder(DjangoJSONEncoder):
         if isinstance(obj, models.FileField):
             return obj.url if obj else None
         return super().default(obj)
+
+
+def obtener_actividades_cierre(cierre_ot):
+    actividades = []
+    for item in cierre_ot.actividades_cierre.select_related('actividad'):
+        if item.actividad is None:
+            continue
+        descripcion = item.actividad.descripcion or ''
+        texto = item.actividad.nombre
+        if descripcion:
+            texto += f": {descripcion}"
+        texto += ' - Realizada' if item.realizada else ' - Pendiente'
+        if item.comentario:
+            texto += f" ({item.comentario})"
+        actividades.append(texto)
+    return actividades
 
 
 # Configurar el logger
@@ -322,14 +338,27 @@ def cierre_ot(request, ot_id):
         print(f"FILES keys: {list(request.FILES.keys())}")
 
         form = CierreOtForm(request.POST, request.FILES, instance=cierre_ot)
+        actividad_formset = CierreOtActividadFormSet(request.POST, instance=cierre_ot)
         form_antes = ImagenAntesForm(request.POST, request.FILES)
         form_despues = ImagenDespuesForm(request.POST, request.FILES)
 
-        print(f"Form is_valid: {form.is_valid()}")
-        if not form.is_valid():
-            print(f"Form errors: {form.errors}")
-            messages.error(request, f"Errores en el formulario: {form.errors}")
-            return render(request, 'Gestion_ot/cierre_ot.html', {'form': form, 'form_antes': form_antes, 'form_despues': form_despues, 'ot': ot})
+        is_valid_form = form.is_valid()
+        is_valid_formset = actividad_formset.is_valid()
+        print(f"Form is_valid: {is_valid_form}")
+        print(f"Actividad formset is_valid: {is_valid_formset}")
+        if not is_valid_form or not is_valid_formset:
+            if not is_valid_form:
+                print(f"Form errors: {form.errors}")
+            if not is_valid_formset:
+                print(f"Formset errors: {actividad_formset.errors}")
+            messages.error(request, f"Errores en el formulario: {form.errors} {actividad_formset.errors}")
+            return render(request, 'Gestion_ot/cierre_ot.html', {
+                'form': form,
+                'actividad_formset': actividad_formset,
+                'form_antes': form_antes,
+                'form_despues': form_despues,
+                'ot': ot
+            })
 
         # Guardar las firmas desde los textareas ocultos
         firma_tecnico = request.POST.get('firma_digital', '')
@@ -341,8 +370,10 @@ def cierre_ot(request, ot_id):
         cierre_ot.firma_digital = firma_tecnico
         cierre_ot.firma_receptor = firma_receptor
 
-        # Guardar el formulario
+        # Guardar el formulario y las actividades del cierre
         cierre_ot = form.save()
+        actividad_formset.instance = cierre_ot
+        actividad_formset.save()
         print(f"Cierre OT guardado con ID: {cierre_ot.id}")
 
         # Guardar imágenes antes
@@ -375,7 +406,13 @@ def cierre_ot(request, ot_id):
         except Exception as e:
             print(f"Error actualizando estados: {e}")
             messages.error(request, f"Error actualizando estados: {e}")
-            return render(request, 'Gestion_ot/cierre_ot.html', {'form': form, 'form_antes': form_antes, 'form_despues': form_despues, 'ot': ot})
+            return render(request, 'Gestion_ot/cierre_ot.html', {
+                'form': form,
+                'actividad_formset': actividad_formset,
+                'form_antes': form_antes,
+                'form_despues': form_despues,
+                'ot': ot
+            })
 
         # Generar y enviar PDF
         try:
@@ -392,20 +429,37 @@ def cierre_ot(request, ot_id):
             enviar_pdf_por_email(pdf_buffer, cierre_ot)
             print("Email enviado correctamente")
 
-            # Construir mensaje
             success_msg = f"OT cerrada exitosamente. PDF generado. Email enviado. Firma tec agregada: {firma_tec_agregada}, Firma rec agregada: {firma_rec_agregada}"
             messages.success(request, success_msg)
             return redirect('listar_ot')
         except Exception as e:
             print(f"Error generando PDF o enviando email: {e}")
             messages.error(request, f"Error procesando cierre: {e}")
-            return render(request, 'Gestion_ot/cierre_ot.html', {'form': form, 'form_antes': form_antes, 'form_despues': form_despues, 'ot': ot})
+            return render(request, 'Gestion_ot/cierre_ot.html', {
+                'form': form,
+                'actividad_formset': actividad_formset,
+                'form_antes': form_antes,
+                'form_despues': form_despues,
+                'ot': ot
+            })
 
     else:
         form = CierreOtForm(instance=cierre_ot)
         form_antes = ImagenAntesForm()
         form_despues = ImagenDespuesForm()
-    return render(request, 'Gestion_ot/cierre_ot.html', {'form': form, 'form_antes': form_antes, 'form_despues': form_despues, 'ot': ot})
+        if not cierre_ot.actividades_cierre.exists():
+            plan = PlanMantenimiento.objects.filter(equipo=ot.solicitud.equipo, activo=True).first()
+            if plan:
+                for actividad in plan.actividades.all():
+                    CierreOtActividad.objects.get_or_create(cierre_ot=cierre_ot, actividad=actividad)
+        actividad_formset = CierreOtActividadFormSet(instance=cierre_ot)
+    return render(request, 'Gestion_ot/cierre_ot.html', {
+        'form': form,
+        'actividad_formset': actividad_formset,
+        'form_antes': form_antes,
+        'form_despues': form_despues,
+        'ot': ot
+    })
 
 
 # Detalles de la solicitud
@@ -482,6 +536,17 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
     imagenes_antes = cierre_ot.imagenes.filter(tipo='antes')
     imagenes_despues = cierre_ot.imagenes.filter(tipo='despues')
     
+    actividades_info = obtener_actividades_cierre(cierre_ot)
+    descripcion_base = cierre_ot.descripcion_falla or ''
+    if actividades_info:
+        actividades_text = '\n'.join(f"- {texto}" for texto in actividades_info)
+        if descripcion_base:
+            descripcion_y_actividades = f"{descripcion_base}\n\n{actividades_text}"
+        else:
+            descripcion_y_actividades = actividades_text
+    else:
+        descripcion_y_actividades = descripcion_base
+
     replacements = {
         '<<OT>>': str(solicitud.consecutivo),
         '<<equipo>>': cierre_ot.orden_trabajo.solicitud.equipo.nombre if cierre_ot.orden_trabajo.solicitud.equipo else '',
@@ -491,12 +556,13 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
         '<<tipointervencion>>': cierre_ot.tipo_intervencion or '',
         '<<causafalla>>': cierre_ot.causa_falla or '',
         '<<sesoluciono>>': 'Sí' if cierre_ot.se_soluciono else 'No',
-        '<<descripcion>>': cierre_ot.descripcion_falla or '',
+        '<<descripcion>>': descripcion_y_actividades,
         '<<observacion>>': cierre_ot.observaciones or '',
         '<<recibido>>': cierre_ot.nombre_receptor or '',
         '<<nombret>>': cierre_ot.nombre_tecnico or '',
         '<<cc>>': cierre_ot.documento_receptor or '',
         '<<cct>>': cierre_ot.documento_tecnico or '',
+        '<<actividades_plan>>': '\n'.join(actividades_info) if actividades_info else '',
     }
     
     # Reemplazar en párrafos manteniendo formato
@@ -558,7 +624,7 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
             firma_rec_agregada = True
         except Exception as e:
             firma_rec_agregada = False
-    
+
     # Agregar imágenes al final del documento
     if imagenes_antes.exists():
         heading_antes = doc.add_heading('Antes', level=2)
@@ -656,7 +722,16 @@ def generar_pdf_reportlab(cierre_ot):
         p = Paragraph(f"<b>{key}:</b> {value}", styles['Normal'])
         story.append(p)
         story.append(Spacer(1, 6))
-    
+
+    actividades_info = obtener_actividades_cierre(cierre_ot)
+    if actividades_info:
+        story.append(Spacer(1, 12))
+        story.append(Paragraph("<b>Actividades del Plan:</b>", styles['Heading2']))
+        story.append(Spacer(1, 6))
+        for texto in actividades_info:
+            story.append(Paragraph(f"- {texto}", styles['Normal']))
+            story.append(Spacer(1, 4))
+
     # Agregar firma si existe
     if cierre_ot.firma_digital:
         story.append(Spacer(1, 12))

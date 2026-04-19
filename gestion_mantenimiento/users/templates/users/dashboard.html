@@ -24,21 +24,33 @@
         </div>
         <div class="iconBx">📥</div>
     </a>
-    <a href="{% url 'listar_ot' %}?estado=en%20proceso" class="card" style="display:flex; text-decoration:none; color:inherit;">
+    {% if tipo_cuenta == 'jefe_de_area' %}
+        <a href="{% url 'gestion_ot' %}" class="card" style="display:flex; text-decoration:none; color:inherit;">
+    {% else %}
+        <a href="{% url 'listar_ot' %}?estado=en%20proceso" class="card" style="display:flex; text-decoration:none; color:inherit;">
+    {% endif %}
         <div>
             <div class="numbers">{{ ot_en_proceso }}</div>
             <div class="cardName">OTs en Proceso</div>
         </div>
         <div class="iconBx">🟦</div>
     </a>
-    <a href="{% url 'listar_ot' %}?estado=en%20revision" class="card" style="display:flex; text-decoration:none; color:inherit;">
+    {% if tipo_cuenta == 'jefe_de_area' %}
+        <a href="{% url 'gestion_ot' %}" class="card" style="display:flex; text-decoration:none; color:inherit;">
+    {% else %}
+        <a href="{% url 'listar_ot' %}?estado=en%20revision" class="card" style="display:flex; text-decoration:none; color:inherit;">
+    {% endif %}
         <div>
             <div class="numbers">{{ ot_en_revision }}</div>
             <div class="cardName">OTs en Revisión</div>
         </div>
         <div class="iconBx">🟣</div>
     </a>
-    <a href="{% url 'listar_ot' %}?estado=finalizada" class="card" style="display:flex; text-decoration:none; color:inherit;">
+    {% if tipo_cuenta == 'jefe_de_area' %}
+        <a href="{% url 'gestion_ot' %}" class="card" style="display:flex; text-decoration:none; color:inherit;">
+    {% else %}
+        <a href="{% url 'listar_ot' %}?estado=finalizada" class="card" style="display:flex; text-decoration:none; color:inherit;">
+    {% endif %}
         <div>
             <div class="numbers">{{ ot_finalizada }}</div>
             <div class="cardName">OTs Finalizadas</div>
@@ -95,23 +107,123 @@
             <h2>Planificadas vs No planificadas</h2>
             <a href="#" class="btn">Actualizar</a>
         </div>
+        <form id="dashboardFilterForm" method="get" style="margin-top:18px; display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+            <div style="flex:1; min-width:180px;">
+                <label style="display:block; margin-bottom:6px; color:#475569; font-weight:600;">Equipo</label>
+                <select id="equipoFilter" name="equipo_id" style="width:100%; padding:12px 14px; border-radius:14px; border:1px solid #cbd5e1; background:#fff;">
+                    <option value="">Todas</option>
+                    {% for equipo in equipos %}
+                        <option value="{{ equipo.id }}" {% if equipo.id == equipo_id_selected %}selected{% endif %}>{{ equipo.display_label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="flex:1; min-width:180px;">
+                <label style="display:block; margin-bottom:6px; color:#475569; font-weight:600;">Ubicación</label>
+                <select id="ubicacionFilter" name="ubicacion_id" style="width:100%; padding:12px 14px; border-radius:14px; border:1px solid #cbd5e1; background:#fff;">
+                    <option value="">Todas</option>
+                    {% for ubicacion in ubicaciones %}
+                        <option value="{{ ubicacion.id }}" {% if ubicacion.id == ubicacion_id_selected %}selected{% endif %}>{{ ubicacion.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="button" id="clearFilters" class="btn" style="padding:12px 20px; border-radius:14px; background:#f8fafc; color:#475569; border:1px solid #cbd5e1;">Limpiar</button>
+        </form>
         <div style="margin-top: 25px; display:grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items:center;">
-            <div style="position:relative; width:100%; min-height:220px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:20px;">
-                <div style="width:180px; height:180px; border-radius:50%; background:linear-gradient(180deg, #eff6ff 0%, #e0f2fe 100%); display:flex; align-items:center; justify-content:center; font-size:1.6rem; font-weight:700; color:#1e3a8a; box-shadow: inset 0 0 0 18px rgba(37,99,235,0.2);">
-                    {{ tareas_planificadas }}
+            <div style="position:relative; width:100%; min-height:240px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:20px;">
+                <div id="planChart" style="width:220px; height:220px; border-radius:50%; background: conic-gradient(#2563eb 0 {{ planificadas_pct }}%, #ef4444 {{ planificadas_pct }}% 100%); display:flex; align-items:center; justify-content:center; box-shadow: inset 0 0 0 18px rgba(255,255,255,0.8); transition: background 1.2s cubic-bezier(0.4,0,0.2,1), transform 0.5s ease; transform: scale(1);">
+                    <div style="width:120px; height:120px; border-radius:50%; background:#ffffff; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:14px; box-shadow: 0 15px 40px rgba(15,23,42,0.08);">
+                        <span style="font-size:0.95rem; color:#475569;">Total</span>
+                        <span id="totalTareasCount" style="font-size:1.8rem; font-weight:700; color:#111827;">{{ total_tareas }}</span>
+                    </div>
                 </div>
             </div>
             <div style="display:grid; gap: 16px;">
                 <div style="background:#eff6ff; border-radius:18px; padding:18px; box-shadow:0 8px 24px rgba(15,23,42,0.06);">
                     <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;"><span style="width:10px; height:10px; border-radius:50%; background:#2563eb;"></span><span style="color:#475569; font-weight:600;">Planificadas</span></div>
-                    <p style="margin:0; font-size:1.6rem; font-weight:700; color:#2563eb;">{{ tareas_planificadas }}</p>
+                    <p id="planificadasCount" style="margin:0; font-size:1.6rem; font-weight:700; color:#2563eb;">{{ tareas_planificadas }}</p>
+                    <p id="planificadasPct" style="margin:6px 0 0; color:#475569;">{{ planificadas_pct }}%</p>
                 </div>
-                <div style="background:#f8fafc; border-radius:18px; padding:18px; box-shadow:0 8px 24px rgba(15,23,42,0.06);">
-                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;"><span style="width:10px; height:10px; border-radius:50%; background:#94a3b8;"></span><span style="color:#475569; font-weight:600;">No planificadas</span></div>
-                    <p style="margin:0; font-size:1.6rem; font-weight:700; color:#0f172a;">{{ tareas_no_planificadas }}</p>
+                <div style="background:#fef2f2; border-radius:18px; padding:18px; box-shadow:0 8px 24px rgba(15,23,42,0.06);">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;"><span style="width:10px; height:10px; border-radius:50%; background:#ef4444;"></span><span style="color:#475569; font-weight:600;">No planificadas</span></div>
+                    <p id="noPlanificadasCount" style="margin:0; font-size:1.6rem; font-weight:700; color:#b91c1c;">{{ tareas_no_planificadas }}</p>
+                    <p id="noPlanificadasPct" style="margin:6px 0 0; color:#475569;">{{ no_planificadas_pct }}%</p>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    function easeOutQuad(t) {
+        return t * (2 - t);
+    }
+
+    function animateValue(element, start, end, duration) {
+        const startTime = performance.now();
+        const range = end - start;
+
+        function step(currentTime) {
+            const progress = Math.min((currentTime - startTime) / duration, 1);
+            const ease = easeOutQuad(progress);
+            element.textContent = Math.round(start + range * ease);
+            if (progress < 1) {
+                requestAnimationFrame(step);
+            }
+        }
+
+        requestAnimationFrame(step);
+    }
+
+    function updateDashboardCards(data) {
+        animateValue(document.getElementById('planificadasCount'), parseInt(document.getElementById('planificadasCount').textContent, 10), data.tareas_planificadas, 900);
+        animateValue(document.getElementById('noPlanificadasCount'), parseInt(document.getElementById('noPlanificadasCount').textContent, 10), data.tareas_no_planificadas, 900);
+        animateValue(document.getElementById('totalTareasCount'), parseInt(document.getElementById('totalTareasCount').textContent, 10), data.total_tareas, 900);
+        animateValue(document.getElementById('planificadasPct'), parseInt(document.getElementById('planificadasPct').textContent, 10), data.planificadas_pct, 900);
+        animateValue(document.getElementById('noPlanificadasPct'), parseInt(document.getElementById('noPlanificadasPct').textContent, 10), data.no_planificadas_pct, 900);
+
+        const chart = document.getElementById('planChart');
+        chart.style.transform = 'scale(1.03)';
+        chart.style.background = `conic-gradient(#2563eb 0 ${data.planificadas_pct}%, #ef4444 ${data.planificadas_pct}% 100%)`;
+        setTimeout(() => {
+            chart.style.transform = 'scale(1)';
+        }, 250);
+    }
+
+    async function fetchDashboardData() {
+        const equipoId = document.getElementById('equipoFilter').value;
+        const ubicacionId = document.getElementById('ubicacionFilter').value;
+        const url = new URL(window.location.href);
+        if (equipoId) {
+            url.searchParams.set('equipo_id', equipoId);
+        } else {
+            url.searchParams.delete('equipo_id');
+        }
+        if (ubicacionId) {
+            url.searchParams.set('ubicacion_id', ubicacionId);
+        } else {
+            url.searchParams.delete('ubicacion_id');
+        }
+        history.replaceState(null, '', url.toString());
+
+        const response = await fetch(url.toString(), {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        if (!response.ok) {
+            console.error('Error al obtener datos de dashboard');
+            return;
+        }
+        const data = await response.json();
+        updateDashboardCards(data);
+    }
+
+    document.getElementById('equipoFilter').addEventListener('change', fetchDashboardData);
+    document.getElementById('ubicacionFilter').addEventListener('change', fetchDashboardData);
+    document.getElementById('clearFilters').addEventListener('click', function () {
+        document.getElementById('equipoFilter').value = '';
+        document.getElementById('ubicacionFilter').value = '';
+        fetchDashboardData();
+    });
+</script>
 {% endblock %}

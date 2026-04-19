@@ -2,66 +2,565 @@
 {% load static %}
 {% load socialaccount %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inicio de Sesión</title>
-    <link rel="stylesheet" href="{% static 'css/login.css' %}">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <title>Inicio de Sesión - Gestión de Mantenimiento</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .auth-container {
+            width: 100%;
+            max-width: 1200px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            min-height: 500px;
+        }
+        
+        .auth-left {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 60px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+        }
+        
+        .auth-left h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+        
+        .auth-left p {
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+        
+        .auth-left .logo-icon {
+            font-size: 5rem;
+            margin-bottom: 20px;
+        }
+        
+        .auth-right {
+            padding: 60px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .form-title {
+            font-size: 1.8rem;
+            color: #0f172a;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .form-subtitle {
+            color: #475569;
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #334155;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+        
+        .form-group select,
+        .form-group input[type="text"],
+        .form-group input[type="email"],
+        .form-group input[type="password"],
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            font-family: inherit;
+            background: white;
+        }
+        
+        .form-group select:focus,
+        .form-group input[type="text"]:focus,
+        .form-group input[type="email"]:focus,
+        .form-group input[type="password"]:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        /* Estilos para widgets renderizados por Django */
+        select, input[type="text"], input[type="email"], input[type="password"], textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+        
+        select:focus, input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .form-group.hidden {
+            display: none;
+        }
+        
+        .error-list {
+            color: #dc2626;
+            font-size: 0.85rem;
+            margin-top: 6px;
+            list-style: none;
+        }
+        
+        .error-list li {
+            margin: 4px 0;
+        }
+        
+        .non-field-errors {
+            background: #fecaca;
+            border: 1px solid #fca5a5;
+            color: #991b1b;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .errorlist {
+            color: #dc2626;
+            font-size: 0.85rem;
+            margin-top: 6px;
+            list-style: none;
+            padding: 0;
+        }
+        
+        .errorlist li {
+            margin: 4px 0;
+        }
+        
+        .helptext {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-top: 4px;
+            display: none;
+        }
+        
+        ol, ul {
+            margin: 0;
+            padding: 0;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .btn-login {
+            width: 100%;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+        
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-login:active {
+            transform: translateY(0);
+        }
+        
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 30px 0;
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+        
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e2e8f0;
+        }
+        
+        .divider::before {
+            margin-right: 12px;
+        }
+        
+        .divider::after {
+            margin-left: 12px;
+        }
+        
+        .social-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .btn-social {
+            padding: 12px 16px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-social:hover {
+            background: #f8fafc;
+            border-color: #94a3b8;
+        }
+        
+        .tab-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+        
+        .tab-btn {
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #94a3b8;
+            transition: all 0.3s;
+        }
+        
+        .tab-btn.active {
+            border-color: #667eea;
+            color: #667eea;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .signup-link {
+            text-align: center;
+            margin-top: 20px;
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        
+        .signup-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .signup-link a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .auth-container {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
+            
+            .auth-left {
+                padding: 40px 30px;
+                min-height: 200px;
+            }
+            
+            .auth-left h1 {
+                font-size: 2rem;
+            }
+            
+            .auth-right {
+                padding: 40px 30px;
+            }
+            
+            .social-buttons {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="login-form">
-            <h2>Inicio de Sesión</h2>
-            <form method="post" action="{% url 'custom_login' %}">
-                {% csrf_token %}
-                {{ form.non_field_errors }}
-                <div class="form-group">
-                    {{ form.tipo_cuenta.label_tag }}
-                    {{ form.tipo_cuenta }}
-                    {{ form.tipo_cuenta.errors }}
-                </div>
-                <div class="form-group" id="div_id_co" style="display: none;">
-                    {{ form.co.label_tag }}
-                    {{ form.co }}
-                    {{ form.co.errors }}
-                </div>
-                <div class="form-group">
-                    {{ form.username.label_tag }}
-                    {{ form.username }}
-                    {{ form.username.errors }}
-                </div>
-                <div class="form-group">
-                    {{ form.password.label_tag }}
-                    {{ form.password }}
-                    {{ form.password.errors }}
-                </div>
-                <button type="submit" class="btn">Iniciar Sesión</button>
-            </form>
-            <div class="social-login">
-                <p>O inicia sesión con:</p>
+    <div class="auth-container">
+        <div class="auth-left">
+            <div class="logo-icon">🔧</div>
+            <h1>Gestión de Mantenimiento</h1>
+            <p>Sistema integral para la gestión de órdenes de trabajo, tareas preventivas y control de activos</p>
+        </div>
+        
+        <div class="auth-right">
+            <div class="tab-buttons">
+                <button class="tab-btn active" data-tab="login">Iniciar Sesión</button>
+                <button class="tab-btn" data-tab="register">Registrarse</button>
+            </div>
+            
+            <!-- LOGIN FORM -->
+            <div id="login" class="tab-content active">
+                <h2 class="form-title">Bienvenido</h2>
+                <p class="form-subtitle">Inicia sesión con tu cuenta</p>
                 
+                <form method="post" action="{% url 'custom_login' %}">
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                        <div class="non-field-errors">
+                            {{ form.non_field_errors.0 }}
+                        </div>
+                    {% endif %}
+                    
+                    <div class="form-group">
+                        <label for="id_tipo_cuenta">Tipo de cuenta</label>
+                        {{ form.tipo_cuenta }}
+                        {% if form.tipo_cuenta.errors %}
+                            <ul class="error-list">
+                                {% for error in form.tipo_cuenta.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group hidden" id="div_id_co">
+                        <label for="id_co">Centro de Operaciones</label>
+                        {{ form.co }}
+                        {% if form.co.errors %}
+                            <ul class="error-list">
+                                {% for error in form.co.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_username">Nombre de usuario</label>
+                        {{ form.username }}
+                        {% if form.username.errors %}
+                            <ul class="error-list">
+                                {% for error in form.username.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_password">Contraseña</label>
+                        {{ form.password }}
+                        {% if form.password.errors %}
+                            <ul class="error-list">
+                                {% for error in form.password.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                    
+                    <button type="submit" class="btn-login">Iniciar Sesión</button>
+                </form>
+                
+                <div class="divider">O continúa con</div>
+                
+                <div class="social-buttons">
+                    <a href="{% provider_login_url 'google' %}" class="btn-social">
+                        <span>🔵</span> Google
+                    </a>
+                </div>
+            </div>
+            
+            <!-- REGISTER FORM -->
+            <div id="register" class="tab-content">
+                <h2 class="form-title">Crear Cuenta</h2>
+                <p class="form-subtitle">Regístrate para comenzar</p>
+                
+                <form method="post" action="{% url 'register' %}">
+                    {% csrf_token %}
+                    
+                    {% if register_form.non_field_errors %}
+                        <div class="non-field-errors">
+                            {{ register_form.non_field_errors.0 }}
+                        </div>
+                    {% endif %}
+                    
+                    {% if success_message %}
+                        <div style="background: #dcfce7; border: 1px solid #86efac; color: #15803d; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9rem;">
+                            {{ success_message }}
+                        </div>
+                    {% endif %}
+                    
+                    <div class="form-group">
+                        <label for="id_username">Nombre de usuario</label>
+                        {{ register_form.username }}
+                        {% if register_form.username.errors %}
+                            <ul class="error-list">
+                                {% for error in register_form.username.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_email">Correo electrónico</label>
+                        {{ register_form.email }}
+                        {% if register_form.email.errors %}
+                            <ul class="error-list">
+                                {% for error in register_form.email.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_password1">Contraseña</label>
+                        {{ register_form.password1 }}
+                        {% if register_form.password1.errors %}
+                            <ul class="error-list">
+                                {% for error in register_form.password1.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_password2">Confirmar contraseña</label>
+                        {{ register_form.password2 }}
+                        {% if register_form.password2.errors %}
+                            <ul class="error-list">
+                                {% for error in register_form.password2.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                    
+                    <button type="submit" class="btn-login">Registrarse</button>
+                </form>
             </div>
         </div>
     </div>
-
+    
     <script>
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tabName = this.getAttribute('data-tab');
+                document.querySelectorAll('.tab-content').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('active');
+                });
+                document.getElementById(tabName).classList.add('active');
+                this.classList.add('active');
+            });
+        });
+        
+        // Type account visibility
         document.addEventListener('DOMContentLoaded', function() {
             var tipoCuentaField = document.getElementById('id_tipo_cuenta');
             var coFieldDiv = document.getElementById('div_id_co');
-
-            tipoCuentaField.addEventListener('change', function() {
-                if (tipoCuentaField.value == 'administrador') {
-                    coFieldDiv.style.display = 'block';
+            
+            function updateCoField() {
+                if (tipoCuentaField && tipoCuentaField.value === 'administrador') {
+                    coFieldDiv.classList.remove('hidden');
                 } else {
-                    coFieldDiv.style.display = 'none';
+                    coFieldDiv.classList.add('hidden');
                 }
-            });
-
-            // Trigger change event on page load to set the initial state
-            tipoCuentaField.dispatchEvent(new Event('change'));
+            }
+            
+            if (tipoCuentaField) {
+                tipoCuentaField.addEventListener('change', updateCoField);
+                updateCoField();
+            }
         });
+        
     </script>
 </body>
 </html>

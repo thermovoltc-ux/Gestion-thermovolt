@@ -1,0 +1,43 @@
+<!-- Validación temporal de OAuth -->
+{% load socialaccount %}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OAuth Debug Info</title>
+    <style>
+        body { font-family: monospace; margin: 20px; background: #f5f5f5; }
+        .box { background: white; padding: 20px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #667eea; }
+        .ok { border-left-color: green; }
+        .error { border-left-color: red; }
+        code { background: #eee; padding: 2px 6px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Información de OAuth 2.0</h1>
+    
+    <div class="box">
+        <h2>Configuración de Site</h2>
+        <p>ID del Site: <code>{{ SITE_ID }}</code></p>
+        <p>Dominio del Site: <code>{{ site_domain }}</code></p>
+    </div>
+    
+    <div class="box">
+        <h2>Google OAuth</h2>
+        <p>Provider: <code>google</code></p>
+        <p>Client ID configurado: <code>{{ has_client_id|yesno:"Sí,No" }}</code></p>
+        <p>Secret configurado: <code>{{ has_secret|yesno:"Sí,No" }}</code></p>
+    </div>
+    
+    <div class="box">
+        <h2>URLs de Callback</h2>
+        <p>Callback URL esperada: <code>http://localhost:8000/accounts/google/login/callback/</code></p>
+        <p>URL actual del request: <code>{{ request.build_absolute_uri }}</code></p>
+    </div>
+    
+    <div class="box">
+        <h2>Prueba</h2>
+        <p><a href="{% provider_login_url 'google' %}" style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Intentar login con Google</a></p>
+    </div>
+</body>
+</html>

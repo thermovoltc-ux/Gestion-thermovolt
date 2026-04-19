@@ -19,19 +19,28 @@ sys.path.insert(0, str(BASE_DIR))
 
 import os
 
+# Cargar variables de entorno desde .env
+from dotenv import load_dotenv
+load_dotenv(BASE_DIR / '.env')
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-h)pgul*0ogs%v!mo10*_=*_&-92aw5s!k%&0_9h5r2td4%_d_g')
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key-change-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'web-production-990bf.up.railway.app']
 
-CSRF_TRUSTED_ORIGINS = ['https://web-production-990bf.up.railway.app']
+# CSRF - Orígenes confiables para desarrollo local y producción
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'https://web-production-990bf.up.railway.app'
+]
 
 SECURE_SSL_REDIRECT = False
 
@@ -39,6 +48,11 @@ SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 CSRF_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SAMESITE = 'Lax'
+
+# Configuración de sesiones - Timeout después de 1 hora de inactividad
+SESSION_COOKIE_AGE = 3600  # 1 hora en segundos
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Cerrar sesión al cerrar el navegador
+SESSION_SAVE_EVERY_REQUEST = True  # Actualizar la fecha de expiración en cada solicitud
 
 
 # Application definition
@@ -73,6 +87,7 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'gestion_mantenimiento.middleware.LocalhostMiddleware',  # Redirigir 127.0.0.1 a localhost
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -188,20 +203,30 @@ AUTHENTICATION_BACKENDS = (
 
 SITE_ID = 1
 
-LOGIN_REDIRECT_URL = '/solicitudes/'
-LOGOUT_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = '/users/dashboard/'
+LOGOUT_REDIRECT_URL = '/users/login/'
 
-LOGIN_URL = '/users/login/'  # Ajusta esta URL según tu configuración
+LOGIN_URL = '/users/login/'
+
+# Configuración de Allauth para desarrollo local
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'optional'  # No requerir validación de email para desarrollo
+
+# Configuración de Site ID - importante para allauth
+SITE_ID = 1
 
 # Configuración de los proveedores sociales
+# Nota: Los credenciales se cargan desde SocialApp en la BD,
+# que es configurada automáticamente por el middleware
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
-        'SCOPE': ['profile', 'email'],
-        'AUTH_PARAMS': {'access_type': 'online'},
-    },
-    'microsoft': {
-        'SCOPE': ['User.Read'],
-        'AUTH_PARAMS': {'response_type': 'code'},
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+        }
     }
 }
 
@@ -211,8 +236,8 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'  # Servidor SMTP de Gmail
 EMAIL_PORT = 587  # Puerto SMTP para TLS
 EMAIL_USE_TLS = True  # Usar TLS
-EMAIL_HOST_USER = 'thermovoltc@gmail.com'  # Tu dirección de correo electrónico de Gmail
-EMAIL_HOST_PASSWORD = 'ayrgjfypucywrqbr'  # App password de Gmail
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'your_email@gmail.com')  # Tu dirección de correo electrónico de Gmail
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'your_app_password')  # App password de Gmail
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER  # Dirección de correo electrónico predeterminada para enviar correos
 
 EMAIL_ADICIONAL = 'juanesteban01010@gmail.com'  # Email adicional para copias

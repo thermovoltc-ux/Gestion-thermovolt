@@ -1,7 +1,8 @@
 from django import forms
 from django.utils import timezone
 from django.contrib.auth.models import User
-from .models import GestionOt, OrdenTrabajo, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento
+from django.forms import inlineformset_factory
+from .models import GestionOt, OrdenTrabajo, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad
 
 # Formulario para GestionOt
 class GestionOtForm(forms.ModelForm):
@@ -69,6 +70,33 @@ class CierreOtForm(forms.ModelForm):
             'hora_inicio': forms.TimeInput(attrs={'type': 'time'}),
             'hora_fin': forms.TimeInput(attrs={'type': 'time'}),
         }
+
+class CierreOtActividadForm(forms.ModelForm):
+    actividad = forms.ModelChoiceField(
+        queryset=ActividadMantenimiento.objects.all(),
+        widget=forms.HiddenInput()
+    )
+    realizada = forms.BooleanField(required=False, label="Realizada")
+    comentario = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Comentario adicional'
+        }),
+        label="Comentario"
+    )
+
+    class Meta:
+        model = CierreOtActividad
+        fields = ['actividad', 'realizada', 'comentario']
+
+CierreOtActividadFormSet = inlineformset_factory(
+    CierreOt,
+    CierreOtActividad,
+    form=CierreOtActividadForm,
+    extra=0,
+    can_delete=False
+)
 
 class ImagenCierreOtForm(forms.ModelForm):
     class Meta:

@@ -64,6 +64,32 @@
                         {{ form.observaciones }}
                         <label for="{{ form.observaciones.id_for_label }}">Observaciones</label>
                     </div>
+                    <div class="cierre-ot-form-section">
+                        <h3>Actividades del Plan</h3>
+                        {% if actividad_formset %}
+                            {{ actividad_formset.management_form }}
+                            {% for subform in actividad_formset.forms %}
+                                <div class="cierre-ot-actividad-item">
+                                    {{ subform.id }}
+                                    {{ subform.actividad }}
+                                    <div class="cierre-ot-actividad-content">
+                                        <strong>{{ subform.instance.actividad.nombre }}</strong>
+                                        <p>{{ subform.instance.actividad.descripcion }}</p>
+                                        <div class="cierre-ot-checkbox-group">
+                                            {{ subform.realizada }}
+                                            <label for="{{ subform.realizada.id_for_label }}">Realizada</label>
+                                        </div>
+                                        <div class="cierre-ot-form-group">
+                                            {{ subform.comentario }}
+                                            <label for="{{ subform.comentario.id_for_label }}">Comentario</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p>No hay actividades del plan vinculadas a esta OT.</p>
+                        {% endif %}
+                    </div>
                     <div class="cierre-ot-form-group cierre-ot-large-textarea">
                         {{ form.materiales_utilizados }}
                         <label for="{{ form.materiales_utilizados.id_for_label }}">Materiales utilizados</label>

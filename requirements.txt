@@ -1,17 +1,32 @@
+asgiref==3.11.1
+certifi==2026.2.25
+cffi==2.0.0
+charset-normalizer==3.4.6
+colorama==0.4.6
+cryptography==46.0.6
+dj-database-url==3.1.2
 Django==4.2.7
-gunicorn==21.2.0
-dj-database-url==2.1.0
-django-crispy-forms==2.1
-django-mptt==0.16.0
 django-allauth==0.63.3
-psycopg2-binary==2.9.9
-requests==2.31.0
-oauthlib==3.2.2
-PyJWT==2.8.0
-cryptography==42.0.5
-python3-openid==3.2.0
-whitenoise==6.6.0
-reportlab==4.0.7
-python-dateutil==2.8.2
-# Agrega otras dependencias según tu proyecto
-# Instala con: pip install -r requirements.txt
+django-crispy-forms==2.1
+django-js-asset==3.1.2
+django-mptt==0.16.0
+docx2pdf==0.1.8
+idna==3.11
+lxml==6.0.2
+Pillow==12.2.0
+pycparser==3.0
+PyJWT==2.12.1
+python-dateutil==2.9.0.post0
+python-docx==1.2.0
+python-dotenv==1.2.2
+pywin32==311
+requests==2.33.1
+six==1.17.0
+sqlparse==0.5.5
+tqdm==4.67.3
+typing_extensions==4.15.0
+tzdata==2025.3
+urllib3==2.6.3
+
+# Instala todas las dependencias del proyecto con:
+# pip install -r requirements.txt

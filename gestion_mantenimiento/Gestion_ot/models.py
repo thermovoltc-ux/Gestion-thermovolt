@@ -66,6 +66,20 @@ class CierreOt(models.Model):
         return f"OT-{self.orden_trabajo.solicitud.consecutivo} - {self.nombre_tecnico} "
 
 
+class CierreOtActividad(models.Model):
+    cierre_ot = models.ForeignKey(CierreOt, on_delete=models.CASCADE, related_name='actividades_cierre')
+    actividad = models.ForeignKey('ActividadMantenimiento', on_delete=models.CASCADE)
+    realizada = models.BooleanField(default=False)
+    comentario = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        ordering = ['actividad__orden']
+
+    def __str__(self):
+        estado = 'Realizada' if self.realizada else 'Pendiente'
+        return f"{self.actividad.nombre} - {estado}"
+
+
 # Modelo para imágenes asociadas a CierreOt
 class ImagenCierreOt(models.Model):
     TIPO_CHOICES = (
