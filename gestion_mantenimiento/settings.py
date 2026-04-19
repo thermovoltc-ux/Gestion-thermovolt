@@ -60,13 +60,6 @@ CSRF_TRUSTED_ORIGINS = [
     'https://*.railway.app',
 ]
 
-# Agregar origen de Railway dinámicamente
-if railway_domain:
-    CSRF_TRUSTED_ORIGINS.extend([
-        f'https://{railway_domain}',
-        f'http://{railway_domain}'
-    ])
-
 SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
 
 SESSION_COOKIE_SECURE = not DEBUG
