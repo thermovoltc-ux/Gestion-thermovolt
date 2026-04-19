@@ -63,3 +63,28 @@ class LocalhostMiddleware:
         except Exception as e:
             # Silenciosamente fallar en caso de error de BD
             pass
+
+
+class DebugMiddleware:
+    """Middleware temporal para debuggear errores 400"""
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Registrar información de la petición
+        if os.environ.get('RAILWAY_ENVIRONMENT'):
+            print(f"DEBUG REQUEST: {request.method} {request.path}", file=sys.stderr)
+            print(f"DEBUG HOST: {request.META.get('HTTP_HOST')}", file=sys.stderr)
+            print(f"DEBUG USER_AGENT: {request.META.get('HTTP_USER_AGENT')}", file=sys.stderr)
+            print(f"DEBUG REMOTE_ADDR: {request.META.get('REMOTE_ADDR')}", file=sys.stderr)
+            print(f"DEBUG SECURE: {request.is_secure()}", file=sys.stderr)
+
+        response = self.get_response(request)
+
+        # Registrar información de la respuesta
+        if os.environ.get('RAILWAY_ENVIRONMENT'):
+            print(f"DEBUG RESPONSE: {response.status_code}", file=sys.stderr)
+            if hasattr(response, 'content'):
+                print(f"DEBUG CONTENT_LENGTH: {len(response.content) if response.content else 0}", file=sys.stderr)
+
+        return response
