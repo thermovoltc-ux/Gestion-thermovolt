@@ -30,7 +30,11 @@ from django.forms import modelformset_factory
 import os
 import base64
 from PIL import Image as PILImage
-import pythoncom
+
+try:
+    import pythoncom
+except ImportError:
+    pythoncom = None
 
 class CustomDjangoJSONEncoder(DjangoJSONEncoder):
     def default(self, obj):
@@ -670,17 +674,19 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
     # Convertir a PDF
     temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
     temp_pdf.close()
-    pythoncom.CoInitialize()
-    convert(temp_docx.name, temp_pdf.name)
-    pythoncom.CoUninitialize()
-    
-    # Leer PDF
-    with open(temp_pdf.name, 'rb') as f:
-        buffer = BytesIO(f.read())
-    
-    # Limpiar archivos temporales
-    os.unlink(temp_docx.name)
-    os.unlink(temp_pdf.name)
+    if pythoncom is not None and os.name == 'nt':
+        pythoncom.CoInitialize()
+        convert(temp_docx.name, temp_pdf.name)
+        pythoncom.CoUninitialize()
+        with open(temp_pdf.name, 'rb') as f:
+            buffer = BytesIO(f.read())
+        os.unlink(temp_docx.name)
+        os.unlink(temp_pdf.name)
+    else:
+        # En entornos no Windows, fallback a ReportLab para generar PDF
+        os.unlink(temp_docx.name)
+        os.unlink(temp_pdf.name)
+        return generar_pdf_reportlab(cierre_ot), firma_tec_agregada, firma_rec_agregada
     
     buffer.seek(0)
     return buffer, firma_tec_agregada, firma_rec_agregada
