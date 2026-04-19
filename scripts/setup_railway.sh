@@ -7,9 +7,13 @@ echo "🚀 Iniciando configuración de Gestión de Mantenimiento..."
 echo "📦 Ejecutando migraciones..."
 python manage.py migrate --noinput
 
-# Crear superusuario si no existe (opcional - descomenta si quieres)
-# echo "👤 Creando superusuario..."
-# python manage.py createsuperuser --noinput --username admin --email admin@example.com || echo "Superusuario ya existe"
+# Crear superusuario en Railway si se configuran las variables de entorno
+if [ "$CREATE_SUPERUSER" = "true" ]; then
+  echo "👤 Creando superusuario de producción..."
+  python manage.py createsuperuser --noinput \
+    --username "$DJANGO_SUPERUSER_USERNAME" \
+    --email "$DJANGO_SUPERUSER_EMAIL" || echo "Superusuario ya existe o no se pudo crear"
+fi
 
 # Recopilar archivos estáticos
 echo "📁 Recopilando archivos estáticos..."
