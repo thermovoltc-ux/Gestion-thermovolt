@@ -33,7 +33,13 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key-change-in
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost,web-production-990bf.up.railway.app').split(',')
+# ALLOWED_HOSTS - Soporta múltiples hosts separados por coma
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+
+# Agregar dominio de Railway si está disponible
+railway_domain = os.environ.get('RAILWAY_STATIC_URL', '').replace('https://', '').replace('http://', '').split('.')[0] + '.up.railway.app'
+if railway_domain and railway_domain not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(railway_domain)
 
 # CSRF - Orígenes confiables para desarrollo local y producción
 CSRF_TRUSTED_ORIGINS = [
@@ -41,6 +47,13 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'https://web-production-990bf.up.railway.app'
 ]
+
+# Agregar origen de Railway dinámicamente
+if railway_domain:
+    CSRF_TRUSTED_ORIGINS.extend([
+        f'https://{railway_domain}',
+        f'http://{railway_domain}'
+    ])
 
 SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
 

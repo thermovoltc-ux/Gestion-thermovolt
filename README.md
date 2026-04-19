@@ -55,29 +55,59 @@ Aplicación web para la gestión de mantenimiento de activos y órdenes de traba
    python manage.py runserver
    ```
 
-## Despliegue
+## Despliegue en Railway
 
-Esta aplicación está configurada para desplegarse en Railway u otra plataforma de hosting compatible con Python.
+Esta aplicación está optimizada para desplegarse en Railway con SQLite.
 
-Asegúrate de configurar las siguientes variables de entorno en tu plataforma de despliegue:
+### Pasos para desplegar:
 
-- `SECRET_KEY`
-- `DEBUG=False`
-- `DATABASE_URL`
-- `ALLOWED_HOSTS`
-- `SECURE_SSL_REDIRECT=True`
-- `EMAIL_HOST_USER`
-- `EMAIL_HOST_PASSWORD`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
+1. **Crear proyecto en Railway:**
+   - Ve a [Railway.app](https://railway.app) y crea una cuenta
+   - Crea un nuevo proyecto
+   - Conecta tu repositorio GitHub: `thermovoltc-ux/Gestion-thermovolt`
 
-El `Procfile` ya está configurado para ejecutar Gunicorn:
+2. **Configurar variables de entorno:**
+   Agrega estas variables en Railway (Variables → Add):
+
+   ```
+   SECRET_KEY=tu_clave_secreta_muy_segura_aqui
+   DEBUG=False
+   ALLOWED_HOSTS=tu-proyecto.up.railway.app
+   SECURE_SSL_REDIRECT=True
+   DATABASE_URL=sqlite:///db.sqlite3
+   EMAIL_HOST_USER=tu_email@gmail.com
+   EMAIL_HOST_PASSWORD=tu_app_password
+   GOOGLE_CLIENT_ID=tu_google_client_id
+   GOOGLE_CLIENT_SECRET=tu_google_client_secret
+   ```
+
+3. **Railway detectará automáticamente:**
+   - `Procfile` para el comando de ejecución
+   - `requirements.txt` para las dependencias
+   - `runtime.txt` si necesitas una versión específica de Python
+
+4. **Despliegue automático:**
+   - Railway ejecutará automáticamente las migraciones y collectstatic
+   - La aplicación estará disponible en `https://tu-proyecto.up.railway.app`
+
+### Notas importantes:
+
+- **SQLite en Railway:** Los archivos se persisten, pero considera PostgreSQL para producción real
+- **Superusuario:** Crea el superusuario manualmente después del despliegue usando Railway CLI o conectándote a la base de datos
+- **Dominio:** Railway asigna automáticamente un dominio `*.up.railway.app`
+
+### Comandos útiles para Railway:
 
 ```bash
-web: gunicorn gestion_mantenimiento.wsgi --bind 0.0.0.0:$PORT
-```
+# Ver logs
+railway logs
 
-No es recomendable ejecutar `createsuperuser` automáticamente en el despliegue. Crea el superusuario manualmente cuando la aplicación esté en producción.
+# Conectar a la base de datos
+railway connect
+
+# Ejecutar comandos Django
+railway run python manage.py shell
+```
 
 ## Configuración OAuth
 
