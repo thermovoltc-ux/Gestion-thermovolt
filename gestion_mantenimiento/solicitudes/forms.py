@@ -18,8 +18,8 @@ class SolicitudForm(forms.ModelForm):
         }
 
     def clean_fecha_creacion(self):
-        fecha_creacion = self.cleaned_data['fecha_creacion']
-        if timezone.is_naive(fecha_creacion):
+        fecha_creacion = self.cleaned_data.get('fecha_creacion')
+        if fecha_creacion and timezone.is_naive(fecha_creacion):
             fecha_creacion = timezone.make_aware(fecha_creacion, timezone.get_current_timezone())
         return fecha_creacion
 

@@ -40,11 +40,10 @@ if os.environ.get('RAILWAY_ENVIRONMENT'):
 # ALLOWED_HOSTS - Soporta múltiples hosts separados por coma
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
 
-# Agregar dominios de Railway automáticamente si estamos en Railway
-if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_SERVICE_ID') or os.environ.get('RAILWAY_STATIC_URL'):
+# Agregar dominios de Railway automáticamente
+if os.environ.get('RAILWAY_ENVIRONMENT'):
     railway_hosts = [
-        'web-production-990bf.up.railway.app',  # Tu dominio específico anterior
-        'web-production-f2af9.up.railway.app',  # Host actual de Railway visto en los logs
+        'web-production-990bf.up.railway.app',  # Tu dominio específico
         '*.up.railway.app',  # Todos los subdominios de Railway
         '*.railway.app',     # Por si acaso
     ]
@@ -57,16 +56,11 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
     'https://web-production-990bf.up.railway.app',
-    'https://web-production-f2af9.up.railway.app',
     'https://*.up.railway.app',
     'https://*.railway.app',
     'http://*',  # Temporal: permitir cualquier origen HTTP
     'https://*', # Temporal: permitir cualquier origen HTTPS
 ]
-
-# Detrás de Railway / proxy, Django necesita saber que la conexión es HTTPS
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-USE_X_FORWARDED_HOST = True
 
 SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
 
@@ -252,13 +246,12 @@ TIME_INPUT_FORMATS = ['%H:%M']
 STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
-    BASE_DIR / "static",
     BASE_DIR / "gestion_mantenimiento" / "static",
 ]
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage' if not DEBUG else 'django.contrib.staticfiles.storage.StaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage' if not DEBUG else 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # Media files
 MEDIA_URL = '/media/'

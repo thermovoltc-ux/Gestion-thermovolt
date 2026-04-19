@@ -5,6 +5,7 @@ charset-normalizer==3.4.6
 colorama==0.4.6
 cryptography==46.0.6
 dj-database-url==3.0.1
+psycopg2-binary==2.9.9
 Django==4.2.7
 django-allauth==0.63.3
 django-crispy-forms==2.1
