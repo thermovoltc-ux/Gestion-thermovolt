@@ -43,7 +43,8 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost').split(','
 # Agregar dominios de Railway automáticamente
 if os.environ.get('RAILWAY_ENVIRONMENT'):
     railway_hosts = [
-        'web-production-990bf.up.railway.app',  # Tu dominio específico
+        'web-production-f2af9.up.railway.app',  # Tu dominio REAL de Railway
+        'web-production-990bf.up.railway.app',  # El anterior por si acaso
         '*.up.railway.app',  # Todos los subdominios de Railway
         '*.railway.app',     # Por si acaso
     ]
