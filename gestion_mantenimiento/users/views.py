@@ -41,6 +41,13 @@ def custom_login(request):
             tipo_cuenta = form.cleaned_data.get('tipo_cuenta')
             co = form.cleaned_data.get('co')
 
+            # Permitir a superusuarios / staff iniciar sesión sin validar grupos
+            if user.is_superuser or user.is_staff:
+                auth_login(request, user)
+                request.session['tipo_cuenta'] = tipo_cuenta
+                request.session['co'] = co
+                return redirect('dashboard')
+
             # Validar que el usuario pertenece al grupo seleccionado
             if tipo_cuenta == 'jefe_de_area' and not user.groups.filter(name='Admin').exists():
                 form.add_error('tipo_cuenta', 'No perteneces al grupo Jefe de Área.')
