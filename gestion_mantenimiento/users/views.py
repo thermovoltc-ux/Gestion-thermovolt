@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from .forms import CustomUserCreationForm, CustomAuthenticationForm
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.models import Group
+from allauth.socialaccount.models import SocialApp
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo, TareaMantenimiento
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
@@ -56,9 +57,11 @@ def custom_login(request):
         form = CustomAuthenticationForm()
     
     register_form = CustomUserCreationForm()
+    google_login_enabled = SocialApp.objects.filter(provider='google').exists()
     return render(request, 'users/login.html', {
         'form': form,
-        'register_form': register_form
+        'register_form': register_form,
+        'google_login_enabled': google_login_enabled,
     })
 
 @login_required

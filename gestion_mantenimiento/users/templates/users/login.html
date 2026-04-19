@@ -445,11 +445,13 @@
                 
                 <div class="divider">O continúa con</div>
                 
+                {% if google_login_enabled %}
                 <div class="social-buttons">
                     <a href="{% provider_login_url 'google' %}" class="btn-social">
                         <span>🔵</span> Google
                     </a>
                 </div>
+                {% endif %}
             </div>
             
             <!-- REGISTER FORM -->
