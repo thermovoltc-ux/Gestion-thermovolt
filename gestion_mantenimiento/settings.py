@@ -148,7 +148,6 @@ WSGI_APPLICATION = 'gestion_mantenimiento.wsgi.application'
 
 import dj_database_url
 
-
 def get_absolute_sqlite_path(path_str):
     path = Path(path_str)
     if not path.is_absolute():
