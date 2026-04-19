@@ -3,7 +3,7 @@ from django.apps import AppConfig
 
 class GestionOtConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'Gestion_ot'
+    name = 'gestion_mantenimiento.Gestion_ot'
     
     def ready(self):
         # Importar signals cuando la app está lista
