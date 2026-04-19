@@ -398,7 +398,7 @@ def cierre_ot(request, ot_id):
 
         # Cambiar estados
         try:
-            estado_revision = Estado.objects.get(nombre="en revision")
+            estado_revision, _ = Estado.objects.get_or_create(nombre="en revision")
             ot.estado = estado_revision
             ot.save()
             cierre_ot.estado = estado_revision
