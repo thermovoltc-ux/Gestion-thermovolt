@@ -47,12 +47,15 @@ DJANGO_SETTINGS_MODULE=gestion_mantenimiento.settings python -c "import django, 
 
 echo "STARTUP: checking static directories"
 echo "Current directory: $(pwd)"
-echo "Listing gestion_mantenimiento/static/:"
-ls -la gestion_mantenimiento/static/ | head -10
+echo "BASE_DIR would be: $(dirname $(dirname $(readlink -f manage.py)))"
+echo "Checking if gestion_mantenimiento/static exists:"
+ls -la gestion_mantenimiento/static/ 2>/dev/null || echo "Directory gestion_mantenimiento/static/ does not exist"
+echo "Checking if static exists:"
+ls -la static/ 2>/dev/null || echo "Directory static/ does not exist"
 echo "Listing gestion_mantenimiento/static/fullcalendar/lib/:"
-ls -la gestion_mantenimiento/static/fullcalendar/lib/ | head -5
+ls -la gestion_mantenimiento/static/fullcalendar/lib/ 2>/dev/null | head -5 || echo "Directory not found"
 echo "Listing gestion_mantenimiento/static/dist/:"
-ls -la gestion_mantenimiento/static/dist/ | head -5
+ls -la gestion_mantenimiento/static/dist/ 2>/dev/null | head -5 || echo "Directory not found"
 
 echo "STARTUP: collecting static files"
 python manage.py collectstatic --noinput --clear --verbosity=2
