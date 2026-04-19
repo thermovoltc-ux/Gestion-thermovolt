@@ -46,15 +46,10 @@ if os.environ.get('RAILWAY_ENVIRONMENT'):
         'web-production-990bf.up.railway.app',  # Tu dominio específico
         '*.up.railway.app',  # Todos los subdominios de Railway
         '*.railway.app',     # Por si acaso
-        '*',  # Temporal: permitir cualquier host para debug
     ]
     for host in railway_hosts:
         if host not in ALLOWED_HOSTS:
             ALLOWED_HOSTS.append(host)
-
-# Debug: imprimir ALLOWED_HOSTS en Railway
-if os.environ.get('RAILWAY_ENVIRONMENT'):
-    print(f'ALLOWED_HOSTS: {ALLOWED_HOSTS}', file=sys.stderr)
 
 # CSRF - Orígenes confiables para desarrollo local y producción
 CSRF_TRUSTED_ORIGINS = [
@@ -131,8 +126,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
-    # Debug middleware temporal
-    'gestion_mantenimiento.middleware.DebugMiddleware',
 ]
 
 if not DEBUG:
@@ -151,7 +144,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'solicitudes.context_processors.is_admin',  # Añadir esta línea
+                'gestion_mantenimiento.solicitudes.context_processors.is_admin',
             ],
         },
     },
