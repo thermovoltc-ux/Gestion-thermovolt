@@ -20,20 +20,7 @@ if username and email and password:
         user.save()
         print('Superusuario creado:', username)
     else:
-        updated = False
-        if not user.is_superuser:
-            user.is_superuser = True
-            updated = True
-        if not user.is_staff:
-            user.is_staff = True
-            updated = True
-        if not user.is_active:
-            user.is_active = True
-            updated = True
-        user.email = email
-        user.set_password(password)
-        user.save()
-        print('Superusuario actualizado:', username, 'actualizado:', updated)
+        print('Superusuario ya existe:', username, '- no se actualiza')
 else:
     print('Superuser vars missing: DJANGO_SUPERUSER_USERNAME, DJANGO_SUPERUSER_EMAIL, DJANGO_SUPERUSER_PASSWORD')
 "
