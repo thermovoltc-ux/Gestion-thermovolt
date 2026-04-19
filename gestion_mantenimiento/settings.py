@@ -33,19 +33,31 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key-change-in
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
+# Forzar DEBUG=False en Railway (producción)
+if os.environ.get('RAILWAY_ENVIRONMENT'):
+    DEBUG = False
+
 # ALLOWED_HOSTS - Soporta múltiples hosts separados por coma
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
 
-# Agregar dominio de Railway si está disponible
-railway_domain = os.environ.get('RAILWAY_STATIC_URL', '').replace('https://', '').replace('http://', '').split('.')[0] + '.up.railway.app'
-if railway_domain and railway_domain not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append(railway_domain)
+# Agregar dominios de Railway automáticamente
+if os.environ.get('RAILWAY_ENVIRONMENT'):
+    railway_hosts = [
+        'web-production-990bf.up.railway.app',  # Tu dominio específico
+        '*.up.railway.app',  # Todos los subdominios de Railway
+        '*.railway.app',     # Por si acaso
+    ]
+    for host in railway_hosts:
+        if host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(host)
 
 # CSRF - Orígenes confiables para desarrollo local y producción
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
-    'https://web-production-990bf.up.railway.app'
+    'https://web-production-990bf.up.railway.app',
+    'https://*.up.railway.app',
+    'https://*.railway.app',
 ]
 
 # Agregar origen de Railway dinámicamente
@@ -78,6 +90,9 @@ SESSION_SAVE_EVERY_REQUEST = True  # Actualizar la fecha de expiración en cada 
 
 
 # Application definition
+
+# Site ID para allauth
+SITE_ID = 1
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -259,14 +274,16 @@ AUTHENTICATION_BACKENDS = (
 
 SITE_ID = 1
 
-LOGIN_REDIRECT_URL = '/users/dashboard/'
-LOGOUT_REDIRECT_URL = '/users/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
 
-LOGIN_URL = '/users/login/'
+LOGIN_URL = '/accounts/login/'
 
-# Configuración de Allauth para desarrollo local
-SOCIALACCOUNT_AUTO_SIGNUP = True
-SOCIALACCOUNT_EMAIL_VERIFICATION = 'optional'  # No requerir validación de email para desarrollo
+# Configuración de Allauth
+ACCOUNT_EMAIL_VERIFICATION = 'none'  # No requerir verificación de email
+ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_USERNAME_REQUIRED = True
 
 # Configuración de Site ID - importante para allauth
 SITE_ID = 1
@@ -302,21 +319,16 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'handlers': {
-        'file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'debug.log'),
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
         },
     },
     'loggers': {
         'django': {
-            'handlers': ['file'],
-            'level': 'DEBUG',
+            'handlers': ['console'],
+            'level': 'INFO',
             'propagate': True,
-        },
-        '': {
-            'handlers': ['file'],
-            'level': 'DEBUG',
         },
     },
 }
