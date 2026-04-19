@@ -12,7 +12,7 @@ from django.contrib import messages
 import os
 from .models import OrdenTrabajo, Estado, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad
 from .forms import GestionOtForm, OrdenTrabajoForm, CierreOtForm, ImagenCierreOtForm, ImagenAntesForm, ImagenDespuesForm, CierreOtActividadFormSet
-from solicitudes.models import Solicitud
+from gestion_mantenimiento.solicitudes.models import Solicitud
 import logging
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
@@ -293,7 +293,7 @@ def listar_ot(request):
         ots = ots.filter(solicitud__equipo_id=equipo_id)
         filter_label = f'Historial de OT para Equipo ID {equipo_id}'
     elif ubicacion_id:
-        from Activos.models import Ubicacion
+        from gestion_mantenimiento.Activos.models import Ubicacion
 
         def get_descendant_ids(ubicacion):
             ids = [ubicacion.id]

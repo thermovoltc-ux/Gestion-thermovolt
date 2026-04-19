@@ -7,7 +7,7 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'gestion_mantenimiento.settings')
 django.setup()
 
-from solicitudes.models import OrdenTrabajo, Solicitud
+from gestion_mantenimiento.solicitudes.models import OrdenTrabajo, Solicitud
 
 def update_existing_records():
     # Obtener todas las órdenes de trabajo

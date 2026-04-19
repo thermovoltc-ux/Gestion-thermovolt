@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from datetime import date, timedelta
 from .models import PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento
-from Activos.models import Equipo
+from gestion_mantenimiento.Activos.models import Equipo
 from .forms import PlanMantenimientoForm, ActividadMantenimientoForm, TareaMantenimientoForm
 
 

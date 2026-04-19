@@ -10,14 +10,14 @@ from dateutil.parser import isoparse
 from .models import Solicitud
 from gestion_mantenimiento.Gestion_ot.models import Estado, OrdenTrabajo, CierreOt
 from .forms import SolicitudForm
-from Activos.models import Activo, Ubicacion, Area, CentroCostos, Equipo
+from gestion_mantenimiento.Activos.models import Activo, Ubicacion, Area, CentroCostos, Equipo
 import logging
 from django.utils.dateformat import DateFormat
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login as auth_login
 from django.contrib.auth.forms import AuthenticationForm
-from users.forms import CustomAuthenticationForm
+from gestion_mantenimiento.users.forms import CustomAuthenticationForm
 from django.core.mail import send_mail
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist

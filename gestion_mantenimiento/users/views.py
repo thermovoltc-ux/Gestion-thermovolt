@@ -8,8 +8,8 @@ from .forms import CustomUserCreationForm, CustomAuthenticationForm
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.models import Group
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo, TareaMantenimiento
-from solicitudes.models import Solicitud
-from Activos.models import Equipo, Ubicacion
+from gestion_mantenimiento.solicitudes.models import Solicitud
+from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
 
 def register(request):
     if request.method == 'POST':
