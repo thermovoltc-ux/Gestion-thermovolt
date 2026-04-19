@@ -57,9 +57,27 @@ Aplicación web para la gestión de mantenimiento de activos y órdenes de traba
 
 ## Despliegue
 
-Esta aplicación está configurada para desplegarse en Railway.
+Esta aplicación está configurada para desplegarse en Railway u otra plataforma de hosting compatible con Python.
 
-Asegúrate de configurar las variables de entorno en tu plataforma de despliegue.
+Asegúrate de configurar las siguientes variables de entorno en tu plataforma de despliegue:
+
+- `SECRET_KEY`
+- `DEBUG=False`
+- `DATABASE_URL`
+- `ALLOWED_HOSTS`
+- `SECURE_SSL_REDIRECT=True`
+- `EMAIL_HOST_USER`
+- `EMAIL_HOST_PASSWORD`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+
+El `Procfile` ya está configurado para ejecutar Gunicorn:
+
+```bash
+web: gunicorn gestion_mantenimiento.wsgi --bind 0.0.0.0:$PORT
+```
+
+No es recomendable ejecutar `createsuperuser` automáticamente en el despliegue. Crea el superusuario manualmente cuando la aplicación esté en producción.
 
 ## Configuración OAuth
 
