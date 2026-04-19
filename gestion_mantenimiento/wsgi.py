@@ -39,5 +39,7 @@ except Exception as exc:
     raise
 
 from django.core.wsgi import get_wsgi_application
+from whitenoise import WhiteNoise
 
 application = get_wsgi_application()
+application = WhiteNoise(application, root=os.path.join(project_root, 'staticfiles'))
