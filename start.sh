@@ -45,8 +45,17 @@ else:
 echo "STARTUP: database path"
 DJANGO_SETTINGS_MODULE=gestion_mantenimiento.settings python -c "import django, os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'gestion_mantenimiento.settings'); django.setup(); from django.conf import settings; print(settings.DATABASES['default'].get('NAME'))"
 
+echo "STARTUP: checking static directories"
+echo "Current directory: $(pwd)"
+echo "Listing gestion_mantenimiento/static/:"
+ls -la gestion_mantenimiento/static/ | head -10
+echo "Listing gestion_mantenimiento/static/fullcalendar/lib/:"
+ls -la gestion_mantenimiento/static/fullcalendar/lib/ | head -5
+echo "Listing gestion_mantenimiento/static/dist/:"
+ls -la gestion_mantenimiento/static/dist/ | head -5
+
 echo "STARTUP: collecting static files"
-python manage.py collectstatic --noinput --clear --verbosity=1
+python manage.py collectstatic --noinput --clear --verbosity=2
 
 echo "STARTUP: launching gunicorn"
 exec gunicorn gestion_mantenimiento.wsgi --bind 0.0.0.0:$PORT --workers 1 --threads 2
