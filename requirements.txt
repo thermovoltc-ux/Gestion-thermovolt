@@ -27,6 +27,7 @@ tqdm==4.67.3
 typing_extensions==4.15.0
 tzdata==2025.3
 urllib3==2.6.3
+whitenoise==6.5.0
 
 # Instala todas las dependencias del proyecto con:
 # pip install -r requirements.txt
