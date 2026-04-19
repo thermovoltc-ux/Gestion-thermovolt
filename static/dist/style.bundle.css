@@ -1,0 +1,1904 @@
+/*!*************************************************************************!*\
+  !*** css ../node_modules/css-loader/dist/cjs.js!./static/css/style.css ***!
+  \*************************************************************************/
+/* Estilos para el menú desplegable */
+.user {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  right: 0;
+  background-color: #f9f9f9;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 10009;
+}
+
+.dropdown-content a, .dropdown-content p {
+  color: black;
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+}
+
+.dropdown-content a:hover {background-color: #f1f1f1}
+
+.user:hover .dropdown-content {
+  display: block;
+}
+
+/* Estilos para el menú desplegable del usuario */
+.user-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.user-dropdown-content {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 60px;
+  background: var(--white);
+  min-width: 250px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  z-index: 1001;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.user-dropdown-content .user-info {
+  padding: 20px;
+  background: linear-gradient(135deg, var(--blue) 0%, #2563eb 100%);
+  color: white;
+  text-align: center;
+}
+
+.user-dropdown-content .user-info strong {
+  display: block;
+  font-size: 1.1rem;
+  margin-bottom: 5px;
+}
+
+.user-dropdown-content .user-info small {
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+.user-dropdown-content hr {
+  margin: 0;
+  border: none;
+  border-top: 1px solid #eee;
+}
+
+.user-dropdown-content a {
+  color: var(--black1);
+  padding: 12px 20px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.3s ease;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.user-dropdown-content a:last-child {
+  border-bottom: none;
+}
+
+.user-dropdown-content a:hover {
+  background: rgba(20, 2, 215, 0.1);
+  color: var(--blue);
+  padding-left: 25px;
+}
+
+.user-dropdown-content a ion-icon {
+  font-size: 1.1rem;
+  min-width: 20px;
+}
+
+.user-dropdown-content .logout-link {
+  color: #dc3545;
+}
+
+.user-dropdown-content .logout-link:hover {
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+}
+
+/* Animación de entrada para el topbar */
+.topbar {
+  animation: slideDown 0.5s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .topbar {
+    height: 60px;
+    padding: 0 15px;
+  }
+
+  .search {
+    width: 200px;
+    margin: 0 10px;
+  }
+
+  .search label input {
+    height: 40px;
+    font-size: 14px;
+  }
+
+  .toggle {
+    width: 45px;
+    height: 45px;
+    font-size: 1.5rem;
+  }
+
+  .user-icon {
+    width: 45px;
+    height: 45px;
+  }
+
+  .main {
+    padding-top: 80px;
+  }
+
+  .user-dropdown-content {
+    min-width: 200px;
+    right: -10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .search {
+    display: none; /* Ocultar búsqueda en móviles muy pequeños */
+  }
+
+  .topbar {
+    justify-content: space-between;
+  }
+}
+
+/* Estilos para el icono de usuario */
+.user-icon {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid rgba(148, 163, 184, 0.3);
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.user-icon:hover {
+  border-color: var(--blue);
+  transform: scale(1.05);
+  box-shadow: 0 4px 20px rgba(20, 2, 215, 0.2);
+}
+
+.user-icon img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.user-icon:hover img {
+  transform: scale(1.1);
+}
+
+/* Placeholder para cuando no hay imagen */
+.user-icon .user-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+/* =============== Globals ============== */
+* {
+  font-family: "Ubuntu", sans-serif;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --blue: #1402d7;
+  --white: #fff;
+  --gray: #f5f5f5;
+  --black1: #222;
+  --black2: #999;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.container {
+  position: relative;
+  width: 100%;
+}
+
+/* =============== Navigation ================ */
+.navigation {
+  position: fixed;
+  width: 80px;
+  height: 100%;
+  background: var(--blue);
+  border-left: 10px solid var(--blue);
+  transition: 0.5s;
+  overflow-y: auto;
+  z-index: 1100;
+}
+.navigation.active {
+  width: 230px;
+}
+
+.navigation ul {
+  position: relative;
+  left: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.navigation ul li {
+  position: relative;
+  width: 100%;
+  list-style: none;
+  margin: 0;
+  border-top-left-radius: 30px;
+  border-bottom-left-radius: 30px;
+}
+
+.navigation ul li:hover,
+.navigation ul li.hovered {
+  background-color: rgba(255, 255, 255, 0.16);
+  border-top-right-radius: 20px;
+  border-bottom-right-radius: 20px;
+}
+
+.navigation ul li:nth-child(1) {
+  margin-bottom: 40px;
+  pointer-events: none;
+}
+
+.navigation ul li a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  height: 60px;
+  text-decoration: none;
+  color: var(--white);
+  transition: color 0.3s ease, background 0.3s ease;
+}
+.navigation ul li:hover a,
+.navigation ul li.hovered a {
+  color: var(--white);
+}
+
+.navigation ul li a .icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
+  text-align: center;
+}
+.navigation ul li a .icon ion-icon {
+  font-size: 1.75rem;
+}
+
+.navigation ul li a .title {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  height: 60px;
+  line-height: 60px;
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  flex: 1;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+.navigation.active ul li a .title {
+  opacity: 1;
+  visibility: visible;
+}
+
+.navigation ul li.has-submenu > a .submenu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 25px;
+  color: var(--white);
+  transition: transform 0.3s ease;
+}
+
+.navigation ul li.has-submenu.active > a .submenu-icon {
+  transform: rotate(180deg);
+}
+
+.navigation ul li .submenu {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+  pointer-events: none;
+}
+
+.navigation ul li.has-submenu.active .submenu {
+  max-height: 999px;
+  pointer-events: auto;
+}
+
+.navigation ul li .submenu li {
+  margin: 0;
+  padding: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.navigation ul li .submenu li a {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px 0 30px;
+  background: transparent;
+  color: var(--white);
+  transition: background 0.25s ease, color 0.25s ease;
+  cursor: pointer;
+  position: relative;
+  pointer-events: auto !important;
+  z-index: 2;
+}
+
+.navigation ul li .submenu li a:hover {
+  background: rgba(255,255,255,0.16);
+  color: var(--white);
+}
+
+.navigation ul li .submenu li a *,
+.navigation ul li .submenu li a ion-icon {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+.navigation ul li .submenu li a .icon {
+  min-width: 36px;
+  width: 36px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+}
+
+.navigation ul li .submenu li a .title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  line-height: 40px;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  width: calc(100% - 46px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+.navigation.active ul li .submenu li a .title {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* --------- curve outside ---------- */
+.navigation ul li:hover a::before,
+.navigation ul li.hovered a::before,
+.navigation ul li:hover a::after,
+.navigation ul li.hovered a::after {
+  display: none;
+}
+
+/* ===================== Main ===================== */
+.main {
+  position: absolute;
+  padding: 1rem 1.5rem;
+  padding-top: 80px; /* 70px topbar */
+  width: calc(100% - 80px);
+  left: 80px;
+  min-height: 100vh;
+  background: var(--gray);
+  transition: all 0.5s ease;
+}
+.main.active {
+  width: calc(100% - 230px);
+  left: 230px;
+}
+
+.main.active .topbar {
+  left: 230px;
+  width: calc(100% - 230px);
+}
+
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 80px;
+  width: calc(100% - 80px);
+  height: 70px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 15px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  z-index: 1200;
+  transition: left 0.5s ease, width 0.5s ease, background 0.3s ease;
+  margin: 0;
+}
+
+.main.active .topbar {
+  left: 230px;
+  width: calc(100% - 230px);
+  transition: left 0.5s ease, width 0.5s ease;
+}
+
+.toggle {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.8rem;
+  cursor: pointer;
+  background: rgba(148, 163, 184, 0.1);
+  border-radius: 12px;
+  color: var(--blue);
+  transition: all 0.3s ease;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  z-index: 1001;
+}
+
+.toggle:hover {
+  background: rgba(20, 2, 215, 0.1);
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(20, 2, 215, 0.15);
+  color: var(--blue);
+}
+
+.search {
+  position: relative;
+  width: 450px;
+  margin: 0 20px;
+}
+
+.search label {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.search label input {
+  width: 100%;
+  height: 45px;
+  border-radius: 25px;
+  padding: 5px 20px;
+  padding-left: 50px;
+  font-size: 16px;
+  outline: none;
+  border: 2px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--black1);
+  transition: all 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.search label input:focus {
+  border-color: var(--blue);
+  background: var(--white);
+  box-shadow: 0 4px 20px rgba(20, 2, 215, 0.15);
+  transform: translateY(-1px);
+}
+
+.search label input::placeholder {
+  color: var(--black2);
+  font-style: italic;
+}
+
+.search label ion-icon {
+  position: absolute;
+  left: 15px;
+  font-size: 1.3rem;
+  color: var(--black2);
+  z-index: 1;
+  transition: color 0.3s ease;
+}
+
+.search label input:focus + ion-icon {
+  color: var(--blue);
+}
+
+.user {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.user img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ======================= Cards ====================== */
+.cardBox {
+  position: relative;
+  width: 100%;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-gap: 30px;
+}
+
+.cardBox .card {
+  position: relative;
+  background: var(--white);
+  padding: 30px;
+  border-radius: 20px;
+  display: flex;
+  justify-content: space-between;
+  cursor: pointer;
+  box-shadow: 0 7px 25px rgba(0, 0, 0, 0.08);
+}
+
+.cardBox .card .numbers {
+  position: relative;
+  font-weight: 500;
+  font-size: 2.5rem;
+  color: var(--blue);
+}
+
+.cardBox .card .cardName {
+  color: var(--black2);
+  font-size: 1.1rem;
+  margin-top: 5px;
+}
+
+.cardBox .card .iconBx {
+  font-size: 3.5rem;
+  color: var(--black2);
+}
+
+.cardBox .card:hover {
+  background: var(--blue);
+}
+.cardBox .card:hover .numbers,
+.cardBox .card:hover .cardName,
+.cardBox .card:hover .iconBx {
+  color: var(--white);
+}
+
+/* ================== Order Details List ============== */
+.details {
+  position: relative;
+  width: 100%;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-gap: 30px;
+  /* margin-top: 10px; */
+}
+
+.details .recentOrders {
+  position: relative;
+  display: grid;
+  min-height: 500px;
+  background: var(--white);
+  padding: 20px;
+  box-shadow: 0 7px 25px rgba(0, 0, 0, 0.08);
+  border-radius: 20px;
+}
+
+.details .cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.cardHeader h2 {
+  font-weight: 600;
+  color: var(--blue);
+}
+.cardHeader .btn {
+  position: relative;
+  padding: 5px 10px;
+  background: var(--blue);
+  text-decoration: none;
+  color: var(--white);
+  border-radius: 6px;
+}
+
+.details table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+.details table thead td {
+  font-weight: 600;
+}
+.details .recentOrders table tr {
+  color: var(--black1);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+.details .recentOrders table tr:last-child {
+  border-bottom: none;
+}
+.details .recentOrders table tbody tr:hover {
+  background: var(--blue);
+  color: var(--white);
+}
+.details .recentOrders table tr td {
+  padding: 10px;
+}
+.details .recentOrders table tr td:last-child {
+  text-align: end;
+}
+.details .recentOrders table tr td:nth-child(2) {
+  text-align: end;
+}
+.details .recentOrders table tr td:nth-child(3) {
+  text-align: center;
+}
+.status.delivered {
+  padding: 2px 4px;
+  background: #8de02c;
+  color: var(--white);
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.status.pending {
+  padding: 2px 4px;
+  background: #e9b10a;
+  color: var(--white);
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.status.return {
+  padding: 2px 4px;
+  background: #f00;
+  color: var(--white);
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.status.inProgress {
+  padding: 2px 4px;
+  background: #1795ce;
+  color: var(--white);
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.recentCustomers {
+  position: relative;
+  display: grid;
+  min-height: 500px;
+  padding: 20px;
+  background: var(--white);
+  box-shadow: 0 7px 25px rgba(0, 0, 0, 0.08);
+  border-radius: 20px;
+}
+.recentCustomers .imgBx {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50px;
+  overflow: hidden;
+}
+.recentCustomers .imgBx img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.recentCustomers table tr td {
+  padding: 12px 10px;
+}
+.recentCustomers table tr td h4 {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.2rem;
+}
+.recentCustomers table tr td h4 span {
+  font-size: 14px;
+  color: var(--black2);
+}
+.recentCustomers table tr:hover {
+  background: var(--blue);
+  color: var(--white);
+}
+.recentCustomers table tr:hover td h4 span {
+  color: var(--white);
+}
+
+/* ====================== Responsive Design ========================== */
+@media (max-width: 991px) {
+  .navigation {
+    position: fixed;
+    width: 230px;
+    border-left: none;
+    transform: translateX(-230px);
+    transition: transform 0.5s;
+    z-index: 1001;
+  }
+  .navigation.active {
+    transform: translateX(0);
+  }
+  .main {
+    width: 100%;
+    left: 0;
+  }
+  .main.active {
+    /* No mover el main en móviles, usar overlay */
+    left: 0;
+  }
+  .cardBox {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .search {
+    width: 200px;
+  }
+  .cardBox {
+    grid-template-columns: repeat(1, 1fr);
+  }
+  .topbar {
+    padding: 0 5px;
+  }
+  .toggle {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .search {
+    display: none; /* Ocultar búsqueda en móviles pequeños */
+  }
+  .topbar {
+    justify-content: space-between;
+  }
+  .main {
+    padding: 0.5rem 1rem;
+  }
+  .cardBox {
+    padding: 10px;
+    grid-gap: 15px;
+  }
+  .cardBox .card {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .search {
+    width: 200px;
+  }
+  .cardBox {
+    grid-template-columns: repeat(1, 1fr);
+  }
+  .topbar {
+    padding: 0 5px;
+  }
+  .toggle {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .search {
+    display: none; /* Ocultar búsqueda en móviles pequeños */
+  }
+  .topbar {
+    justify-content: space-between;
+  }
+  .main {
+    padding: 0.5rem 1rem;
+  }
+  .cardBox {
+    padding: 10px;
+    grid-gap: 15px;
+  }
+  .cardBox .card {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .details {
+    grid-template-columns: 1fr;
+  }
+  .recentOrders {
+    overflow-x: auto;
+  }
+  .status.inProgress {
+    white-space: nowrap;
+  }
+  /* Kanban responsive - Mobile */
+  .kanban-container {
+    flex-direction: column !important;
+    overflow-x: visible !important;
+    overflow-y: auto !important;
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  .kanban-column {
+    flex: 1 0 auto !important;
+    width: 100% !important;
+    max-height: 300px;
+    margin-bottom: 1rem;
+  }
+
+  .kanban-card {
+    padding: 0.75rem;
+    margin: 0.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Kanban responsive - Very small mobile */
+  .kanban-container {
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    gap: 0.3rem;
+    padding: 0.25rem;
+  }
+
+  .kanban-column {
+    width: 100% !important;
+    flex: 1 0 auto !important;
+    max-height: 280px;
+    margin-bottom: 0.8rem;
+  }
+
+  .kanban-column h2 {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.3rem;
+  }
+
+  .kanban-card {
+    padding: 0.5rem;
+    margin: 0.15rem;
+  }
+
+  .kanban-card h3 {
+    font-size: 0.75rem;
+  }
+
+  .kanban-card h4 {
+    font-size: 0.7rem;
+  }
+
+  .kanban-card p {
+    font-size: 0.65rem;
+  }
+
+  .kanban-card small {
+    font-size: 0.6rem;
+  }
+}
+
+/* Overlay para móviles cuando navegación está activa */
+.navigation {
+  position: fixed;
+  width: 80px;
+  height: 100%;
+  background: var(--blue);
+  border-left: 10px solid var(--blue);
+  transition: 0.5s;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  z-index: 1100;
+}
+.navigation::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.navigation::-webkit-scrollbar-track {
+  background: transparent;
+}
+.navigation::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+.navigation.active {
+  width: 230px;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1050;
+  display: none;
+}
+.overlay.active {
+  display: block;
+}
+
+@media (max-width: 480px) {
+  .cardBox {
+    grid-template-columns: repeat(1, 1fr);
+  }
+  .cardHeader h2 {
+    font-size: 20px;
+  }
+  .user {
+    min-width: 40px;
+  }
+  .navigation {
+    width: 230px;
+    left: 0;
+    transform: translateX(-100%);
+    transition: transform 0.4s ease;
+    z-index: 1001;
+    border-left: none;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.25);
+  }
+  .navigation.active {
+    transform: translateX(0);
+  }
+  .toggle {
+    z-index: 10001;
+  }
+  .main.active .toggle {
+    color: #fff;
+    position: fixed;
+    right: 0;
+    left: initial;
+  }
+}
+
+/* Contenido principal */
+.content {
+  padding: 20px;
+  margin-left: 40px;
+  transition: margin-left 0.3s ease;
+}
+
+.content.shift {
+  margin-left: 220px;
+}
+
+form {
+  margin: 20px auto;
+  padding: 3rem 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.form-group {
+  position: relative;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group-inline {
+  display: flex;
+  gap: 20px;
+}
+
+.form-group label {
+  position: absolute;
+  top: 10px;
+  left: 15px;
+  transform: translateY(0);
+  font-weight: bold;
+  font-size: 14px;
+  color: #666;
+  background: white;
+  padding: 0 5px;
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.form-group input:focus + label,
+.form-group textarea:focus + label,
+.form-group select:focus + label,
+.form-group input:not(:placeholder-shown) + label,
+.form-group textarea:not(:placeholder-shown) + label,
+.form-group select:not(:placeholder-shown) + label {
+  top: -10px;
+  left: 10px;
+  font-size: 12px;
+  color: #000000;
+  transform: translateY(0);
+}
+
+.form-group input[type="checkbox"] {
+  width: auto;
+}
+
+.form-group input[type="date"],
+.form-group input[type="time"] {
+  width: 100%;
+  padding: 10px;
+}
+
+button[type="submit"] {
+  background-color: #4CAF50;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  display: block;
+  width: 100%;
+}
+
+button[type="submit"]:hover {
+  background-color: #45a049;
+}
+
+/* estilos para formulario de activos */
+/* Estilos generales para el formulario con ID 'form-activo' */
+#form-activo {
+  margin: 20px auto;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.activo-list {
+  list-style: none; /* Elimina los puntos por defecto */
+  padding: 0;
+  flex-grow: 1;
+}
+
+.activo-list-item {
+  margin-bottom: 20px;
+}
+
+.activo-list-item h3 {
+  font-size: 1.5rem;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.form-group label {
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+}
+
+/* Estilos para el contenedor de los botones al final */
+.form-buttons {
+  display: flex;
+  justify-content: flex-start; /* Alinea los botones a la izquierda */
+  margin-top: auto; /* Empuja los botones hacia abajo */
+}
+
+.form-buttons .btn {
+  padding: 8px 12px; /* Ajusta el padding para que se ajuste al texto */
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-right: 10px; /* Espacio entre los botones */
+  width: auto; /* Ajusta el ancho al contenido */
+  display: inline-block; /* Asegura que el botón se ajuste al contenido */
+}
+
+.form-buttons .btn-success {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.form-buttons .btn-success:hover {
+  background-color: #45a049;
+}
+
+.form-buttons .btn-danger {
+  background-color: #f44336;
+  color: white;
+}
+
+.form-buttons .btn-danger:hover {
+  background-color: #e53935;
+}
+
+
+
+
+
+
+/* CSS */
+
+/* Estilo para la barra de desplazamiento del contenedor Kanban */
+.kanban-container::-webkit-scrollbar,
+.kanban-column::-webkit-scrollbar {
+  width: 10px; /* Ancho de la barra */
+  height: 10px; /* Altura para scroll horizontal */
+}
+
+.kanban-container::-webkit-scrollbar-track,
+.kanban-column::-webkit-scrollbar-track {
+  background: #f4f4f9; /* Fondo del "track" */
+  border-radius: 8px; /* Bordes redondeados */
+}
+
+.kanban-container::-webkit-scrollbar-thumb,
+.kanban-column::-webkit-scrollbar-thumb {
+  background-color: #b0b0b0; /* Color de la barra deslizante */
+  border-radius: 8px; /* Bordes redondeados */
+  border: 2px solid #f4f4f9; /* Espacio entre la barra y el "track" */
+}
+
+.kanban-container::-webkit-scrollbar-thumb:hover,
+.kanban-column::-webkit-scrollbar-thumb:hover {
+  background-color: #888888; /* Color al pasar el cursor */
+}
+
+
+/* Contenedor principal de Kanban */ 
+/* Contenedor principal de Kanban */
+.kanban-container {
+  display: flex;
+  padding: 0rem 1rem;
+  border-radius: 0 0 8px 8px;
+  gap: 1rem;
+  overflow-x: auto; /* Permite desplazamiento horizontal */
+  background-color: #0072ff33; /* Fondo claro */
+  padding-bottom: 1rem;
+}
+
+/* Columnas del Kanban */
+.kanban-column {
+  flex: 1;
+  padding: 0;
+  background-color: #f4f4f9; /* Fondo de columna */
+  border-radius: 8px;
+  max-height: 400px;
+  overflow-y: auto; /* Desplazamiento vertical */
+  position: relative; /* Contexto para z-index */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-top: 1rem;
+}
+
+/* Encabezado fijo de las columnas */
+.kanban-column h2 {
+  font-size: 1rem;
+  font-weight: bold;
+  color: #333333;
+  margin: 0;
+  padding: 0.75rem 0.5rem;
+  background-color: #f4f4f9; /* Fondo sólido */
+  position: sticky; /* Fijar al inicio */
+  top: 0; /* Se mantiene en la parte superior */
+  z-index: 10; /* Asegura que quede sobre las tarjetas */
+  border-bottom: 2px solid #0072ff33; /* Línea de separación */
+}
+
+
+/* Línea colorida al lado del título */
+#solicitudes h2::before,
+#ot_en_proceso h2::before,
+#ot_en_revision h2::before,
+#ot_finalizada h2::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 16px;
+  margin-right: 0.5rem;
+  border-radius: 3px;
+}
+
+/* Colores para las líneas de las columnas */
+#solicitudes h2::before {
+  background-color: #5d5d5d; /* Color de línea (ajusta según columna) */
+}
+
+#ot_en_proceso h2::before {
+  background-color: #ff9f43; /* Color de línea (ajusta según columna) */
+}
+
+#ot_en_revision h2::before {
+  background-color: #3064f5; /* Color de línea (ajusta según columna) */
+}
+
+#ot_finalizada h2::before {
+  background-color: #00dc25; /* Color de línea (ajusta según columna) */
+}
+
+
+/* Tarjetas */
+/* Tarjetas del Kanban */
+.kanban-card {
+  background-color: #ffffff;
+  margin: 0.5rem;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: grab;
+  transition: box-shadow 0.2s ease-in-out;
+  z-index: 1; /* Las tarjetas quedan detrás */
+  position: relative;
+}
+
+.kanban-card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Sombra más pronunciada al pasar el cursor */
+}
+
+/* Encabezado de cada tarjeta */
+.kanban-card h3 {
+  font-size: 0.9rem;
+  font-weight: bold;
+  margin: 0 0 0.5rem 0;
+  color: #007bff; /* Azul suave para OT o títulos */
+}
+
+/* Texto adicional dentro de tarjetas */
+.kanban-card p {
+  font-size: 0.8rem;
+  margin: 0.2rem 0;
+  color: #555555;
+}
+
+.kanban-card .card-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #777777;
+  margin-top: 0.5rem;
+}
+
+/* Iconos pequeños */
+.kanban-card .card-meta i {
+  margin-right: 0.2rem;
+  color: #999999;
+}
+
+
+
+.modal {
+  display: none; /* Oculto por defecto */
+  position: fixed; /* Posición fija */
+  z-index: 10001; /* Encima de otros elementos */
+  left: 0;
+  top: 0;
+  width: 100%; /* Ancho completo */
+  height: 100%; /* Alto completo */
+  overflow: auto; /* Permitir scroll si es necesario */
+  background-color: rgb(0,0,0); /* Color de fondo */
+  background-color: rgba(0,0,0,0.4); /* Fondo con opacidad */
+}
+
+.modal-content {
+  background-color: #fefefe;
+  margin: 15% auto; /* Centrado */
+  padding: 20px;
+  border: 1px solid #888;
+  width: 80%; /* Ancho del modal */
+}
+
+.close {
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+  color: black;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* Estilos para la tabla */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+table, th, td {
+  border: 1px solid #ddd;
+}
+
+th, td {
+  padding: 10px;
+  text-align: left;
+}
+
+th {
+  background-color: #f2f2f2;
+}
+
+tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+tr:hover {
+  background-color: #f1f1f1;
+}
+
+@media (max-width: 768px) {
+  .list-container {
+    overflow-x: hidden;
+    padding: 0.5rem;
+  }
+
+  .list-container table {
+    width: 100%;
+    border: none;
+    min-width: 0;
+  }
+
+  .list-container thead,
+  .list-container tbody,
+  .list-container th,
+  .list-container td,
+  .list-container tr {
+    display: block;
+  }
+
+  .list-container thead tr {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  .list-container tr {
+    margin: 0 0 1rem 0;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fff;
+    padding: 0.5rem;
+  }
+
+  .list-container td {
+    border: none;
+    border-bottom: 1px solid #eee;
+    position: relative;
+    padding-left: 50%;
+    text-align: left;
+    white-space: normal;
+    font-size: 0.85rem;
+  }
+
+  .list-container td:last-child {
+    border-bottom: none;
+  }
+
+  .list-container td:before {
+    position: absolute;
+    top: 0.6rem;
+    left: 0.75rem;
+    width: 45%;
+    padding-right: 10px;
+    white-space: nowrap;
+    font-weight: 700;
+    content: attr(data-label);
+    color: #333;
+    text-align: left;
+  }
+
+  .list-container td:nth-child(1):before { content: "Consecutivo"; }
+  .list-container td:nth-child(2):before { content: "Creado por"; }
+  .list-container td:nth-child(3):before { content: "Ubicación"; }
+  .list-container td:nth-child(4):before { content: "Descripción"; }
+  .list-container td:nth-child(5):before { content: "Fecha de Creación"; }
+  .list-container td:nth-child(6):before { content: "Estado"; }
+}
+
+@media (max-width: 480px) {
+  td {
+    font-size: 0.8rem;
+    padding-left: 45%;
+  }
+
+  td:before {
+    font-size: 0.78rem;
+  }
+
+  /* Ocultar campos menos críticos */
+  td:nth-child(4),
+  td:nth-child(5) {
+    display: none;
+  }
+}
+
+
+.ui-autocomplete {
+  z-index: 1000;
+  background-color: white;
+  border: 1px solid #ccc;
+  max-height: 200px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.ui-menu-item {
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.ui-menu-item:hover {
+  background-color: #ddd;
+}
+
+
+ /* Estilos generales */
+ .tree-view {
+  font-family: Arial, sans-serif;
+  margin-top: 20px;
+  padding-left: 10px;
+}
+
+/* Estilos para cada nodo */
+.tree-item {
+  margin: 10px 0;
+}
+
+/* Estilos para el nodo con nombre de ubicación */
+.tree-node {
+  cursor: pointer;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Estilos para los sub-elementos */
+.tree-children {
+  display: none; /* Oculto por defecto */
+  padding-left: 20px;
+  list-style-type: none;
+  margin: 5px 0;
+}
+
+.tree-sub-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 0;
+}
+
+/* Iconos para expandir y los elementos */
+.icon-folder {
+  font-size: 1.2em;
+  transition: transform 0.3s ease;
+}
+
+.icon-leaf {
+  font-size: 0.9em;
+  color: #4CAF50;
+}
+
+/* Botón para crear un nuevo activo */
+.create-button {
+  display: inline-block;
+  margin-top: 15px;
+  padding: 10px 15px;
+  background-color: #2196F3;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+/* Estilo para el ícono al abrir */
+.open .icon-folder {
+  transform: rotate(90deg);
+}
+
+/* ... Resto de tus estilos CSS ... */
+
+.modal {
+  /* Estilos para el modal */
+  display: none;
+  position: fixed;
+  z-index: 10001;
+  /* ... Otros estilos ... */
+}
+
+.modal-content {
+  /* Estilos para el contenido del modal */
+  background-color: #fefefe;
+  margin: 15% auto;
+  padding: 20px;
+  border: 1px solid #888;
+  width: 80%;
+}
+
+.close {
+  /* Estilos para el botón de cerrar */
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+
+
+
+
+
+
+/* Alinea los botones de vista a la izquierda */
+.view-buttons {
+  display: flex;
+  background-color: white;
+  padding: 8px;
+  gap: 15px;
+  align-items: center;
+  justify-content: flex-start;
+  border-radius: 15px;  /* Borde redondeado para el contenedor */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Sombra suave para el contenedor */
+}
+
+/* Botones individuales */
+.view-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.view-button ion-icon {
+  font-size: 24px;
+  color: #000;
+}
+
+/* Contenedor principal de botones (izquierda y derecha) */
+.view-buttons-container {
+  background-color: #0072ff33;
+  display: flex;
+  justify-content: space-between; /* Distribuye botones en extremos */
+  align-items: center;
+  width: 100%;
+  padding: 0rem 1rem;
+}
+
+
+.ot-title {
+  padding: 1rem 1rem;
+  border-radius: 8px 8px 0 0;
+  background-color: #0072ff33;
+  text-align: left;
+}
+
+/* Contenedor del botón de filtro (derecha) */
+.filter-container {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Botón de filtro */
+.filter-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative; /* Necesario para posicionar el indicador */
+}
+
+.filter-button ion-icon {
+  font-size: 24px;
+  color: #000;
+}
+
+/* Indicador de filtro aplicado */
+.filter-button .filter-indicator {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 10px;
+  height: 10px;
+  background-color: red;
+  border-radius: 50%;
+  display: none; /* Ocultamos el indicador inicialmente */
+}
+
+.filter-button.filter-applied .filter-indicator {
+  display: block; /* Muestra el indicador cuando hay un filtro activo */
+}
+
+/* Barra lateral de filtro */
+.filter-sidebar {
+  position: fixed;
+  top: 0;
+  right: -300px; /* Inicialmente oculta fuera de la pantalla */
+  width: 300px;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.3);
+  transition: right 0.3s ease;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.filter-sidebar.visible {
+  right: 0px; /* Mueve la barra lateral a la vista */
+}
+
+.filter-sidebar-content {
+  position: relative;
+  padding: 20px;
+}
+
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 30px;
+  color: white;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.filter-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-input, .filter-select, .filter-submit-button {
+  display: block;
+  margin: 10px 0;
+}
+
+.filter-submit-button {
+  padding: 10px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.filter-submit-button:hover {
+  background-color: #45a049;
+}
+
+/* Ajustes generales para iconos */
+.view-button ion-icon,
+.filter-button ion-icon {
+  font-size: 24px;
+  color: #000;
+}
+
+/* Agregar padding a la barra lateral */
+.filter-sidebar-content {
+  padding: 20px;
+}
+
+/* Ajuste en la transición de visibilidad */
+.filter-sidebar.visible {
+  right: 0;
+}
+
+.filter-sidebar h2 {
+  margin-top: 0;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.filter-sidebar .filter-form-group {
+  margin-bottom: 15px;
+  list-style-type: none; /* Elimina los puntos de la lista */
+  padding: 0;
+}
+
+.filter-sidebar .filter-form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.filter-sidebar .filter-form-group input,
+.filter-sidebar .filter-form-group select {
+  width: 100%;
+  padding: 8px;
+  border: none;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}
+
+.filter-sidebar button[type="submit"] {
+  background-color: #4CAF50;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 100%;
+  font-size: 1rem;
+}
+
+.filter-sidebar button[type="submit"]:hover {
+  background-color: #45a049;
+}
+
+.filter-sidebar .filter-form button[type="submit"] {
+  background-color: #4CAF50;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 100%;
+  font-size: 1rem;
+}
+
+.filter-sidebar .filter-form button[type="submit"]:hover {
+  background-color: #45a049;
+}
+
+.calendar-container {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #0072ff33;
+}
+#calendar-view {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+#calendar {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden; /* Evita el desplazamiento */
+}
+
+.fc-event {
+  cursor: pointer;
+}
+
+/* Ajustes de calendario para anchos pequeños */
+@media (max-width: 770px) {
+  .calendar-container {
+    padding: 0.25rem;
+    width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  #calendar {
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: 0.82rem;
+  }
+
+  .fc .fc-scrollgrid {
+    width: 100% !important;
+    overflow-x: auto;
+  }
+
+  .fc .fc-scrollgrid-section > table,
+  .fc .fc-daygrid-day-frame,
+  .fc .fc-daygrid-day {
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  .fc .fc-daygrid-day-top {
+    white-space: normal;
+    font-size: 0.82rem;
+  }
+
+  .fc .fc-daygrid-day-events {
+    max-height: 120px;
+    overflow-y: auto;
+  }
+}
+
+.ver-solicitud {
+  cursor: pointer;
+}
+
+.list-container {
+  background-color: #0072ff33;
+}

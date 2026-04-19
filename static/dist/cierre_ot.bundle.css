@@ -1,0 +1,498 @@
+/*!*************************************************************************************!*\
+  !*** css ../node_modules/css-loader/dist/cjs.js!./static/css/modules/cierre_ot.css ***!
+  \*************************************************************************************/
+/* cierre_ot.css - Estilos limpios y masculinos para el formulario de cierre de OT */
+
+* {
+    box-sizing: border-box;
+}
+
+form {
+    display: block !important;
+    width: 100%;
+}
+
+.cierre-ot-form-container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 30px;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    border: 1px solid #bdc3c7;
+    display: block !important;
+}
+
+.cierre-ot-form-container h1 {
+    text-align: center;
+    color: #2c3e50;
+    margin-bottom: 30px;
+    font-size: 2.2em;
+    font-weight: 600;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 15px;
+}
+
+/* LAYOUT DE FILAS Y COLUMNAS */
+.fila {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 32px;
+    margin-bottom: 24px;
+    width: 100% !important;
+    flex-wrap: nowrap !important;
+    justify-content: space-between !important;
+}
+
+.columna {
+    flex: 1 1 calc(50% - 16px) !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.fila-mantenimiento .columna {
+    min-height: 100%;
+}
+
+.fila-imagenes .columna,
+.fila-firmas .columna {
+    min-height: 100%;
+}
+
+/* SECCIONES DE FORMULARIO */
+.cierre-ot-form-section {
+    background: #ffffff;
+    padding: 25px;
+    border-radius: 6px;
+    border: 1px solid #bdc3c7;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.cierre-ot-form-section h2 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    font-size: 1.4em;
+    font-weight: 600;
+    border-bottom: 1px solid #3498db;
+    padding-bottom: 8px;
+}
+
+/* GRUPOS DE FORMULARIO */
+.cierre-ot-form-group {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column-reverse;
+}
+
+.cierre-ot-form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #2c3e50;
+    font-weight: 500;
+    font-size: 13px;
+    height: 15px;
+    line-height: 15px;
+}
+
+.cierre-ot-form-group input,
+.cierre-ot-form-group select,
+.cierre-ot-form-group textarea {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+    font-size: 14px;
+    background: #ffffff;
+    transition: border-color 0.2s ease;
+    box-sizing: border-box;
+}
+
+.cierre-ot-form-group input:focus,
+.cierre-ot-form-group select:focus,
+.cierre-ot-form-group textarea:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+}
+
+.cierre-ot-form-group textarea {
+    min-height: 70px;
+    max-height: 120px;
+    resize: vertical;
+    line-height: 1.4;
+    padding: 10px 12px !important;
+    overflow-y: auto;
+}
+
+.cierre-ot-large-textarea textarea {
+    min-height: 70px;
+    max-height: 120px;
+    resize: vertical;
+    overflow-y: auto;
+}
+
+/* CHECKBOX */
+.cierre-ot-checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #bdc3c7;
+}
+
+.cierre-ot-checkbox-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #3498db;
+    cursor: pointer;
+}
+
+.cierre-ot-checkbox-group label {
+    font-weight: 500;
+    color: #2c3e50;
+    cursor: pointer;
+    margin: 0;
+}
+
+/* SECCIÓN DE IMÁGENES */
+.cierre-ot-image-upload-section {
+    margin-bottom: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #bdc3c7;
+}
+
+.cierre-ot-image-upload-section h3 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    font-weight: 600;
+}
+
+/* FIRMA DIGITAL */
+.cierre-ot-signature-section {
+    margin-top: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #bdc3c7;
+}
+
+.cierre-ot-signature-section label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 14px;
+}
+
+.cierre-ot-signature-canvas {
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+    background: #ffffff;
+    cursor: crosshair;
+    width: 100%;
+    max-width: 400px;
+}
+
+/* BOTONES */
+.cierre-ot-btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.cierre-ot-btn:hover {
+    opacity: 0.9;
+}
+
+.cierre-ot-btn-primary {
+    background: #3498db;
+    color: white;
+    width: auto;
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 13px;
+}
+
+.cierre-ot-btn-primary:hover {
+    background: #2980b9;
+}
+
+.cierre-ot-btn-secondary {
+    background: #95a5a6;
+    color: white;
+}
+
+.cierre-ot-btn-secondary:hover {
+    background: #7f8c8d;
+}
+
+/* ALERTAS */
+.cierre-ot-alert {
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 14px;
+    border: 1px solid;
+}
+
+.cierre-ot-alert-success {
+    background: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.cierre-ot-alert-error {
+    background: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+}
+
+.cierre-ot-alert-warning {
+    background: #fff3cd;
+    color: #856404;
+    border-color: #ffeaa7;
+}
+
+.cierre-ot-alert-info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border-color: #bee5eb;
+}
+
+/* INPUT ESPECÍFICOS */
+input[type="date"],
+input[type="time"] {
+    font-size: 14px;
+}
+
+.cierre-ot-section-title-duplicate {
+    display: block;
+}
+
+@media (max-width: 900px) {
+    .cierre-ot-section-title-duplicate {
+        display: none;
+    }
+}
+
+.cierre-ot-mobile-sign-btn {
+    display: none;
+    margin-bottom: 10px;
+}
+
+.cierre-ot-signature-canvas {
+    max-width: 100%;
+    min-height: 140px;
+}
+
+@media (max-width: 768px) {
+    .cierre-ot-mobile-sign-btn {
+        display: inline-block;
+    }
+
+    .cierre-ot-signature-canvas {
+        display: none !important;
+    }
+
+    .cierre-ot-signature-section label {
+        margin-bottom: 8px;
+    }
+}
+
+.signature-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.signature-overlay-content {
+    width: 100%;
+    max-width: 1000px;
+    max-height: 100vh;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    overflow: hidden;
+}
+
+.signature-overlay-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.signature-overlay-header #overlay-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.cierre-ot-signature-canvas-overlay {
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 240px;
+    max-height: calc(100vh - 170px);
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+    background: #fff;
+    touch-action: none;
+}
+
+.signature-overlay-actions {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.signature-overlay-actions .cierre-ot-btn {
+    min-width: 110px;
+    padding: 10px 16px;
+    font-size: 15px;
+    border-radius: 6px;
+}
+
+.signature-overlay-actions .cierre-ot-btn-primary {
+    width: auto;
+    margin: 0;
+}
+
+.signature-overlay-actions .cierre-ot-btn-secondary {
+    width: auto;
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .signature-overlay-content {
+        padding: 8px;
+    }
+
+    .cierre-ot-signature-canvas-overlay {
+        max-height: calc(100vh - 180px);
+    }
+
+    .signature-overlay-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .signature-overlay-actions .cierre-ot-btn {
+        width: 100%;
+    }
+}
+
+/* overlay de firma ya ocupa toda la pantalla sin mensaje de rotación */
+
+/* CHECKBOX PERSONALIZADO */
+.cierre-ot-checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #bdc3c7;
+}
+
+.cierre-ot-checkbox-group input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: #3498db;
+    cursor: pointer;
+    margin: 0;
+}
+
+.cierre-ot-checkbox-group label {
+    font-weight: 500;
+    color: #2c3e50;
+    cursor: pointer;
+    margin: 0;
+    font-size: 14px;
+}
+
+/* RESPONSIVE DESIGN */
+@media (max-width: 900px) {
+    .fila {
+        flex-direction: column !important;
+        flex-wrap: wrap !important;
+        gap: 18px;
+    }
+
+    .columna {
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+        width: 100% !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .cierre-ot-form-container {
+        padding: 20px;
+        margin: 10px;
+        border-radius: 6px;
+    }
+
+    .cierre-ot-form-container h1 {
+        font-size: 1.8em;
+        margin-bottom: 25px;
+    }
+
+    .fila {
+        flex-direction: column !important;
+        flex-wrap: wrap !important;
+        gap: 18px;
+    }
+
+    .columna {
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+        width: 100% !important;
+    }
+
+    .cierre-ot-form-section {
+        padding: 20px;
+    }
+
+    .cierre-ot-form-group {
+        margin-bottom: 16px;
+    }
+
+    .cierre-ot-form-group label {
+        height: auto;
+    }
+
+    .cierre-ot-signature-canvas {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .cierre-ot-btn {
+        width: 100%;
+        padding: 15px;
+    }
+}
+

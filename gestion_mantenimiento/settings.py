@@ -246,8 +246,7 @@ TIME_INPUT_FORMATS = ['%H:%M']
 STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
-    BASE_DIR / "gestion_mantenimiento" / "static",
-    BASE_DIR / "static",  # Asegurar que también se incluya si existe
+    BASE_DIR / "static",
 ]
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
