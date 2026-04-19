@@ -88,12 +88,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
 
-    'solicitudes',
-    'Activos',
-    'Gestion_ot',
+    'gestion_mantenimiento.solicitudes',
+    'gestion_mantenimiento.Activos',
+    'gestion_mantenimiento.Gestion_ot',
     'crispy_forms',
     'mptt',
-    'users',
+    'gestion_mantenimiento.users',
     'django.contrib.sites',
     'allauth',
     'allauth.account',
