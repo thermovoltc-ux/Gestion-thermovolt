@@ -8,7 +8,7 @@ from datetime import timedelta
 import datetime
 from dateutil.parser import isoparse
 from .models import Solicitud
-from Gestion_ot.models import Estado, OrdenTrabajo, CierreOt
+from gestion_mantenimiento.Gestion_ot.models import Estado, OrdenTrabajo, CierreOt
 from .forms import SolicitudForm
 from Activos.models import Activo, Ubicacion, Area, CentroCostos, Equipo
 import logging

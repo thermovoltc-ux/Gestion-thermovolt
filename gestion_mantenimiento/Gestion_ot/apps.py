@@ -7,4 +7,4 @@ class GestionOtConfig(AppConfig):
     
     def ready(self):
         # Importar signals cuando la app está lista
-        import Gestion_ot.models
+        import gestion_mantenimiento.Gestion_ot.models

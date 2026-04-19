@@ -7,7 +7,7 @@ from django.http import JsonResponse
 from .forms import CustomUserCreationForm, CustomAuthenticationForm
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.models import Group
-from Gestion_ot.models import OrdenTrabajo, TareaMantenimiento
+from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo, TareaMantenimiento
 from solicitudes.models import Solicitud
 from Activos.models import Equipo, Ubicacion
 
