@@ -148,9 +148,44 @@ WSGI_APPLICATION = 'gestion_mantenimiento.wsgi.application'
 
 import dj_database_url
 
-DATABASES = {
-    'default': dj_database_url.config(default=f'sqlite:///{BASE_DIR / "db.sqlite3"}')
-}
+
+def get_absolute_sqlite_path(path_str):
+    path = Path(path_str)
+    if not path.is_absolute():
+        path = BASE_DIR / path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch(exist_ok=True)
+    return path
+
+
+def build_sqlite_url(path: Path) -> str:
+    return f'sqlite:///{path}'
+
+
+database_url = os.environ.get('DATABASE_URL')
+
+if database_url:
+    parsed_db = dj_database_url.parse(database_url)
+    if parsed_db.get('ENGINE') == 'django.db.backends.sqlite3' and parsed_db.get('NAME'):
+        parsed_db['NAME'] = str(get_absolute_sqlite_path(parsed_db['NAME']))
+    DATABASES = {'default': parsed_db}
+else:
+    if os.environ.get('RAILWAY_STATIC_URL') or os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_SERVICE_ID'):
+        default_path = Path('/data/db.sqlite3')
+        try:
+            default_path.parent.mkdir(parents=True, exist_ok=True)
+            default_path.touch(exist_ok=True)
+            database_url = build_sqlite_url(default_path)
+        except OSError:
+            fallback_path = get_absolute_sqlite_path(BASE_DIR / 'db.sqlite3')
+            database_url = build_sqlite_url(fallback_path)
+    else:
+        fallback_path = get_absolute_sqlite_path(BASE_DIR / 'db.sqlite3')
+        database_url = build_sqlite_url(fallback_path)
+    DATABASES = {'default': dj_database_url.config(default=database_url)}
+
+if DATABASES['default'].get('ENGINE') == 'django.db.backends.sqlite3':
+    print('DATABASE PATH:', DATABASES['default'].get('NAME'), file=sys.stdout)
 
 
 # Password validation
