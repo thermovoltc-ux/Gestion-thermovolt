@@ -57,11 +57,16 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
     'https://web-production-990bf.up.railway.app',
+    'https://web-production-f2af9.up.railway.app',
     'https://*.up.railway.app',
     'https://*.railway.app',
     'http://*',  # Temporal: permitir cualquier origen HTTP
     'https://*', # Temporal: permitir cualquier origen HTTPS
 ]
+
+# Detrás de Railway / proxy, Django necesita saber que la conexión es HTTPS
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
 
 SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
 
