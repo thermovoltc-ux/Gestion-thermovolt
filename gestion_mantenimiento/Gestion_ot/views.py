@@ -746,7 +746,8 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
         # En entornos no Windows, fallback a ReportLab para generar PDF
         os.unlink(temp_docx.name)
         os.unlink(temp_pdf.name)
-        return generar_pdf_reportlab(cierre_ot), firma_tec_agregada, firma_rec_agregada
+        buffer, _, _ = generar_pdf_reportlab(cierre_ot)
+        return buffer, firma_tec_agregada, firma_rec_agregada
     
     buffer.seek(0)
     return buffer, firma_tec_agregada, firma_rec_agregada
