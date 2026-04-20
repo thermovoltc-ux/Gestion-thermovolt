@@ -50,15 +50,23 @@ def obtener_imagen_temporal_para_pdf(file_field):
     Intenta primero descargar desde URL remota (Cloudinary).
     Como fallback, usa path local si existe.
     """
+    # Validar que file_field no sea None o cadena vacía
+    if not file_field or isinstance(file_field, str):
+        print(f"file_field inválido: {file_field}")
+        return None, False
+    
     try:
+        # Obtener el nombre del archivo de forma segura
+        file_name = getattr(file_field, 'name', 'unknown')
+        
         # Intentar obtener URL primero (mejor opción para Cloudinary)
         if hasattr(file_field, 'url'):
             url = file_field.url
-            if url and re.match(r'^https?://', url):
+            if url and isinstance(url, str) and re.match(r'^https?://', url):
                 try:
                     response = requests.get(url, timeout=10)
                     response.raise_for_status()
-                    suffix = os.path.splitext(file_field.name)[1] or '.jpg'
+                    suffix = os.path.splitext(file_name)[1] or '.jpg'
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
                     temp_file.write(response.content)
                     temp_file.close()
@@ -73,7 +81,7 @@ def obtener_imagen_temporal_para_pdf(file_field):
                 if local_path and os.path.exists(local_path):
                     return local_path, False
             except (AttributeError, ValueError, NotImplementedError) as e:
-                print(f"Path no disponible para {getattr(file_field, 'name', 'unknown')}: {e}")
+                print(f"Path no disponible para {file_name}: {e}")
     except Exception as e:
         print(f"Error general obteniendo imagen: {e}")
     
