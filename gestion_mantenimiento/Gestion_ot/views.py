@@ -934,43 +934,6 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         logger.warning("No hay destinatarios para enviar el email")
         return False
     
-    # Enviar usando SendGrid API si está configurado
-    if hasattr(settings, 'SENDGRID_API_KEY') and settings.SENDGRID_API_KEY:
-        try:
-            attachment_content = base64.b64encode(pdf_buffer.getvalue()).decode('utf-8')
-            payload = {
-                "personalizations": [
-                    {
-                        "to": [{"email": email} for email in recipient_list],
-                        "subject": subject,
-                    }
-                ],
-                "from": {"email": from_email},
-                "content": [{"type": "text/plain", "value": message}],
-                "attachments": [
-                    {
-                        "content": attachment_content,
-                        "type": "application/pdf",
-                        "filename": "informe_mantenimiento.pdf"
-                    }
-                ]
-            }
-            headers = {
-                "Authorization": f"Bearer {settings.SENDGRID_API_KEY}",
-                "Content-Type": "application/json"
-            }
-            response = requests.post("https://api.sendgrid.com/v3/mail/send", json=payload, headers=headers, timeout=30)
-            if response.status_code in (200, 202):
-                logger.info("Email enviado exitosamente via SendGrid API")
-                return True
-            logger.error("SendGrid error %s: %s", response.status_code, response.text)
-            return False
-        except Exception as e:
-            logger.error("Error enviando email con SendGrid: %s", e)
-            logger.error("Tipo de error: %s", type(e).__name__)
-            return False
-
-    # Fallback a Django EmailBackend (Gmail SMTP)
     try:
         email = EmailMessage(
             subject,
@@ -979,9 +942,19 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
             recipient_list,
         )
         email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
-        email.send()
-        logger.info("Email enviado exitosamente via Gmail SMTP")
+        logger.info("Intentando enviar email con configuración:")
+        logger.info("  HOST: %s", settings.EMAIL_HOST)
+        logger.info("  PORT: %s", settings.EMAIL_PORT)
+        logger.info("  USER: %s", settings.EMAIL_HOST_USER)
+        logger.info("  FROM: %s", from_email)
+        logger.info("  TO: %s", recipient_list)
+        logger.info("  Tamaño PDF: %s bytes", len(pdf_buffer.getvalue()))
+        email.send(fail_silently=False)
+        logger.info("Email enviado exitosamente via %s", settings.EMAIL_HOST)
         return True
     except Exception as e:
         logger.error("Error enviando email: %s", e)
+        logger.error("Tipo de error: %s", type(e).__name__)
+        import traceback
+        logger.error("Traceback completo: %s", traceback.format_exc())
         return False
