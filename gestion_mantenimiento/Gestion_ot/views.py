@@ -762,6 +762,7 @@ def generar_pdf_reportlab(cierre_ot):
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     styles = getSampleStyleSheet()
     story = []
+    temp_files = []  # Rastrear archivos para limpiar después
     
     # Título
     title = Paragraph("INFORME DE MANTENIMIENTO", styles['Title'])
@@ -824,13 +825,11 @@ def generar_pdf_reportlab(cierre_ot):
             # Guardar temporalmente
             temp_img_path = f"/tmp/firma_{cierre_ot.id}.png"
             img.save(temp_img_path)
+            temp_files.append(temp_img_path)  # Rastrear para limpiar después
             
             # Agregar al PDF
             firma_img = Image(temp_img_path, width=200, height=100)
             story.append(firma_img)
-            
-            # Limpiar archivo temporal
-            os.remove(temp_img_path)
         except Exception as e:
             print(f"Error procesando firma: {e}")
     
@@ -843,9 +842,6 @@ def generar_pdf_reportlab(cierre_ot):
         story.append(Spacer(1, 6))
         
         # Crear tabla de imágenes (2 por fila)
-        from reportlab.platypus import Table, TableStyle
-        from reportlab.lib import colors
-        
         data = []
         row = []
         for i, img in enumerate(imagenes_antes):
@@ -853,10 +849,10 @@ def generar_pdf_reportlab(cierre_ot):
                 img_path, is_temp = obtener_imagen_temporal_para_pdf(img.imagen)
                 if not img_path:
                     continue
+                if is_temp:
+                    temp_files.append(img_path)  # Rastrear para limpiar después
                 img_reportlab = Image(img_path, width=150, height=100)
                 row.append(img_reportlab)
-                if is_temp:
-                    os.remove(img_path)
                 if len(row) == 2 or i == len(imagenes_antes) - 1:
                     data.append(row)
                     row = []
@@ -888,10 +884,10 @@ def generar_pdf_reportlab(cierre_ot):
                 img_path, is_temp = obtener_imagen_temporal_para_pdf(img.imagen)
                 if not img_path:
                     continue
+                if is_temp:
+                    temp_files.append(img_path)  # Rastrear para limpiar después
                 img_reportlab = Image(img_path, width=150, height=100)
                 row.append(img_reportlab)
-                if is_temp:
-                    os.remove(img_path)
                 if len(row) == 2 or i == len(imagenes_despues) - 1:
                     data.append(row)
                     row = []
@@ -907,9 +903,20 @@ def generar_pdf_reportlab(cierre_ot):
             story.append(table)
             story.append(Spacer(1, 12))
     
-    doc.build(story)
+    try:
+        doc.build(story)
+    finally:
+        # Limpiar archivos temporales DESPUÉS de que se construya el PDF
+        for temp_file in temp_files:
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except Exception as e:
+                print(f"Error borrando archivo temporal {temp_file}: {e}")
+    
     buffer.seek(0)
     return buffer, False, False
+
 
 
 def enviar_pdf_por_email(pdf_buffer, cierre_ot):
