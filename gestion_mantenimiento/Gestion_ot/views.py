@@ -574,23 +574,27 @@ def generar_pdf_informe(cierre_ot, request=None):
 
 def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_rec=None):
     """Genera PDF desde plantilla Word"""
+    logger.info(f"Generando PDF desde plantilla: {template_path}")
+    logger.info(f"Plantilla existe: {os.path.exists(template_path)}")
+
     doc = Document(template_path)
-    
+    logger.info("Documento Word cargado exitosamente")
+
     # Inicializar variables de firmas
     firma_tec_agregada = False
     firma_rec_agregada = False
-    
+
     # Usar firma_tec si proporcionado, sino de cierre_ot
     firma_tec = firma_tec or cierre_ot.firma_digital
     firma_rec = firma_rec or cierre_ot.firma_receptor
-    
+
     # Datos para reemplazar
     ot = cierre_ot.orden_trabajo
     solicitud = ot.solicitud
-    
+
     imagenes_antes = cierre_ot.imagenes.filter(tipo='antes')
     imagenes_despues = cierre_ot.imagenes.filter(tipo='despues')
-    
+
     actividades_info = obtener_actividades_cierre(cierre_ot)
     descripcion_base = cierre_ot.descripcion_falla or ''
     if actividades_info:
@@ -619,14 +623,20 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
         '<<cct>>': cierre_ot.documento_tecnico or '',
         '<<actividades_plan>>': '\n'.join(actividades_info) if actividades_info else '',
     }
-    
+
+    logger.info(f"Tags a reemplazar: {list(replacements.keys())}")
+    logger.info(f"Valores de ejemplo: OT={replacements['<<OT>>']}, equipo={replacements['<<equipo>>']}")
+
     # Reemplazar en párrafos manteniendo formato
+    replacements_count = 0
     for paragraph in doc.paragraphs:
         for run in paragraph.runs:
             for key, value in replacements.items():
                 if key in run.text:
+                    logger.info(f"Reemplazando {key} con: {value[:50]}...")
                     run.text = run.text.replace(key, value)
-    
+                    replacements_count += 1
+
     # Reemplazar en tablas manteniendo formato
     for table in doc.tables:
         for row in table.rows:
@@ -635,7 +645,11 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
                     for run in paragraph.runs:
                         for key, value in replacements.items():
                             if key in run.text:
+                                logger.info(f"Reemplazando en tabla {key} con: {value[:50]}...")
                                 run.text = run.text.replace(key, value)
+                                replacements_count += 1
+
+    logger.info(f"Total de reemplazos realizados: {replacements_count}")
     
     # Agregar firmas al final del documento (siempre, sin depender de tags)
     table_firmas = doc.add_table(rows=1, cols=2)
