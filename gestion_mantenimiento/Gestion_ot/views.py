@@ -482,14 +482,19 @@ def cierre_ot(request, ot_id):
             print(f"PDF generado correctamente, tamaño: {len(pdf_buffer.getvalue())} bytes")
 
             print(f"Correo técnico: {cierre_ot.correo_tecnico}")
-            enviar_pdf_por_email(pdf_buffer, cierre_ot)
-            print("Email enviado correctamente")
-
-            success_msg = f"OT cerrada exitosamente. PDF generado. Email enviado. Firma tec agregada: {firma_tec_agregada}, Firma rec agregada: {firma_rec_agregada}"
+            email_enviado = enviar_pdf_por_email(pdf_buffer, cierre_ot)
+            
+            if email_enviado:
+                print("Email enviado correctamente")
+                success_msg = f"OT cerrada exitosamente. PDF generado y email enviado. Firma tec agregada: {firma_tec_agregada}, Firma rec agregada: {firma_rec_agregada}"
+            else:
+                print("Advertencia: PDF generado pero email no se pudo enviar")
+                success_msg = f"OT cerrada exitosamente. PDF generado pero EMAIL NO SE ENVIÓ (revisar configuración). Firma tec agregada: {firma_tec_agregada}, Firma rec agregada: {firma_rec_agregada}"
+            
             messages.success(request, success_msg)
             return redirect('listar_ot')
         except Exception as e:
-            print(f"Error generando PDF o enviando email: {e}")
+            print(f"Error generando PDF: {e}")
             messages.error(request, f"Error procesando cierre: {e}")
             return render(request, 'Gestion_ot/cierre_ot.html', {
                 'form': form,
@@ -921,7 +926,7 @@ def generar_pdf_reportlab(cierre_ot):
 
 
 def enviar_pdf_por_email(pdf_buffer, cierre_ot):
-    """Envía el PDF por email"""
+    """Envía el PDF por email - retorna True si es exitoso, False si falla"""
     subject = f"Informe de Mantenimiento OT-{cierre_ot.orden_trabajo.solicitud.consecutivo}"
     message = "Adjunto se encuentra el informe de mantenimiento."
     from_email = settings.DEFAULT_FROM_EMAIL
@@ -936,19 +941,24 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     print(f"Desde: {from_email}")
     print(f"Tamaño del PDF: {len(pdf_buffer.getvalue())} bytes")
     
-    if recipient_list:
-        try:
-            email = EmailMessage(
-                subject,
-                message,
-                from_email,
-                recipient_list,
-            )
-            email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
-            email.send()
-            print("Email enviado exitosamente via EmailMessage")
-        except Exception as e:
-            print(f"Error enviando email con EmailMessage: {e}")
-            raise
-    else:
+    if not recipient_list:
         print("No hay destinatarios para enviar el email")
+        return False
+    
+    try:
+        email = EmailMessage(
+            subject,
+            message,
+            from_email,
+            recipient_list,
+        )
+        email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
+        email.send()
+        print("Email enviado exitosamente")
+        return True
+    except Exception as e:
+        print(f"Error enviando email: {e}")
+        print(f"Tipo de error: {type(e).__name__}")
+        # No lanzar excepción - permitir que el cierre se complete
+        # El PDF ya fue generado exitosamente, solo el email falló
+        return False
