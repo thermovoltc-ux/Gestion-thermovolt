@@ -2,12 +2,14 @@ asgiref==3.11.1
 certifi==2026.2.25
 cffi==2.0.0
 charset-normalizer==3.4.6
+cloudinary==1.40.0
 colorama==0.4.6
 cryptography==46.0.6
 dj-database-url==3.0.1
 psycopg2-binary==2.9.9
 Django==4.2.7
 django-allauth==0.63.3
+django-cloudinary-storage==0.3.0
 django-crispy-forms==2.1
 django-js-asset==2.2.0
 django-mptt==0.16.0
@@ -18,6 +20,8 @@ lxml==6.0.2
 Pillow==11.3.0
 pycparser==2.23
 PyJWT==2.12.1
+python-docx==1.1.2
+reportlab==4.4.10
 python-dateutil==2.9.0.post0
 python-docx==1.2.0
 python-dotenv==1.2.1

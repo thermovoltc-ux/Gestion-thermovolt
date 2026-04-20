@@ -8,6 +8,10 @@ from django.utils import timezone
 from datetime import timedelta
 import datetime
 from dateutil.parser import isoparse
+import re
+import requests
+from urllib.parse import urljoin
+import os
 from django.contrib import messages
 import os
 from .models import OrdenTrabajo, Estado, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad
@@ -22,6 +26,10 @@ from docx import Document
 from docx2pdf import convert
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
 from django.core.mail import EmailMessage
 from django.conf import settings
 from io import BytesIO
@@ -35,6 +43,38 @@ try:
     import pythoncom
 except ImportError:
     pythoncom = None
+
+
+def obtener_imagen_temporal_para_pdf(file_field):
+    """Devuelve una ruta local temporal para usar en PDF.
+    Si la imagen está en Cloudinary u otra URL remota, descarga la URL.
+    Si la imagen está localmente disponible, devuelve el path directo.
+    """
+    if hasattr(file_field, 'path'):
+        try:
+            local_path = file_field.path
+            if local_path and os.path.exists(local_path):
+                return local_path, False
+        except Exception:
+            pass
+
+    if hasattr(file_field, 'url') and file_field.url:
+        url = file_field.url
+        if re.match(r'^https?://', url):
+            try:
+                response = requests.get(url, timeout=10)
+                response.raise_for_status()
+                suffix = os.path.splitext(file_field.name)[1] or '.jpg'
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+                temp_file.write(response.content)
+                temp_file.close()
+                return temp_file.name, True
+            except Exception as e:
+                print(f"Error descargando imagen para PDF desde {url}: {e}")
+                return None, False
+
+    print(f"No se pudo obtener archivo válido para PDF desde: {getattr(file_field, 'name', 'unknown')}")
+    return None, False
 
 class CustomDjangoJSONEncoder(DjangoJSONEncoder):
     def default(self, obj):
@@ -640,9 +680,13 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
         col_idx = 0
         for img in imagenes_antes:
             cell = table.cell(row_idx, col_idx)
-            run = cell.paragraphs[0].add_run()
-            run.add_picture(img.imagen.path, width=Inches(2))
-            cell.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            image_path, is_temp = obtener_imagen_temporal_para_pdf(img.imagen)
+            if image_path:
+                run = cell.paragraphs[0].add_run()
+                run.add_picture(image_path, width=Inches(2))
+                cell.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                if is_temp:
+                    os.unlink(image_path)
             col_idx += 1
             if col_idx == 2:
                 col_idx = 0
@@ -658,9 +702,13 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
         col_idx = 0
         for img in imagenes_despues:
             cell = table.cell(row_idx, col_idx)
-            run = cell.paragraphs[0].add_run()
-            run.add_picture(img.imagen.path, width=Inches(2))
-            cell.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            image_path, is_temp = obtener_imagen_temporal_para_pdf(img.imagen)
+            if image_path:
+                run = cell.paragraphs[0].add_run()
+                run.add_picture(image_path, width=Inches(2))
+                cell.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                if is_temp:
+                    os.unlink(image_path)
             col_idx += 1
             if col_idx == 2:
                 col_idx = 0
@@ -693,6 +741,11 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
 
 def generar_pdf_reportlab(cierre_ot):
     """Genera un PDF de informe similar al de Google Docs"""
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib import colors
+
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     styles = getSampleStyleSheet()
@@ -785,9 +838,13 @@ def generar_pdf_reportlab(cierre_ot):
         row = []
         for i, img in enumerate(imagenes_antes):
             try:
-                img_path = img.imagen.path
+                img_path, is_temp = obtener_imagen_temporal_para_pdf(img.imagen)
+                if not img_path:
+                    continue
                 img_reportlab = Image(img_path, width=150, height=100)
                 row.append(img_reportlab)
+                if is_temp:
+                    os.remove(img_path)
                 if len(row) == 2 or i == len(imagenes_antes) - 1:
                     data.append(row)
                     row = []
@@ -816,9 +873,13 @@ def generar_pdf_reportlab(cierre_ot):
         row = []
         for i, img in enumerate(imagenes_despues):
             try:
-                img_path = img.imagen.path
+                img_path, is_temp = obtener_imagen_temporal_para_pdf(img.imagen)
+                if not img_path:
+                    continue
                 img_reportlab = Image(img_path, width=150, height=100)
                 row.append(img_reportlab)
+                if is_temp:
+                    os.remove(img_path)
                 if len(row) == 2 or i == len(imagenes_despues) - 1:
                     data.append(row)
                     row = []

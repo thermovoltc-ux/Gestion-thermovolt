@@ -7,6 +7,10 @@ echo "🚀 Iniciando configuración de Gestión de Mantenimiento..."
 echo "📦 Ejecutando migraciones..."
 python manage.py migrate --noinput
 
+# Crear estados iniciales
+echo "🏷️ Creando estados iniciales..."
+python manage.py crear_estados
+
 # Crear superusuario en Railway si se configuran las variables de entorno
 if [ "$CREATE_SUPERUSER" = "true" ]; then
   echo "👤 Creando superusuario de producción..."

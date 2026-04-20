@@ -4,6 +4,9 @@ set -ex
 echo "STARTUP: running all migrations"
 python manage.py migrate --noinput
 
+echo "STARTUP: creating initial states"
+python manage.py crear_estados
+
 if [ "$CREATE_SUPERUSER" = "true" ]; then
   echo "STARTUP: creating superuser if needed"
   python manage.py shell -c "
