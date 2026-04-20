@@ -317,29 +317,17 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-# settings.py
-
-# Configuración de Email
-# Prioridad: Resend > Gmail
-RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
-
-# Usar backend diferente según si tenemos RESEND_API_KEY
-if RESEND_API_KEY:
-    # Usar Resend para producción (recomendado para Railway)
-    # Usaremos el SDK de Resend directamente desde las vistas
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Dummy backend
-else:
-    # Fallback a Gmail para desarrollo
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_HOST = 'smtp.gmail.com'  # Servidor SMTP de Gmail
-    EMAIL_PORT = 587  # Puerto SMTP para TLS
-    EMAIL_USE_TLS = True  # Usar TLS
-
+# Email Configuration - Gmail SMTP Only
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'  # Gmail SMTP server
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'your_email@gmail.com')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'your_app_password')
-DEFAULT_FROM_EMAIL = 'noreply@resend.dev' if RESEND_API_KEY else EMAIL_HOST_USER
+DEFAULT_FROM_EMAIL = os.environ.get('EMAIL_HOST_USER', 'your_email@gmail.com')
 
-EMAIL_ADICIONAL = 'juanesteban01010@gmail.com'  # Email adicional para copias
+# Additional email for CC copies (optional)
+EMAIL_ADICIONAL = os.environ.get('EMAIL_ADICIONAL', '')  # Additional email for copies
 
 LOGGING = {
     'version': 1,

@@ -52,7 +52,6 @@ def obtener_imagen_temporal_para_pdf(file_field):
     """
     # Validar que file_field no sea None o cadena vacía
     if not file_field or isinstance(file_field, str):
-        print(f"file_field inválido: {file_field}")
         return None, False
     
     try:
@@ -72,7 +71,7 @@ def obtener_imagen_temporal_para_pdf(file_field):
                     temp_file.close()
                     return temp_file.name, True
                 except Exception as e:
-                    print(f"Error descargando imagen desde {url}: {e}")
+                    pass  # Silently fall back to local path
         
         # Fallback a path local si URL no está disponible
         if hasattr(file_field, 'path'):
@@ -81,11 +80,9 @@ def obtener_imagen_temporal_para_pdf(file_field):
                 if local_path and os.path.exists(local_path):
                     return local_path, False
             except (AttributeError, ValueError, NotImplementedError) as e:
-                print(f"Path no disponible para {file_name}: {e}")
+                pass  # Silently continue
     except Exception as e:
-        print(f"Error general obteniendo imagen: {e}")
-    
-    print(f"No se pudo obtener archivo válido para PDF desde: {getattr(file_field, 'name', 'unknown')}")
+        pass  # Silently continue
     return None, False
 
 class CustomDjangoJSONEncoder(DjangoJSONEncoder):
@@ -383,15 +380,14 @@ def listar_ot(request):
 # Vista para cerrar una OT
 @login_required
 def cierre_ot(request, ot_id):
-    print(f"Vista cierre_ot llamada para ot_id: {ot_id}, método: {request.method}")
+    logger.info("cierre_ot called ot_id=%s method=%s", ot_id, request.method)
     ot = get_object_or_404(OrdenTrabajo, id=ot_id)
     cierre_ot, created = CierreOt.objects.get_or_create(orden_trabajo=ot)
     form_antes = ImagenAntesForm()
     form_despues = ImagenDespuesForm()
 
     if request.method == 'POST':
-        print(f"POST data keys: {list(request.POST.keys())}")
-        print(f"FILES keys: {list(request.FILES.keys())}")
+        logger.debug("cierre_ot POST data keys=%s files keys=%s", list(request.POST.keys()), list(request.FILES.keys()))
 
         form = CierreOtForm(request.POST, request.FILES, instance=cierre_ot)
         actividad_formset = CierreOtActividadFormSet(request.POST, instance=cierre_ot)
@@ -400,13 +396,12 @@ def cierre_ot(request, ot_id):
 
         is_valid_form = form.is_valid()
         is_valid_formset = actividad_formset.is_valid()
-        print(f"Form is_valid: {is_valid_form}")
-        print(f"Actividad formset is_valid: {is_valid_formset}")
+        logger.debug("cierre_ot form valid=%s formset valid=%s", is_valid_form, is_valid_formset)
         if not is_valid_form or not is_valid_formset:
             if not is_valid_form:
-                print(f"Form errors: {form.errors}")
+                logger.error("cierre_ot form errors=%s", form.errors)
             if not is_valid_formset:
-                print(f"Formset errors: {actividad_formset.errors}")
+                logger.error("cierre_ot formset errors=%s", actividad_formset.errors)
             messages.error(request, f"Errores en el formulario: {form.errors} {actividad_formset.errors}")
             return render(request, 'Gestion_ot/cierre_ot.html', {
                 'form': form,
@@ -420,8 +415,7 @@ def cierre_ot(request, ot_id):
         firma_tecnico = request.POST.get('firma_digital', '')
         firma_receptor = request.POST.get('firma_receptor', '')
 
-        print(f"Firma técnico recibida: {firma_tecnico[:100] if firma_tecnico else 'None'}")
-        print(f"Firma receptor recibida: {firma_receptor[:100] if firma_receptor else 'None'}")
+        logger.debug("firma_tecnico recibida length=%s firma_receptor length=%s", len(firma_tecnico), len(firma_receptor))
 
         cierre_ot.firma_digital = firma_tecnico
         cierre_ot.firma_receptor = firma_receptor
@@ -430,7 +424,7 @@ def cierre_ot(request, ot_id):
         cierre_ot = form.save()
         actividad_formset.instance = cierre_ot
         actividad_formset.save()
-        print(f"Cierre OT guardado con ID: {cierre_ot.id}")
+        logger.info("Cierre OT guardado con ID: %s", cierre_ot.id)
 
         # Guardar imágenes antes
         imagenes_antes_count = 0
@@ -438,7 +432,7 @@ def cierre_ot(request, ot_id):
             if file:
                 ImagenCierreOt.objects.create(cierre_ot=cierre_ot, imagen=file, tipo='antes')
                 imagenes_antes_count += 1
-        print(f"Imágenes antes guardadas: {imagenes_antes_count}")
+        logger.info("Imágenes antes guardadas: %s", imagenes_antes_count)
 
         # Guardar imágenes después
         imagenes_despues_count = 0
@@ -446,7 +440,7 @@ def cierre_ot(request, ot_id):
             if file:
                 ImagenCierreOt.objects.create(cierre_ot=cierre_ot, imagen=file, tipo='despues')
                 imagenes_despues_count += 1
-        print(f"Imágenes después guardadas: {imagenes_despues_count}")
+        logger.info("Imágenes después guardadas: %s", imagenes_despues_count)
 
         # Cambiar estados
         try:
@@ -458,9 +452,9 @@ def cierre_ot(request, ot_id):
             solicitud = ot.solicitud
             solicitud.estado = estado_revision
             solicitud.save()
-            print("Estados actualizados correctamente")
+            logger.info("Estados actualizados correctamente")
         except Exception as e:
-            print(f"Error actualizando estados: {e}")
+            logger.error("Error actualizando estados: %s", e)
             messages.error(request, f"Error actualizando estados: {e}")
             return render(request, 'Gestion_ot/cierre_ot.html', {
                 'form': form,
@@ -479,22 +473,22 @@ def cierre_ot(request, ot_id):
                 pdf_buffer, firma_tec_agregada, firma_rec_agregada = result
             else:
                 pdf_buffer = result
-            print(f"PDF generado correctamente, tamaño: {len(pdf_buffer.getvalue())} bytes")
+            logger.info("PDF generado correctamente, tamaño=%s bytes", len(pdf_buffer.getvalue()))
 
-            print(f"Correo técnico: {cierre_ot.correo_tecnico}")
+            logger.info("Correo técnico: %s", cierre_ot.correo_tecnico)
             email_enviado = enviar_pdf_por_email(pdf_buffer, cierre_ot)
             
             if email_enviado:
-                print("Email enviado correctamente")
+                logger.info("Email enviado correctamente")
                 success_msg = f"OT cerrada exitosamente. PDF generado y email enviado. Firma tec agregada: {firma_tec_agregada}, Firma rec agregada: {firma_rec_agregada}"
             else:
-                print("Advertencia: PDF generado pero email no se pudo enviar")
+                logger.warning("Advertencia: PDF generado pero email no se pudo enviar")
                 success_msg = f"OT cerrada exitosamente. PDF generado pero EMAIL NO SE ENVIÓ (revisar configuración). Firma tec agregada: {firma_tec_agregada}, Firma rec agregada: {firma_rec_agregada}"
             
             messages.success(request, success_msg)
             return redirect('listar_ot')
         except Exception as e:
-            print(f"Error generando PDF: {e}")
+            logger.error("Error generando PDF: %s", e)
             messages.error(request, f"Error procesando cierre: {e}")
             return render(request, 'Gestion_ot/cierre_ot.html', {
                 'form': form,
@@ -837,7 +831,7 @@ def generar_pdf_reportlab(cierre_ot):
             firma_img = Image(temp_img_path, width=200, height=100)
             story.append(firma_img)
         except Exception as e:
-            print(f"Error procesando firma: {e}")
+            pass  # Silently continue with PDF
     
     # Agregar imágenes antes si existen
     imagenes_antes = cierre_ot.imagenes.filter(tipo='antes')
@@ -863,7 +857,7 @@ def generar_pdf_reportlab(cierre_ot):
                     data.append(row)
                     row = []
             except Exception as e:
-                print(f"Error cargando imagen antes: {e}")
+                pass  # Silently skip image
         
         if data:
             table = Table(data)
@@ -898,7 +892,7 @@ def generar_pdf_reportlab(cierre_ot):
                     data.append(row)
                     row = []
             except Exception as e:
-                print(f"Error cargando imagen después: {e}")
+                pass  # Silently skip image
         
         if data:
             table = Table(data)
@@ -918,7 +912,7 @@ def generar_pdf_reportlab(cierre_ot):
                 if os.path.exists(temp_file):
                     os.remove(temp_file)
             except Exception as e:
-                print(f"Error borrando archivo temporal {temp_file}: {e}")
+                pass  # Silently continue cleanup
     
     buffer.seek(0)
     return buffer, False, False
@@ -926,7 +920,7 @@ def generar_pdf_reportlab(cierre_ot):
 
 
 def enviar_pdf_por_email(pdf_buffer, cierre_ot):
-    """Envía el PDF por email - retorna True si es exitoso, False si falla"""
+    """Envía el PDF por email usando Gmail SMTP - retorna True si es exitoso, False si falla"""
     subject = f"Informe de Mantenimiento OT-{cierre_ot.orden_trabajo.solicitud.consecutivo}"
     message = "Adjunto se encuentra el informe de mantenimiento."
     from_email = settings.DEFAULT_FROM_EMAIL
@@ -936,48 +930,11 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     if hasattr(settings, 'EMAIL_ADICIONAL') and settings.EMAIL_ADICIONAL:
         recipient_list.append(settings.EMAIL_ADICIONAL)
     
-    print(f"Intentando enviar email a: {recipient_list}")
-    print(f"Asunto: {subject}")
-    print(f"Desde: {from_email}")
-    print(f"Tamaño del PDF: {len(pdf_buffer.getvalue())} bytes")
-    
     if not recipient_list:
-        print("No hay destinatarios para enviar el email")
+        logger.warning("No hay destinatarios para enviar el email")
         return False
     
-    # Intentar usar Resend si está disponible
-    if hasattr(settings, 'RESEND_API_KEY') and settings.RESEND_API_KEY:
-        try:
-            from resend import Resend
-            client = Resend(api_key=settings.RESEND_API_KEY)
-            
-            # Convertir PDF a base64 para envío
-            import base64
-            pdf_base64 = base64.b64encode(pdf_buffer.getvalue()).decode('utf-8')
-            
-            # Enviar con Resend
-            response = client.emails.send({
-                "from": from_email,
-                "to": recipient_list,
-                "subject": subject,
-                "html": message,
-                "attachments": [
-                    {
-                        "filename": "informe_mantenimiento.pdf",
-                        "content": pdf_base64,
-                        "encoding": "base64"
-                    }
-                ]
-            })
-            
-            print(f"Email enviado exitosamente con Resend. ID: {response.get('id')}")
-            return True
-        except Exception as e:
-            print(f"Error enviando email con Resend: {e}")
-            print(f"Tipo de error: {type(e).__name__}")
-            # Continuar al fallback
-    
-    # Fallback a Django EmailBackend (Gmail)
+    # Enviar usando Django EmailBackend (Gmail SMTP)
     try:
         email = EmailMessage(
             subject,
@@ -987,11 +944,8 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         )
         email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
         email.send()
-        print("Email enviado exitosamente via Django EmailBackend")
+        logger.info("Email enviado exitosamente via Gmail SMTP")
         return True
     except Exception as e:
-        print(f"Error enviando email: {e}")
-        print(f"Tipo de error: {type(e).__name__}")
-        # No lanzar excepción - permitir que el cierre se complete
-        # El PDF ya fue generado exitosamente, solo el email falló
+        logger.error("Error enviando email: %s", e)
         return False
