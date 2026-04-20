@@ -114,13 +114,6 @@ INSTALLED_APPS = [
     'cloudinary',
 ]
 
-# Agregar django_resend si está disponible (solo en producción con Railway)
-try:
-    import django_resend
-    INSTALLED_APPS.append('django_resend')
-except ImportError:
-    pass  # django_resend no está instalado localmente
-
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
 MIDDLEWARE = [
@@ -329,9 +322,12 @@ SOCIALACCOUNT_PROVIDERS = {
 # Configuración de Email
 # Prioridad: Resend > Gmail
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
+
+# Usar backend diferente según si tenemos RESEND_API_KEY
 if RESEND_API_KEY:
     # Usar Resend para producción (recomendado para Railway)
-    EMAIL_BACKEND = 'django_resend.backends.ResendBackend'
+    # Usaremos el SDK de Resend directamente desde las vistas
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Dummy backend
 else:
     # Fallback a Gmail para desarrollo
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -341,7 +337,7 @@ else:
 
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'your_email@gmail.com')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'your_app_password')
-DEFAULT_FROM_EMAIL = RESEND_API_KEY and 'noreply@resend.dev' or EMAIL_HOST_USER
+DEFAULT_FROM_EMAIL = 'noreply@resend.dev' if RESEND_API_KEY else EMAIL_HOST_USER
 
 EMAIL_ADICIONAL = 'juanesteban01010@gmail.com'  # Email adicional para copias
 

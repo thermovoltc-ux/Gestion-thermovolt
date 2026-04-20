@@ -945,6 +945,39 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         print("No hay destinatarios para enviar el email")
         return False
     
+    # Intentar usar Resend si está disponible
+    if hasattr(settings, 'RESEND_API_KEY') and settings.RESEND_API_KEY:
+        try:
+            from resend import Resend
+            client = Resend(api_key=settings.RESEND_API_KEY)
+            
+            # Convertir PDF a base64 para envío
+            import base64
+            pdf_base64 = base64.b64encode(pdf_buffer.getvalue()).decode('utf-8')
+            
+            # Enviar con Resend
+            response = client.emails.send({
+                "from": from_email,
+                "to": recipient_list,
+                "subject": subject,
+                "html": message,
+                "attachments": [
+                    {
+                        "filename": "informe_mantenimiento.pdf",
+                        "content": pdf_base64,
+                        "encoding": "base64"
+                    }
+                ]
+            })
+            
+            print(f"Email enviado exitosamente con Resend. ID: {response.get('id')}")
+            return True
+        except Exception as e:
+            print(f"Error enviando email con Resend: {e}")
+            print(f"Tipo de error: {type(e).__name__}")
+            # Continuar al fallback
+    
+    # Fallback a Django EmailBackend (Gmail)
     try:
         email = EmailMessage(
             subject,
@@ -954,7 +987,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         )
         email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
         email.send()
-        print("Email enviado exitosamente")
+        print("Email enviado exitosamente via Django EmailBackend")
         return True
     except Exception as e:
         print(f"Error enviando email: {e}")
