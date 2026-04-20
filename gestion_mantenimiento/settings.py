@@ -112,6 +112,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.microsoft',
     'cloudinary_storage',
     'cloudinary',
+    'django_resend',
     
 
 ]
@@ -321,13 +322,22 @@ SOCIALACCOUNT_PROVIDERS = {
 
 # settings.py
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'  # Servidor SMTP de Gmail
-EMAIL_PORT = 587  # Puerto SMTP para TLS
-EMAIL_USE_TLS = True  # Usar TLS
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'your_email@gmail.com')  # Tu dirección de correo electrónico de Gmail
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'your_app_password')  # App password de Gmail
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER  # Dirección de correo electrónico predeterminada para enviar correos
+# Configuración de Email
+# Prioridad: Resend > Gmail
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
+if RESEND_API_KEY:
+    # Usar Resend para producción (recomendado para Railway)
+    EMAIL_BACKEND = 'django_resend.backends.ResendBackend'
+else:
+    # Fallback a Gmail para desarrollo
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = 'smtp.gmail.com'  # Servidor SMTP de Gmail
+    EMAIL_PORT = 587  # Puerto SMTP para TLS
+    EMAIL_USE_TLS = True  # Usar TLS
+
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'your_email@gmail.com')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'your_app_password')
+DEFAULT_FROM_EMAIL = RESEND_API_KEY and 'noreply@resend.dev' or EMAIL_HOST_USER
 
 EMAIL_ADICIONAL = 'juanesteban01010@gmail.com'  # Email adicional para copias
 
