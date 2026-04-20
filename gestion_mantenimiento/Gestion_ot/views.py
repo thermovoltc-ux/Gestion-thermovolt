@@ -784,7 +784,7 @@ def generar_pdf_reportlab(cierre_ot):
         'Descripción': cierre_ot.descripcion_falla or '',
         'Observaciones': cierre_ot.observaciones or '',
         'Recibido por': cierre_ot.nombre_tecnico or '',
-        'Documento de Identidad': cierre_ot.documento_tecnico.name if cierre_ot.documento_tecnico else '',
+        'Documento de Identidad': cierre_ot.documento_tecnico or '',
         'Nombre del Técnico': cierre_ot.nombre_tecnico or '',
     }
     
