@@ -47,32 +47,36 @@ except ImportError:
 
 def obtener_imagen_temporal_para_pdf(file_field):
     """Devuelve una ruta local temporal para usar en PDF.
-    Si la imagen está en Cloudinary u otra URL remota, descarga la URL.
-    Si la imagen está localmente disponible, devuelve el path directo.
+    Intenta primero descargar desde URL remota (Cloudinary).
+    Como fallback, usa path local si existe.
     """
-    if hasattr(file_field, 'path'):
-        try:
-            local_path = file_field.path
-            if local_path and os.path.exists(local_path):
-                return local_path, False
-        except Exception:
-            pass
-
-    if hasattr(file_field, 'url') and file_field.url:
-        url = file_field.url
-        if re.match(r'^https?://', url):
+    try:
+        # Intentar obtener URL primero (mejor opción para Cloudinary)
+        if hasattr(file_field, 'url'):
+            url = file_field.url
+            if url and re.match(r'^https?://', url):
+                try:
+                    response = requests.get(url, timeout=10)
+                    response.raise_for_status()
+                    suffix = os.path.splitext(file_field.name)[1] or '.jpg'
+                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+                    temp_file.write(response.content)
+                    temp_file.close()
+                    return temp_file.name, True
+                except Exception as e:
+                    print(f"Error descargando imagen desde {url}: {e}")
+        
+        # Fallback a path local si URL no está disponible
+        if hasattr(file_field, 'path'):
             try:
-                response = requests.get(url, timeout=10)
-                response.raise_for_status()
-                suffix = os.path.splitext(file_field.name)[1] or '.jpg'
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-                temp_file.write(response.content)
-                temp_file.close()
-                return temp_file.name, True
-            except Exception as e:
-                print(f"Error descargando imagen para PDF desde {url}: {e}")
-                return None, False
-
+                local_path = file_field.path
+                if local_path and os.path.exists(local_path):
+                    return local_path, False
+            except (AttributeError, ValueError, NotImplementedError) as e:
+                print(f"Path no disponible para {getattr(file_field, 'name', 'unknown')}: {e}")
+    except Exception as e:
+        print(f"Error general obteniendo imagen: {e}")
+    
     print(f"No se pudo obtener archivo válido para PDF desde: {getattr(file_field, 'name', 'unknown')}")
     return None, False
 
