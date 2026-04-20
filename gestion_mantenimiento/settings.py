@@ -112,10 +112,14 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.microsoft',
     'cloudinary_storage',
     'cloudinary',
-    'django_resend',
-    
-
 ]
+
+# Agregar django_resend si está disponible (solo en producción con Railway)
+try:
+    import django_resend
+    INSTALLED_APPS.append('django_resend')
+except ImportError:
+    pass  # django_resend no está instalado localmente
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
