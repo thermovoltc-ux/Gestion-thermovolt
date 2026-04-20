@@ -318,15 +318,19 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 # Email Configuration
+SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
+SENDGRID_FROM_EMAIL = os.environ.get('SENDGRID_FROM_EMAIL', 'thermovoltc@gmail.com')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'your_email@gmail.com')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'your_app_password')
+
+# Configuración de email - siempre usar SMTP local para desarrollo
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'  # Gmail SMTP server for local development
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'your_email@gmail.com')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'your_app_password')
-SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
-SENDGRID_FROM_EMAIL = os.environ.get('SENDGRID_FROM_EMAIL') or EMAIL_HOST_USER
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL') or SENDGRID_FROM_EMAIL
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL') or EMAIL_HOST_USER
+
+# SendGrid se usa directamente en las vistas, no por SMTP
 
 # Additional email for CC copies (optional)
 EMAIL_ADICIONAL = os.environ.get('EMAIL_ADICIONAL', '')  # Additional email for copies

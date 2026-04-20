@@ -935,23 +935,58 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         return False
     
     try:
-        email = EmailMessage(
-            subject,
-            message,
-            from_email,
-            recipient_list,
-        )
-        email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
-        logger.info("Intentando enviar email con configuración:")
-        logger.info("  HOST: %s", settings.EMAIL_HOST)
-        logger.info("  PORT: %s", settings.EMAIL_PORT)
-        logger.info("  USER: %s", settings.EMAIL_HOST_USER)
-        logger.info("  FROM: %s", from_email)
-        logger.info("  TO: %s", recipient_list)
-        logger.info("  Tamaño PDF: %s bytes", len(pdf_buffer.getvalue()))
-        email.send(fail_silently=False)
-        logger.info("Email enviado exitosamente via %s", settings.EMAIL_HOST)
-        return True
+        # Usar API de SendGrid directamente para evitar bloqueo SMTP de Railway
+        if hasattr(settings, 'SENDGRID_API_KEY') and settings.SENDGRID_API_KEY:
+            import base64
+            import io
+
+            # Crear payload para SendGrid API
+            pdf_content = pdf_buffer.getvalue()
+            pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
+
+            payload = {
+                "personalizations": [{
+                    "to": [{"email": email} for email in recipient_list],
+                    "subject": subject
+                }],
+                "from": {"email": from_email},
+                "content": [{"type": "text/plain", "value": message}],
+                "attachments": [{
+                    "content": pdf_base64,
+                    "type": "application/pdf",
+                    "filename": "informe_mantenimiento.pdf",
+                    "disposition": "attachment"
+                }]
+            }
+
+            headers = {
+                "Authorization": f"Bearer {settings.SENDGRID_API_KEY}",
+                "Content-Type": "application/json"
+            }
+
+            logger.info("Enviando email via SendGrid API con %d bytes PDF", len(pdf_content))
+            response = requests.post(
+                "https://api.sendgrid.com/v3/mail/send",
+                json=payload,
+                headers=headers,
+                timeout=30
+            )
+
+            if response.status_code in (200, 202):
+                logger.info("Email enviado exitosamente via SendGrid API")
+                return True
+            else:
+                logger.error("SendGrid API error %s: %s", response.status_code, response.text)
+                return False
+
+        # Fallback a SMTP local (desarrollo)
+        else:
+            email = EmailMessage(subject, message, from_email, recipient_list)
+            email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
+            email.send(fail_silently=False)
+            logger.info("Email enviado exitosamente via SMTP local")
+            return True
+
     except Exception as e:
         logger.error("Error enviando email: %s", e)
         logger.error("Tipo de error: %s", type(e).__name__)
