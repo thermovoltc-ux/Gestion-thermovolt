@@ -923,64 +923,20 @@ def generar_pdf_reportlab(cierre_ot):
             story.append(Spacer(1, 4))
 
     # Agregar firma si existe
-    if cierre_ot.firma_digital:
-        story.append(Spacer(1, 12))
-        firma_title = Paragraph("<b>Firma Digital del Técnico:</b>", styles['Normal'])
-        story.append(firma_title)
-        story.append(Spacer(1, 6))
-        
-        # Convertir data URL a imagen
-        try:
-            header, encoded = cierre_ot.firma_digital.split(",", 1)
-        except ValueError:
-            encoded = cierre_ot.firma_digital
-        image_data = base64.b64decode(encoded)
-        img_buffer = BytesIO(image_data)
-        img = PILImage.open(img_buffer)
-        
-        # Convertir a RGB si es necesario
-        if img.mode != 'RGB':
-            img = img.convert('RGB')
-        
-        # Guardar temporalmente
-        temp_img_path = f"/tmp/firma_{cierre_ot.id}.png"
-        img.save(temp_img_path)
-        temp_files.append(temp_img_path)  # Rastrear para limpiar después
-        
-        # Agregar al PDF
-        firma_img = Image(temp_img_path, width=200, height=100)
-        story.append(firma_img)
-    except Exception as e:
-        logger.warning("Error agregando firma técnica: %s", e)
-        pass  # Silently continue with PDF
-
-    # Agregar firma del receptor si existe
-    if cierre_ot.firma_receptor:
-        story.append(Spacer(1, 12))
-        firma_rec_title = Paragraph("<b>Firma Digital del Receptor:</b>", styles['Normal'])
-        story.append(firma_rec_title)
-        story.append(Spacer(1, 6))
-        
-        try:
-            header, encoded = cierre_ot.firma_receptor.split(",", 1)
-        except ValueError:
-            encoded = cierre_ot.firma_receptor
-        image_data = base64.b64decode(encoded)
-        img_buffer = BytesIO(image_data)
-        img = PILImage.open(img_buffer)
-        
-        if img.mode != 'RGB':
-            img = img.convert('RGB')
-        
-        temp_img_path = f"/tmp/firma_rec_{cierre_ot.id}.png"
-        img.save(temp_img_path)
-        temp_files.append(temp_img_path)
-        
-        firma_rec_img = Image(temp_img_path, width=200, height=100)
-        story.append(firma_rec_img)
-    except Exception as e:
-        logger.warning("Error agregando firma del receptor: %s", e)
-        pass
+    try:
+        if cierre_ot.firma_digital:
+            story.append(Spacer(1, 12))
+            firma_title = Paragraph("<b>Firma Digital del Técnico:</b>", styles['Normal'])
+            story.append(firma_title)
+            story.append(Spacer(1, 6))
+            
+            try:
+                header, encoded = cierre_ot.firma_digital.split(",", 1)
+            except ValueError:
+                encoded = cierre_ot.firma_digital
+            image_data = base64.b64decode(encoded)
+            img_buffer = BytesIO(image_data)
+            img = PILImage.open(img_buffer)
             
             # Convertir a RGB si es necesario
             if img.mode != 'RGB':
@@ -994,8 +950,38 @@ def generar_pdf_reportlab(cierre_ot):
             # Agregar al PDF
             firma_img = Image(temp_img_path, width=200, height=100)
             story.append(firma_img)
-        except Exception as e:
-            pass  # Silently continue with PDF
+    except Exception as e:
+        logger.warning("Error agregando firma técnica: %s", e)
+        pass  # Silently continue with PDF
+
+    # Agregar firma del receptor si existe
+    try:
+        if cierre_ot.firma_receptor:
+            story.append(Spacer(1, 12))
+            firma_rec_title = Paragraph("<b>Firma Digital del Receptor:</b>", styles['Normal'])
+            story.append(firma_rec_title)
+            story.append(Spacer(1, 6))
+            
+            try:
+                header, encoded = cierre_ot.firma_receptor.split(",", 1)
+            except ValueError:
+                encoded = cierre_ot.firma_receptor
+            image_data = base64.b64decode(encoded)
+            img_buffer = BytesIO(image_data)
+            img = PILImage.open(img_buffer)
+            
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            temp_img_path = f"/tmp/firma_rec_{cierre_ot.id}.png"
+            img.save(temp_img_path)
+            temp_files.append(temp_img_path)
+            
+            firma_rec_img = Image(temp_img_path, width=200, height=100)
+            story.append(firma_rec_img)
+    except Exception as e:
+        logger.warning("Error agregando firma del receptor: %s", e)
+        pass
     
     # Agregar imágenes antes si existen
     imagenes_antes = cierre_ot.imagenes.filter(tipo='antes')
