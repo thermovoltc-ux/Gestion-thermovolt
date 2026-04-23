@@ -37,12 +37,56 @@ import tempfile
 from django.forms import modelformset_factory
 import os
 import base64
+import shutil
+import subprocess
 from PIL import Image as PILImage
 
 try:
     import pythoncom
 except ImportError:
     pythoncom = None
+
+
+def convertir_docx_a_pdf(docx_path, pdf_path):
+    """Convierte un archivo DOCX a PDF.
+    Usa docx2pdf en Windows o LibreOffice/soffice en Linux.
+    """
+    if os.name == 'nt':
+        if pythoncom is None:
+            raise RuntimeError('pythoncom no disponible en Windows')
+        pythoncom.CoInitialize()
+        try:
+            convert(docx_path, pdf_path)
+        finally:
+            pythoncom.CoUninitialize()
+        return
+
+    # Intentar docx2pdf en Linux/Unix si está disponible.
+    try:
+        convert(docx_path, pdf_path)
+        if os.path.exists(pdf_path):
+            return
+    except Exception as exc:
+        logger.warning('docx2pdf falló en Linux/Unix: %s', exc)
+
+    # Intentar libreoffice/soffice en Linux/Unix.
+    libreoffice = shutil.which('soffice') or shutil.which('libreoffice')
+    if not libreoffice:
+        raise RuntimeError('No se encontró LibreOffice/soffice para convertir DOCX a PDF')
+
+    output_dir = os.path.dirname(pdf_path)
+    cmd = [libreoffice, '--headless', '--convert-to', 'pdf', '--outdir', output_dir, docx_path]
+    logger.info('Ejecutando conversión LibreOffice: %s', ' '.join(cmd))
+    subprocess.run(cmd, check=True, timeout=120)
+
+    alt_pdf = os.path.join(output_dir, os.path.splitext(os.path.basename(docx_path))[0] + '.pdf')
+    if os.path.exists(pdf_path):
+        return
+    if os.path.exists(alt_pdf):
+        os.replace(alt_pdf, pdf_path)
+        return
+
+    raise RuntimeError('LibreOffice no produjo el PDF esperado')
 
 
 def obtener_imagen_temporal_para_pdf(file_field):
@@ -627,72 +671,121 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
     logger.info(f"Tags a reemplazar: {list(replacements.keys())}")
     logger.info(f"Valores de ejemplo: OT={replacements['<<OT>>']}, equipo={replacements['<<equipo>>']}")
 
-    # Reemplazar en párrafos manteniendo formato
     replacements_count = 0
-    for paragraph in doc.paragraphs:
-        for run in paragraph.runs:
-            for key, value in replacements.items():
-                if key in run.text:
-                    logger.info(f"Reemplazando {key} con: {value[:50]}...")
-                    run.text = run.text.replace(key, value)
-                    replacements_count += 1
+    firmas_en_plantilla = False
 
-    # Reemplazar en tablas manteniendo formato
+    def add_signature_image_to_paragraph(paragraph, image_base64):
+        try:
+            header, encoded = image_base64.split(",", 1)
+        except ValueError:
+            encoded = image_base64
+        image_data = base64.b64decode(encoded)
+        temp_firma_path = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+        temp_firma_path.write(image_data)
+        temp_firma_path.close()
+        run = paragraph.add_run()
+        run.add_break()
+        run.add_picture(temp_firma_path.name, width=Inches(2))
+        paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        os.unlink(temp_firma_path.name)
+        return True
+
+    def replace_paragraph_text(paragraph):
+        nonlocal replacements_count, firma_tec_agregada, firma_rec_agregada, firmas_en_plantilla
+        original_text = paragraph.text
+        if not any(key in original_text for key in replacements):
+            return
+
+        updated_text = original_text
+        for key, value in replacements.items():
+            if key in updated_text:
+                updated_text = updated_text.replace(key, value)
+                replacements_count += original_text.count(key)
+
+        if updated_text != original_text:
+            for run in paragraph.runs[::-1]:
+                paragraph._p.remove(run._r)
+            paragraph.add_run(updated_text)
+
+        if '<<recibido>>' in original_text:
+            firmas_en_plantilla = True
+            if firma_rec:
+                try:
+                    if add_signature_image_to_paragraph(paragraph, firma_rec):
+                        firma_rec_agregada = True
+                except Exception:
+                    pass
+
+        if '<<nombret>>' in original_text:
+            firmas_en_plantilla = True
+            if firma_tec:
+                try:
+                    if add_signature_image_to_paragraph(paragraph, firma_tec):
+                        firma_tec_agregada = True
+                except Exception:
+                    pass
+
+    def process_cell(cell):
+        for paragraph in cell.paragraphs:
+            replace_paragraph_text(paragraph)
+        for nested_table in cell.tables:
+            for row in nested_table.rows:
+                for nested_cell in row.cells:
+                    process_cell(nested_cell)
+
+    for paragraph in doc.paragraphs:
+        replace_paragraph_text(paragraph)
+
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
-                for paragraph in cell.paragraphs:
-                    for run in paragraph.runs:
-                        for key, value in replacements.items():
-                            if key in run.text:
-                                logger.info(f"Reemplazando en tabla {key} con: {value[:50]}...")
-                                run.text = run.text.replace(key, value)
-                                replacements_count += 1
+                process_cell(cell)
 
     logger.info(f"Total de reemplazos realizados: {replacements_count}")
-    
-    # Agregar firmas al final del documento (siempre, sin depender de tags)
-    table_firmas = doc.add_table(rows=1, cols=2)
-    
-    # Firma técnico
-    cell_tec = table_firmas.cell(0, 0)
-    cell_tec.text = 'Firma Técnico'
-    cell_tec.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    if firma_tec:
-        try:
-            header, encoded = firma_tec.split(",", 1)
-            image_data = base64.b64decode(encoded)
-            temp_firma_path = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-            temp_firma_path.write(image_data)
-            temp_firma_path.close()
-            p = cell_tec.add_paragraph()
-            p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-            run = p.add_run()
-            run.add_picture(temp_firma_path.name, width=Inches(2))
-            os.unlink(temp_firma_path.name)
-            firma_tec_agregada = True
-        except Exception as e:
-            firma_tec_agregada = False
-    
-    # Firma receptor
-    cell_rec = table_firmas.cell(0, 1)
-    cell_rec.text = 'Firma Receptor'
-    cell_rec.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    if firma_rec:
-        try:
-            header, encoded = firma_rec.split(",", 1)
-            image_data = base64.b64decode(encoded)
-            temp_firma_path = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-            temp_firma_path.write(image_data)
-            temp_firma_path.close()
-            p = cell_rec.add_paragraph()
-            p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-            run = p.add_run()
-            run.add_picture(temp_firma_path.name, width=Inches(2))
-            os.unlink(temp_firma_path.name)
-            firma_rec_agregada = True
-        except Exception as e:
-            firma_rec_agregada = False
+
+    if not firmas_en_plantilla:
+        # Agregar firmas al final del documento solo si no hay campos en la plantilla
+        table_firmas = doc.add_table(rows=1, cols=2)
+        
+        # Firma técnico
+        cell_tec = table_firmas.cell(0, 0)
+        cell_tec.text = 'Firma Técnico'
+        cell_tec.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        if firma_tec:
+            try:
+                header, encoded = firma_tec.split(",", 1)
+                image_data = base64.b64decode(encoded)
+                temp_firma_path = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+                temp_firma_path.write(image_data)
+                temp_firma_path.close()
+                p = cell_tec.add_paragraph()
+                p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                run = p.add_run()
+                run.add_picture(temp_firma_path.name, width=Inches(2))
+                os.unlink(temp_firma_path.name)
+                firma_tec_agregada = True
+            except Exception:
+                firma_tec_agregada = False
+        
+        # Firma receptor
+        cell_rec = table_firmas.cell(0, 1)
+        cell_rec.text = 'Firma Receptor'
+        cell_rec.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        if firma_rec:
+            try:
+                header, encoded = firma_rec.split(",", 1)
+                image_data = base64.b64decode(encoded)
+                temp_firma_path = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+                temp_firma_path.write(image_data)
+                temp_firma_path.close()
+                p = cell_rec.add_paragraph()
+                p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                run = p.add_run()
+                run.add_picture(temp_firma_path.name, width=Inches(2))
+                os.unlink(temp_firma_path.name)
+                firma_rec_agregada = True
+            except Exception:
+                firma_rec_agregada = False
 
     # Agregar imágenes al final del documento
     if imagenes_antes.exists():
@@ -747,20 +840,23 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
     # Convertir a PDF
     temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
     temp_pdf.close()
-    if pythoncom is not None and os.name == 'nt':
-        pythoncom.CoInitialize()
-        convert(temp_docx.name, temp_pdf.name)
-        pythoncom.CoUninitialize()
+    
+    try:
+        convertir_docx_a_pdf(temp_docx.name, temp_pdf.name)
         with open(temp_pdf.name, 'rb') as f:
             buffer = BytesIO(f.read())
+        logger.info("PDF generado exitosamente desde plantilla Word")
+    except Exception as e:
+        logger.warning("Error al convertir DOCX a PDF: %s", e)
         os.unlink(temp_docx.name)
-        os.unlink(temp_pdf.name)
-    else:
-        # En entornos no Windows, fallback a ReportLab para generar PDF
-        os.unlink(temp_docx.name)
-        os.unlink(temp_pdf.name)
+        if os.path.exists(temp_pdf.name):
+            os.unlink(temp_pdf.name)
         buffer, _, _ = generar_pdf_reportlab(cierre_ot)
         return buffer, firma_tec_agregada, firma_rec_agregada
+    
+    # Limpiar archivos temporales
+    os.unlink(temp_docx.name)
+    os.unlink(temp_pdf.name)
     
     buffer.seek(0)
     return buffer, firma_tec_agregada, firma_rec_agregada
