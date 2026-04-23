@@ -844,15 +844,18 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
             pdf_size = os.path.getsize(temp_pdf.name)
             logger.info("PDF generado exitosamente, tamaño: %d bytes", pdf_size)
             if pdf_size == 0:
-                logger.error("PDF generado pero está vacío")
+                logger.error("PDF generado pero está vacío - usando ReportLab")
                 raise RuntimeError("PDF generado está vacío")
+            if pdf_size > 20 * 1024 * 1024:  # 20MB límite
+                logger.warning("PDF muy grande (%d bytes) - usando ReportLab", pdf_size)
+                raise RuntimeError("PDF demasiado grande")
             with open(temp_pdf.name, 'rb') as f:
                 buffer = BytesIO(f.read())
         else:
             logger.error("PDF no se generó, archivo no existe: %s", temp_pdf.name)
             raise RuntimeError("PDF no se generó")
     except Exception as e:
-        logger.warning("Error al convertir DOCX a PDF: %s", e)
+        logger.warning("Error al convertir DOCX a PDF: %s - usando ReportLab", e)
         os.unlink(temp_docx.name)
         if os.path.exists(temp_pdf.name):
             os.unlink(temp_pdf.name)
@@ -929,9 +932,55 @@ def generar_pdf_reportlab(cierre_ot):
         # Convertir data URL a imagen
         try:
             header, encoded = cierre_ot.firma_digital.split(",", 1)
-            image_data = base64.b64decode(encoded)
-            img_buffer = BytesIO(image_data)
-            img = PILImage.open(img_buffer)
+        except ValueError:
+            encoded = cierre_ot.firma_digital
+        image_data = base64.b64decode(encoded)
+        img_buffer = BytesIO(image_data)
+        img = PILImage.open(img_buffer)
+        
+        # Convertir a RGB si es necesario
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+        
+        # Guardar temporalmente
+        temp_img_path = f"/tmp/firma_{cierre_ot.id}.png"
+        img.save(temp_img_path)
+        temp_files.append(temp_img_path)  # Rastrear para limpiar después
+        
+        # Agregar al PDF
+        firma_img = Image(temp_img_path, width=200, height=100)
+        story.append(firma_img)
+    except Exception as e:
+        logger.warning("Error agregando firma técnica: %s", e)
+        pass  # Silently continue with PDF
+
+    # Agregar firma del receptor si existe
+    if cierre_ot.firma_receptor:
+        story.append(Spacer(1, 12))
+        firma_rec_title = Paragraph("<b>Firma Digital del Receptor:</b>", styles['Normal'])
+        story.append(firma_rec_title)
+        story.append(Spacer(1, 6))
+        
+        try:
+            header, encoded = cierre_ot.firma_receptor.split(",", 1)
+        except ValueError:
+            encoded = cierre_ot.firma_receptor
+        image_data = base64.b64decode(encoded)
+        img_buffer = BytesIO(image_data)
+        img = PILImage.open(img_buffer)
+        
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+        
+        temp_img_path = f"/tmp/firma_rec_{cierre_ot.id}.png"
+        img.save(temp_img_path)
+        temp_files.append(temp_img_path)
+        
+        firma_rec_img = Image(temp_img_path, width=200, height=100)
+        story.append(firma_rec_img)
+    except Exception as e:
+        logger.warning("Error agregando firma del receptor: %s", e)
+        pass
             
             # Convertir a RGB si es necesario
             if img.mode != 'RGB':
@@ -1059,6 +1108,11 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
             pdf_content = pdf_buffer.getvalue()
             pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
 
+            # Verificar tamaño del PDF (SendGrid tiene límite de ~30MB por email)
+            pdf_size_mb = len(pdf_content) / (1024 * 1024)
+            if pdf_size_mb > 25:
+                logger.warning("PDF muy grande (%.2f MB) - podría fallar en SendGrid", pdf_size_mb)
+
             payload = {
                 "personalizations": [{
                     "to": [{"email": email} for email in recipient_list],
@@ -1079,7 +1133,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
                 "Content-Type": "application/json"
             }
 
-            logger.info("Enviando email via SendGrid API from=%s to=%s", from_email, recipient_list)
+            logger.info("Enviando email via SendGrid API from=%s to=%s, PDF=%.2f MB", from_email, recipient_list, pdf_size_mb)
             response = requests.post(
                 "https://api.sendgrid.com/v3/mail/send",
                 json=payload,
