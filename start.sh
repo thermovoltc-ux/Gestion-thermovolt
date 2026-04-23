@@ -5,8 +5,13 @@ echo "STARTUP: checking LibreOffice availability"
 if ! command -v soffice >/dev/null 2>&1 && ! command -v libreoffice >/dev/null 2>&1; then
   echo "LibreOffice no encontrado. Intentando instalar..."
   if command -v apt-get >/dev/null 2>&1; then
-    apt-get update
-    apt-get install -y libreoffice-core libreoffice-writer libreoffice-common
+    apt-get update || true
+    apt-get install -y libreoffice-core libreoffice-writer libreoffice-common || true
+    if command -v soffice >/dev/null 2>&1 || command -v libreoffice >/dev/null 2>&1; then
+      echo "LibreOffice instalado correctamente"
+    else
+      echo "No se pudo instalar LibreOffice. Continuando sin él."
+    fi
   else
     echo "apt-get no disponible: no se puede instalar LibreOffice automáticamente"
   fi

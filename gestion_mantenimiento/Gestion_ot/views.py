@@ -61,15 +61,8 @@ def convertir_docx_a_pdf(docx_path, pdf_path):
             pythoncom.CoUninitialize()
         return
 
-    # Intentar docx2pdf en Linux/Unix si está disponible.
-    try:
-        convert(docx_path, pdf_path)
-        if os.path.exists(pdf_path):
-            return
-    except Exception as exc:
-        logger.warning('docx2pdf falló en Linux/Unix: %s', exc)
-
-    # Intentar libreoffice/soffice en Linux/Unix.
+    # En Linux/Unix no usamos docx2pdf porque requiere Microsoft Word.
+    # Intentamos directamente usar LibreOffice/soffice.
     libreoffice = shutil.which('soffice') or shutil.which('libreoffice')
     if not libreoffice:
         raise RuntimeError('No se encontró LibreOffice/soffice para convertir DOCX a PDF')
