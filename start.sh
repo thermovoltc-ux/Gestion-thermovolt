@@ -1,6 +1,19 @@
 #!/bin/sh
 set -ex
 
+echo "STARTUP: checking LibreOffice availability"
+if ! command -v soffice >/dev/null 2>&1 && ! command -v libreoffice >/dev/null 2>&1; then
+  echo "LibreOffice no encontrado. Intentando instalar..."
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update
+    apt-get install -y libreoffice-core libreoffice-writer libreoffice-common
+  else
+    echo "apt-get no disponible: no se puede instalar LibreOffice automáticamente"
+  fi
+else
+  echo "LibreOffice ya está instalado"
+fi
+
 echo "STARTUP: running all migrations"
 python manage.py migrate --noinput
 
