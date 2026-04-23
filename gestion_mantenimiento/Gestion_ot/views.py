@@ -70,7 +70,10 @@ def convertir_docx_a_pdf(docx_path, pdf_path):
     output_dir = os.path.dirname(pdf_path)
     cmd = [libreoffice, '--headless', '--convert-to', 'pdf', '--outdir', output_dir, docx_path]
     logger.info('Ejecutando conversión LibreOffice: %s', ' '.join(cmd))
-    subprocess.run(cmd, check=True, timeout=120)
+    result = subprocess.run(cmd, check=True, timeout=120, capture_output=True, text=True)
+    logger.info('LibreOffice stdout: %s', result.stdout)
+    if result.stderr:
+        logger.warning('LibreOffice stderr: %s', result.stderr)
 
     alt_pdf = os.path.join(output_dir, os.path.splitext(os.path.basename(docx_path))[0] + '.pdf')
     if os.path.exists(pdf_path):
@@ -829,6 +832,7 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
     temp_docx = tempfile.NamedTemporaryFile(delete=False, suffix='.docx')
     temp_docx.close()
     doc.save(temp_docx.name)
+    logger.info("DOCX temporal guardado en: %s", temp_docx.name)
     
     # Convertir a PDF
     temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
@@ -836,9 +840,17 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
     
     try:
         convertir_docx_a_pdf(temp_docx.name, temp_pdf.name)
-        with open(temp_pdf.name, 'rb') as f:
-            buffer = BytesIO(f.read())
-        logger.info("PDF generado exitosamente desde plantilla Word")
+        if os.path.exists(temp_pdf.name):
+            pdf_size = os.path.getsize(temp_pdf.name)
+            logger.info("PDF generado exitosamente, tamaño: %d bytes", pdf_size)
+            if pdf_size == 0:
+                logger.error("PDF generado pero está vacío")
+                raise RuntimeError("PDF generado está vacío")
+            with open(temp_pdf.name, 'rb') as f:
+                buffer = BytesIO(f.read())
+        else:
+            logger.error("PDF no se generó, archivo no existe: %s", temp_pdf.name)
+            raise RuntimeError("PDF no se generó")
     except Exception as e:
         logger.warning("Error al convertir DOCX a PDF: %s", e)
         os.unlink(temp_docx.name)
@@ -1067,7 +1079,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
                 "Content-Type": "application/json"
             }
 
-            logger.info("Enviando email via SendGrid API con %d bytes PDF", len(pdf_content))
+            logger.info("Enviando email via SendGrid API from=%s to=%s", from_email, recipient_list)
             response = requests.post(
                 "https://api.sendgrid.com/v3/mail/send",
                 json=payload,
@@ -1077,6 +1089,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
 
             if response.status_code in (200, 202):
                 logger.info("Email enviado exitosamente via SendGrid API")
+                logger.info("SendGrid response headers: %s", response.headers)
                 return True
             else:
                 logger.error("SendGrid API error %s: %s", response.status_code, response.text)
