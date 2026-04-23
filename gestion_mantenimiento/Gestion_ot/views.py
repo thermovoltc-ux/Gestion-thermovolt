@@ -604,21 +604,29 @@ def detalles_solicitud(request, consecutivo):
 def generar_pdf_informe(cierre_ot, request=None):
     """Genera un PDF usando plantilla Word si existe, sino usa ReportLab"""
     template_path = os.path.join(settings.BASE_DIR, 'gestion_mantenimiento', 'static', 'plantilla_ot.docx')
+    logger.info(f"Intentando generar PDF para OT {cierre_ot.orden_trabajo.solicitud.consecutivo}")
+    logger.info(f"Ruta de plantilla: {template_path}")
+    logger.info(f"¿Plantilla existe?: {os.path.exists(template_path)}")
     
     if os.path.exists(template_path):
+        logger.info("Usando plantilla Word para generar PDF")
         firma_tec = request.POST.get('firma_digital') if request else None
         firma_rec = request.POST.get('firma_receptor') if request else None
         return generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec, firma_rec)
     else:
+        logger.warning("Plantilla no encontrada, usando ReportLab como fallback")
         return generar_pdf_reportlab(cierre_ot)
 
 def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_rec=None):
     """Genera PDF desde plantilla Word"""
-    logger.info(f"Generando PDF desde plantilla: {template_path}")
-    logger.info(f"Plantilla existe: {os.path.exists(template_path)}")
+    logger.info("=== INICIANDO GENERACIÓN PDF DESDE PLANTILLA ===")
+    logger.info(f"Plantilla: {template_path}")
+    logger.info(f"¿Plantilla existe?: {os.path.exists(template_path)}")
 
     doc = Document(template_path)
     logger.info("Documento Word cargado exitosamente")
+    logger.info(f"Número de párrafos en plantilla: {len(doc.paragraphs)}")
+    logger.info(f"Número de tablas en plantilla: {len(doc.tables)}")
 
     # Inicializar variables de firmas
     firma_tec_agregada = False
@@ -627,6 +635,8 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
     # Usar firma_tec si proporcionado, sino de cierre_ot
     firma_tec = firma_tec or cierre_ot.firma_digital
     firma_rec = firma_rec or cierre_ot.firma_receptor
+    logger.info(f"Firma técnica presente: {bool(firma_tec)}")
+    logger.info(f"Firma receptor presente: {bool(firma_rec)}")
 
     # Datos para reemplazar
     ot = cierre_ot.orden_trabajo
@@ -854,11 +864,13 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
         else:
             logger.error("PDF no se generó, archivo no existe: %s", temp_pdf.name)
             raise RuntimeError("PDF no se generó")
+        logger.info("=== PDF DESDE PLANTILLA COMPLETADO EXITOSAMENTE ===")
     except Exception as e:
         logger.warning("Error al convertir DOCX a PDF: %s - usando ReportLab", e)
         os.unlink(temp_docx.name)
         if os.path.exists(temp_pdf.name):
             os.unlink(temp_pdf.name)
+        logger.info("=== USANDO REPORTLAB COMO FALLBACK ===")
         buffer, _, _ = generar_pdf_reportlab(cierre_ot)
         return buffer, firma_tec_agregada, firma_rec_agregada
     
@@ -871,6 +883,7 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
 
 def generar_pdf_reportlab(cierre_ot):
     """Genera un PDF de informe similar al de Google Docs"""
+    logger.info("=== GENERANDO PDF CON REPORTLAB (FALLBACK) ===")
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import getSampleStyleSheet
@@ -925,6 +938,7 @@ def generar_pdf_reportlab(cierre_ot):
     # Agregar firma si existe
     try:
         if cierre_ot.firma_digital:
+            logger.info("Procesando firma técnica en ReportLab")
             story.append(Spacer(1, 12))
             firma_title = Paragraph("<b>Firma Digital del Técnico:</b>", styles['Normal'])
             story.append(firma_title)
@@ -932,24 +946,30 @@ def generar_pdf_reportlab(cierre_ot):
             
             try:
                 header, encoded = cierre_ot.firma_digital.split(",", 1)
+                logger.info("Firma técnica decodificada correctamente")
             except ValueError:
                 encoded = cierre_ot.firma_digital
+                logger.info("Firma técnica sin header, usando directamente")
             image_data = base64.b64decode(encoded)
             img_buffer = BytesIO(image_data)
             img = PILImage.open(img_buffer)
+            logger.info(f"Imagen firma técnica cargada: {img.size}, mode: {img.mode}")
             
             # Convertir a RGB si es necesario
             if img.mode != 'RGB':
                 img = img.convert('RGB')
+                logger.info("Imagen convertida a RGB")
             
             # Guardar temporalmente
             temp_img_path = f"/tmp/firma_{cierre_ot.id}.png"
             img.save(temp_img_path)
             temp_files.append(temp_img_path)  # Rastrear para limpiar después
+            logger.info(f"Imagen firma técnica guardada en: {temp_img_path}")
             
             # Agregar al PDF
             firma_img = Image(temp_img_path, width=200, height=100)
             story.append(firma_img)
+            logger.info("Firma técnica agregada al PDF")
     except Exception as e:
         logger.warning("Error agregando firma técnica: %s", e)
         pass  # Silently continue with PDF
@@ -957,6 +977,7 @@ def generar_pdf_reportlab(cierre_ot):
     # Agregar firma del receptor si existe
     try:
         if cierre_ot.firma_receptor:
+            logger.info("Procesando firma del receptor en ReportLab")
             story.append(Spacer(1, 12))
             firma_rec_title = Paragraph("<b>Firma Digital del Receptor:</b>", styles['Normal'])
             story.append(firma_rec_title)
@@ -964,21 +985,27 @@ def generar_pdf_reportlab(cierre_ot):
             
             try:
                 header, encoded = cierre_ot.firma_receptor.split(",", 1)
+                logger.info("Firma receptor decodificada correctamente")
             except ValueError:
                 encoded = cierre_ot.firma_receptor
+                logger.info("Firma receptor sin header, usando directamente")
             image_data = base64.b64decode(encoded)
             img_buffer = BytesIO(image_data)
             img = PILImage.open(img_buffer)
+            logger.info(f"Imagen firma receptor cargada: {img.size}, mode: {img.mode}")
             
             if img.mode != 'RGB':
                 img = img.convert('RGB')
+                logger.info("Imagen firma receptor convertida a RGB")
             
             temp_img_path = f"/tmp/firma_rec_{cierre_ot.id}.png"
             img.save(temp_img_path)
             temp_files.append(temp_img_path)
+            logger.info(f"Imagen firma receptor guardada en: {temp_img_path}")
             
             firma_rec_img = Image(temp_img_path, width=200, height=100)
             story.append(firma_rec_img)
+            logger.info("Firma receptor agregada al PDF")
     except Exception as e:
         logger.warning("Error agregando firma del receptor: %s", e)
         pass
@@ -1065,6 +1092,7 @@ def generar_pdf_reportlab(cierre_ot):
                 pass  # Silently continue cleanup
     
     buffer.seek(0)
+    logger.info("=== PDF REPORTLAB COMPLETADO ===")
     return buffer, False, False
 
 
