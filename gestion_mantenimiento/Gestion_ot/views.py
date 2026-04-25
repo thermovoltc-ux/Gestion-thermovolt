@@ -51,6 +51,13 @@ def convertir_docx_a_pdf(docx_path, pdf_path):
     """Convierte un archivo DOCX a PDF.
     Usa docx2pdf en Windows o LibreOffice/soffice en Linux.
     """
+    logger.info(f"=== INICIANDO CONVERSIÓN DOCX A PDF ===")
+    logger.info(f"DOCX origen: {docx_path}, existe: {os.path.exists(docx_path)}")
+    if os.path.exists(docx_path):
+        docx_size = os.path.getsize(docx_path)
+        logger.info(f"Tamaño DOCX: {docx_size} bytes")
+    logger.info(f"PDF destino: {pdf_path}")
+    
     if os.name == 'nt':
         if pythoncom is None:
             raise RuntimeError('pythoncom no disponible en Windows')
@@ -59,6 +66,7 @@ def convertir_docx_a_pdf(docx_path, pdf_path):
             convert(docx_path, pdf_path)
         finally:
             pythoncom.CoUninitialize()
+        logger.info("Conversión Windows completada")
         return
 
     # En Linux/Unix no usamos docx2pdf porque requiere Microsoft Word.
@@ -67,21 +75,49 @@ def convertir_docx_a_pdf(docx_path, pdf_path):
     if not libreoffice:
         raise RuntimeError('No se encontró LibreOffice/soffice para convertir DOCX a PDF')
 
+    logger.info(f"Ejecutable LibreOffice encontrado en: {libreoffice}")
     output_dir = os.path.dirname(pdf_path)
+    logger.info(f"Directorio de salida: {output_dir}")
+    
     cmd = [libreoffice, '--headless', '--convert-to', 'pdf', '--outdir', output_dir, docx_path]
     logger.info('Ejecutando conversión LibreOffice: %s', ' '.join(cmd))
-    result = subprocess.run(cmd, check=True, timeout=120, capture_output=True, text=True)
-    logger.info('LibreOffice stdout: %s', result.stdout)
-    if result.stderr:
-        logger.warning('LibreOffice stderr: %s', result.stderr)
+    
+    try:
+        result = subprocess.run(cmd, check=True, timeout=120, capture_output=True, text=True)
+        logger.info('LibreOffice stdout: %s', result.stdout)
+        if result.stderr:
+            logger.warning('LibreOffice stderr: %s', result.stderr)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"LibreOffice retornó código de error: {e.returncode}")
+        logger.error(f"STDOUT: {e.stdout}")
+        logger.error(f"STDERR: {e.stderr}")
+        raise
+    except subprocess.TimeoutExpired:
+        logger.error("LibreOffice superó el timeout de 120 segundos")
+        raise
 
+    # Verificar dónde se generó el PDF
     alt_pdf = os.path.join(output_dir, os.path.splitext(os.path.basename(docx_path))[0] + '.pdf')
+    logger.info(f"Verificando ubicaciones esperadas:")
+    logger.info(f"  PDF primario ({pdf_path}): existe={os.path.exists(pdf_path)}")
     if os.path.exists(pdf_path):
+        size = os.path.getsize(pdf_path)
+        logger.info(f"  Tamaño PDF primario: {size} bytes")
+    logger.info(f"  PDF alternativo ({alt_pdf}): existe={os.path.exists(alt_pdf)}")
+    if os.path.exists(alt_pdf):
+        size = os.path.getsize(alt_pdf)
+        logger.info(f"  Tamaño PDF alternativo: {size} bytes")
+        
+    if os.path.exists(pdf_path):
+        logger.info("PDF encontrado en ubicación primaria")
         return
     if os.path.exists(alt_pdf):
+        logger.info(f"Moviendo PDF de {alt_pdf} a {pdf_path}")
         os.replace(alt_pdf, pdf_path)
+        logger.info("PDF movido exitosamente")
         return
 
+    logger.error("LibreOffice no produjo el PDF esperado")
     raise RuntimeError('LibreOffice no produjo el PDF esperado')
 
 
@@ -937,7 +973,8 @@ def generar_pdf_reportlab(cierre_ot):
 
     # Agregar firma si existe
     try:
-        if cierre_ot.firma_digital:
+        logger.info(f"Verificando firma técnica - Valor: {repr(cierre_ot.firma_digital)}, Tipo: {type(cierre_ot.firma_digital)}")
+        if cierre_ot.firma_digital and str(cierre_ot.firma_digital).strip():
             logger.info("Procesando firma técnica en ReportLab")
             story.append(Spacer(1, 12))
             firma_title = Paragraph("<b>Firma Digital del Técnico:</b>", styles['Normal'])
@@ -970,13 +1007,16 @@ def generar_pdf_reportlab(cierre_ot):
             firma_img = Image(temp_img_path, width=200, height=100)
             story.append(firma_img)
             logger.info("Firma técnica agregada al PDF")
+        else:
+            logger.warning(f"Firma técnica no disponible o vacía")
     except Exception as e:
         logger.warning("Error agregando firma técnica: %s", e)
         pass  # Silently continue with PDF
 
     # Agregar firma del receptor si existe
     try:
-        if cierre_ot.firma_receptor:
+        logger.info(f"Verificando firma receptor - Valor: {repr(cierre_ot.firma_receptor)}, Tipo: {type(cierre_ot.firma_receptor)}")
+        if cierre_ot.firma_receptor and str(cierre_ot.firma_receptor).strip():
             logger.info("Procesando firma del receptor en ReportLab")
             story.append(Spacer(1, 12))
             firma_rec_title = Paragraph("<b>Firma Digital del Receptor:</b>", styles['Normal'])
@@ -1006,6 +1046,8 @@ def generar_pdf_reportlab(cierre_ot):
             firma_rec_img = Image(temp_img_path, width=200, height=100)
             story.append(firma_rec_img)
             logger.info("Firma receptor agregada al PDF")
+        else:
+            logger.warning(f"Firma receptor no disponible o vacía")
     except Exception as e:
         logger.warning("Error agregando firma del receptor: %s", e)
         pass

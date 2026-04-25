@@ -1,6 +1,24 @@
 #!/bin/sh
 set -ex
 
+echo "STARTUP: checking Java availability"
+if ! command -v java >/dev/null 2>&1; then
+  echo "Java no encontrado. Intentando instalar openjdk..."
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update || true
+    apt-get install -y openjdk-11-jre-headless || true
+    if command -v java >/dev/null 2>&1; then
+      echo "Java instalado correctamente"
+    else
+      echo "No se pudo instalar Java. LibreOffice puede tener limitaciones."
+    fi
+  else
+    echo "apt-get no disponible: no se puede instalar Java automáticamente"
+  fi
+else
+  echo "Java ya está disponible"
+fi
+
 echo "STARTUP: checking LibreOffice availability"
 if ! command -v soffice >/dev/null 2>&1 && ! command -v libreoffice >/dev/null 2>&1; then
   echo "LibreOffice no encontrado. Intentando instalar..."
