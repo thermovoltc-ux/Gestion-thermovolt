@@ -1,41 +1,52 @@
 #!/bin/sh
 set -ex
 
-echo "STARTUP: checking Java availability"
-if ! command -v java >/dev/null 2>&1; then
-  echo "Java no encontrado. Intentando instalar openjdk..."
-  if command -v apt-get >/dev/null 2>&1; then
-    apt-get update || true
-    apt-get install -y openjdk-11-jre-headless || true
-    if command -v java >/dev/null 2>&1; then
-      echo "Java instalado correctamente"
-    else
-      echo "No se pudo instalar Java. LibreOffice puede tener limitaciones."
-    fi
-  else
-    echo "apt-get no disponible: no se puede instalar Java automáticamente"
-  fi
+echo "STARTUP: checking and installing dependencies..."
+
+# Install Java - necesario para LibreOffice
+echo "Instalando Java runtime..."
+apt-get update || true
+apt-get install -y default-jre || apt-get install -y openjdk-11-jre || true
+
+# Verify Java
+if command -v java >/dev/null 2>&1; then
+  JAVA_VERSION=$(java -version 2>&1 | head -1)
+  echo "✓ Java instalado: $JAVA_VERSION"
 else
-  echo "Java ya está disponible"
+  echo "⚠ Advertencia: Java no se pudo instalar"
 fi
 
-echo "STARTUP: checking LibreOffice availability"
-if ! command -v soffice >/dev/null 2>&1 && ! command -v libreoffice >/dev/null 2>&1; then
-  echo "LibreOffice no encontrado. Intentando instalar..."
-  if command -v apt-get >/dev/null 2>&1; then
-    apt-get update || true
-    apt-get install -y libreoffice-core libreoffice-writer libreoffice-common || true
-    if command -v soffice >/dev/null 2>&1 || command -v libreoffice >/dev/null 2>&1; then
-      echo "LibreOffice instalado correctamente"
-    else
-      echo "No se pudo instalar LibreOffice. Continuando sin él."
-    fi
-  else
-    echo "apt-get no disponible: no se puede instalar LibreOffice automáticamente"
-  fi
+# Install LibreOffice - intenta instalar la suite completa primero
+echo "Instalando LibreOffice..."
+apt-get install -y libreoffice || apt-get install -y libreoffice-core libreoffice-writer libreoffice-calc || true
+
+# Verify LibreOffice
+LIBREOFFICE_CMD=""
+if command -v soffice >/dev/null 2>&1; then
+  LIBREOFFICE_CMD="soffice"
+  echo "✓ LibreOffice (soffice) disponible"
+elif command -v libreoffice >/dev/null 2>&1; then
+  LIBREOFFICE_CMD="libreoffice"
+  echo "✓ LibreOffice disponible"
 else
-  echo "LibreOffice ya está instalado"
+  echo "⚠ Advertencia: LibreOffice no se pudo instalar correctamente"
 fi
+
+# Configure LibreOffice to work in headless mode
+echo "Configurando LibreOffice para modo headless..."
+if [ -n "$LIBREOFFICE_CMD" ]; then
+  # Crear directorio de configuración si no existe
+  mkdir -p ~/.config/libreoffice/4/user
+  
+  # Intentar inicializar LibreOffice sin interfaz para crear configuración
+  # Esto puede ayudar a evitar problemas en la primera ejecución
+  timeout 30 $LIBREOFFICE_CMD --headless --norestore --invisible --convert-to pdf /dev/null 2>&1 || true
+  
+  echo "✓ LibreOffice preconfigurado"
+fi
+
+echo "✓ STARTUP: dependencias instaladas y configuradas"
+
 
 echo "STARTUP: running all migrations"
 python manage.py migrate --noinput

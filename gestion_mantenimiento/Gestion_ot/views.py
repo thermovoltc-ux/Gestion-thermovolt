@@ -79,22 +79,40 @@ def convertir_docx_a_pdf(docx_path, pdf_path):
     output_dir = os.path.dirname(pdf_path)
     logger.info(f"Directorio de salida: {output_dir}")
     
-    cmd = [libreoffice, '--headless', '--convert-to', 'pdf', '--outdir', output_dir, docx_path]
-    logger.info('Ejecutando conversión LibreOffice: %s', ' '.join(cmd))
+    # Intentar con diferentes flags para evitar problemas con Java en headless mode
+    comandos = [
+        # Primera opción: con flags para evitar issues de Java
+        [libreoffice, '--headless', '--norestore', '--nofirststartwizard', '--convert-to', 'pdf', '--outdir', output_dir, docx_path],
+        # Segunda opción: con invisible en lugar de headless
+        [libreoffice, '--invisible', '--norestore', '--convert-to', 'pdf', '--outdir', output_dir, docx_path],
+        # Tercera opción: minimal (si soffice)
+        [libreoffice, '--headless', '--convert-to', 'pdf', '--outdir', output_dir, docx_path],
+    ]
     
-    try:
-        result = subprocess.run(cmd, check=True, timeout=120, capture_output=True, text=True)
-        logger.info('LibreOffice stdout: %s', result.stdout)
-        if result.stderr:
-            logger.warning('LibreOffice stderr: %s', result.stderr)
-    except subprocess.CalledProcessError as e:
-        logger.error(f"LibreOffice retornó código de error: {e.returncode}")
-        logger.error(f"STDOUT: {e.stdout}")
-        logger.error(f"STDERR: {e.stderr}")
-        raise
-    except subprocess.TimeoutExpired:
-        logger.error("LibreOffice superó el timeout de 120 segundos")
-        raise
+    resultado_exitoso = False
+    ultimo_error = None
+    
+    for i, cmd in enumerate(comandos, 1):
+        try:
+            logger.info(f'Intento {i} de {len(comandos)}: {" ".join(cmd)}')
+            result = subprocess.run(cmd, check=True, timeout=120, capture_output=True, text=True)
+            logger.info(f'Intento {i} exitoso - LibreOffice stdout: %s', result.stdout)
+            if result.stderr and 'failed to launch javaldx' not in result.stderr:
+                logger.info(f'Intento {i} - LibreOffice stderr (no crítico): %s', result.stderr)
+            resultado_exitoso = True
+            break
+        except subprocess.CalledProcessError as e:
+            ultimo_error = f"Código {e.returncode}: {e.stderr}"
+            logger.warning(f'Intento {i} falló - {ultimo_error}')
+            continue
+        except subprocess.TimeoutExpired:
+            ultimo_error = "Timeout de 120 segundos"
+            logger.warning(f'Intento {i} falló - {ultimo_error}')
+            continue
+    
+    if not resultado_exitoso:
+        logger.error(f"Todos los intentos de conversión con LibreOffice fallaron. Último error: {ultimo_error}")
+        raise RuntimeError(f'LibreOffice no pudo convertir el documento: {ultimo_error}')
 
     # Verificar dónde se generó el PDF
     alt_pdf = os.path.join(output_dir, os.path.splitext(os.path.basename(docx_path))[0] + '.pdf')
@@ -103,21 +121,46 @@ def convertir_docx_a_pdf(docx_path, pdf_path):
     if os.path.exists(pdf_path):
         size = os.path.getsize(pdf_path)
         logger.info(f"  Tamaño PDF primario: {size} bytes")
+        if size == 0:
+            logger.error("PDF existe pero está VACÍO (0 bytes)")
+        
     logger.info(f"  PDF alternativo ({alt_pdf}): existe={os.path.exists(alt_pdf)}")
     if os.path.exists(alt_pdf):
         size = os.path.getsize(alt_pdf)
         logger.info(f"  Tamaño PDF alternativo: {size} bytes")
+        if size == 0:
+            logger.error("PDF alternativo existe pero está VACÍO (0 bytes)")
         
     if os.path.exists(pdf_path):
-        logger.info("PDF encontrado en ubicación primaria")
-        return
+        size = os.path.getsize(pdf_path)
+        if size > 0:
+            logger.info(f"✓ PDF generado exitosamente ({size} bytes)")
+            return
+        else:
+            logger.error("✗ PDF existe pero está vacío - buscando archivos generados en el directorio...")
+            # Listar archivos generados para debugging
+            try:
+                files = os.listdir(output_dir)
+                logger.info(f"Archivos en {output_dir}: {files}")
+                for f in files:
+                    if f.endswith('.pdf'):
+                        full_path = os.path.join(output_dir, f)
+                        size = os.path.getsize(full_path)
+                        logger.info(f"  Archivo PDF encontrado: {f} ({size} bytes)")
+            except Exception as e:
+                logger.warning(f"No se pudo listar archivos: {e}")
+                
     if os.path.exists(alt_pdf):
-        logger.info(f"Moviendo PDF de {alt_pdf} a {pdf_path}")
-        os.replace(alt_pdf, pdf_path)
-        logger.info("PDF movido exitosamente")
-        return
+        size = os.path.getsize(alt_pdf)
+        if size > 0:
+            logger.info(f"Moviendo PDF de {alt_pdf} a {pdf_path}")
+            os.replace(alt_pdf, pdf_path)
+            logger.info(f"✓ PDF movido exitosamente ({size} bytes)")
+            return
+        else:
+            logger.error("PDF alternativo existe pero está vacío")
 
-    logger.error("LibreOffice no produjo el PDF esperado")
+    logger.error("✗ LibreOffice no produjo el PDF esperado")
     raise RuntimeError('LibreOffice no produjo el PDF esperado')
 
 
