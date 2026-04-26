@@ -112,10 +112,15 @@ class MultipleFileInput(forms.ClearableFileInput):
 # ============================================================================
 
 class PlanMantenimientoForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from gestion_mantenimiento.Activos.models import Equipo
+        self.fields['equipo'].queryset = Equipo.objects.all()
     class Meta:
         model = PlanMantenimiento
-        fields = ['nombre', 'descripcion', 'cantidad', 'unidad', 'fecha_inicio', 'activo']
+        fields = ['equipo', 'nombre', 'descripcion', 'cantidad', 'unidad', 'fecha_inicio', 'activo']
         widgets = {
+            'equipo': forms.Select(attrs={'class': 'form-control'}),
             'nombre': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Ej: Lubricación mensual, Inspección trimestral'
