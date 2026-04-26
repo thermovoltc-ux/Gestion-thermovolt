@@ -770,35 +770,10 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
         except ValueError:
             encoded = image_base64
         image_data = base64.b64decode(encoded)
-        
-        # Abrir imagen y redimensionar si es muy pequeña (firmas del celular)
-        try:
-            img = PILImage.open(BytesIO(image_data))
-            # Convertir a RGB si es necesario
-            if img.mode in ('RGBA', 'P'):
-                img = img.convert('RGB')
-            # Redimensionar si la imagen es pequeña (mínimo 800x400 para firmas)
-            min_width, min_height = 800, 400
-            if img.width < min_width or img.height < min_height:
-                # Calcular nuevas dimensiones manteniendo proporción
-                ratio = min(min_width / img.width, min_height / img.height)
-                new_width = int(img.width * ratio * 1.5)  # 1.5x para mejor calidad
-                new_height = int(img.height * ratio * 1.5)
-                img = img.resize((new_width, new_height), PILImage.LANCZOS)
-                logger.info(f"Imagen redimensionada de {img.width}x{img.height} a {new_width}x{new_height}")
-            
-            # Guardar imagen procesada en el archivo temporal
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-            img.save(temp_file.name, 'PNG', quality=95)
-            temp_file.close()
-            return temp_file.name
-        except Exception as e:
-            # Si falla el procesamiento, guardar original
-            logger.warning(f"Error procesando imagen: {e}, guardando original")
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-            temp_file.write(image_data)
-            temp_file.close()
-            return temp_file.name
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        temp_file.write(image_data)
+        temp_file.close()
+        return temp_file.name
 
     # Crear archivos temporales de firmas si existen
     if firma_tec:
