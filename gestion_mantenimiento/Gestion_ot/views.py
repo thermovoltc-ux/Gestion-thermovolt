@@ -648,7 +648,14 @@ def detalles_solicitud(request, consecutivo):
         'descripcion': solicitud.descripcion_problema,
         'fecha_creacion': solicitud.fecha_creacion,
         'estado': solicitud.estado.nombre,
-        'equipo': str(solicitud.equipo.display_label) if solicitud.equipo else '',
+        'equipo': (
+            str(solicitud.equipo.display_label)
+            if solicitud.equipo and getattr(solicitud.equipo, 'display_label', None)
+            else (
+                f"{solicitud.equipo.codigo} / {solicitud.equipo.ubicacion.nombre if solicitud.equipo and solicitud.equipo.ubicacion else ''} / {solicitud.equipo.nombre}"
+                if solicitud.equipo else ''
+            )
+        ),
         'ordenes_trabajo': []
     }
     for ot in ordenes_trabajo:
