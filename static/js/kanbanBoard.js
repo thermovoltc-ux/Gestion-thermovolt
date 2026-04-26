@@ -176,8 +176,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 return response.json();
             })
             .then(data => {
+                console.log('[DEBUG] Respuesta del servidor:', data);
                 const actualizarElemento = (id, valor) => {
                     const elemento = document.getElementById(id);
+                    console.log(`[DEBUG] Intentando actualizar ${id}, elemento existe: ${!!elemento}, valor: "${valor}"`);
                     if (elemento) {
                         if (valor) {
                             elemento.textContent = valor;
@@ -194,6 +196,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 actualizarElemento('modalNumeroActivo', data.consecutivo);
                 actualizarElemento('modalPDV', data.pdv);
                 actualizarElemento('modalEquipo', data.equipo);
+                console.log('[DEBUG] Equipo recibido en JS:', data.equipo);
                 actualizarElemento('modalDescripcion', data.descripcion);
                 actualizarElemento('modalFechaCreacion', data.fecha_creacion);
                 actualizarElemento('modalEstado', data.estado);
