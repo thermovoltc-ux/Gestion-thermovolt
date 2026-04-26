@@ -116,6 +116,7 @@ class PlanMantenimientoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         from gestion_mantenimiento.Activos.models import Equipo
         self.fields['equipo'].queryset = Equipo.objects.all()
+        self.fields['equipo'].label_from_instance = lambda obj: obj.display_label
     class Meta:
         model = PlanMantenimiento
         fields = ['equipo', 'nombre', 'descripcion', 'cantidad', 'unidad', 'fecha_inicio', 'activo']
