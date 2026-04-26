@@ -936,7 +936,6 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
         num_images = imagenes_antes.count()
         num_rows = (num_images + 1) // 2
         table = doc.add_table(rows=num_rows, cols=2)
-        table.style = 'Table Grid'
         
         row_idx = 0
         col_idx = 0
@@ -968,7 +967,6 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
         num_images = imagenes_despues.count()
         num_rows = (num_images + 1) // 2
         table = doc.add_table(rows=num_rows, cols=2)
-        table.style = 'Table Grid'
         
         row_idx = 0
         col_idx = 0
