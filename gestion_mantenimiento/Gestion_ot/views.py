@@ -983,6 +983,7 @@ def generar_pdf_reportlab(cierre_ot):
     ot = cierre_ot.orden_trabajo
     solicitud = ot.solicitud
     
+    # Crear estructura de datos más simple sin firmas (las agregaremos después)
     data = {
         'OT': str(solicitud.consecutivo),
         'Equipo': getattr(solicitud.equipo, 'nombre', '') if hasattr(solicitud, 'equipo') else '',
@@ -994,12 +995,9 @@ def generar_pdf_reportlab(cierre_ot):
         '¿Se solucionó la falla?': 'Sí' if cierre_ot.se_soluciono else 'No',
         'Descripción': cierre_ot.descripcion_falla or '',
         'Observaciones': cierre_ot.observaciones or '',
-        'Recibido por': cierre_ot.nombre_tecnico or '',
-        'Documento de Identidad': cierre_ot.documento_tecnico or '',
-        'Nombre del Técnico': cierre_ot.nombre_tecnico or '',
     }
     
-    # Agregar párrafos con los datos
+    # Agregar párrafos con los datos principales
     for key, value in data.items():
         p = Paragraph(f"<b>{key}:</b> {value}", styles['Normal'])
         story.append(p)
@@ -1014,15 +1012,77 @@ def generar_pdf_reportlab(cierre_ot):
             story.append(Paragraph(f"- {texto}", styles['Normal']))
             story.append(Spacer(1, 4))
 
-    # Agregar firma si existe
+    # Sección de receptor con firma debajo
+    story.append(Spacer(1, 12))
+    story.append(Paragraph("<b>RECEPCIÓN DEL TRABAJO</b>", styles['Heading2']))
+    story.append(Spacer(1, 6))
+    
+    p_recibido = Paragraph(f"<b>Recibido por:</b> {cierre_ot.nombre_tecnico or ''}", styles['Normal'])
+    story.append(p_recibido)
+    story.append(Spacer(1, 4))
+    
+    p_doc_receptor = Paragraph(f"<b>Documento de Identidad:</b> {cierre_ot.documento_tecnico or ''}", styles['Normal'])
+    story.append(p_doc_receptor)
+    story.append(Spacer(1, 6))
+    
+    # Agregar firma del receptor AQUÍ si existe
+    try:
+        logger.info(f"Verificando firma receptor - Valor: {repr(cierre_ot.firma_receptor)}, Tipo: {type(cierre_ot.firma_receptor)}")
+        if cierre_ot.firma_receptor and str(cierre_ot.firma_receptor).strip():
+            logger.info("Procesando firma del receptor en ReportLab")
+            story.append(Paragraph("<b>Firma:</b>", styles['Normal']))
+            story.append(Spacer(1, 4))
+            
+            try:
+                header, encoded = cierre_ot.firma_receptor.split(",", 1)
+                logger.info("Firma receptor decodificada correctamente")
+            except ValueError:
+                encoded = cierre_ot.firma_receptor
+                logger.info("Firma receptor sin header, usando directamente")
+            image_data = base64.b64decode(encoded)
+            img_buffer = BytesIO(image_data)
+            img = PILImage.open(img_buffer)
+            logger.info(f"Imagen firma receptor cargada: {img.size}, mode: {img.mode}")
+            
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+                logger.info("Imagen firma receptor convertida a RGB")
+            
+            temp_img_path = f"/tmp/firma_rec_{cierre_ot.id}.png"
+            img.save(temp_img_path)
+            temp_files.append(temp_img_path)
+            logger.info(f"Imagen firma receptor guardada en: {temp_img_path}")
+            
+            firma_rec_img = Image(temp_img_path, width=200, height=100)
+            story.append(firma_rec_img)
+            logger.info("Firma receptor agregada al PDF")
+        else:
+            logger.warning(f"Firma receptor no disponible o vacía")
+    except Exception as e:
+        logger.warning("Error agregando firma del receptor: %s", e)
+        pass
+    
+    story.append(Spacer(1, 12))
+    
+    # Sección de técnico con firma debajo
+    story.append(Paragraph("<b>REALIZADO POR</b>", styles['Heading2']))
+    story.append(Spacer(1, 6))
+    
+    p_tecnico = Paragraph(f"<b>Realizado por:</b> {cierre_ot.nombre_tecnico or ''}", styles['Normal'])
+    story.append(p_tecnico)
+    story.append(Spacer(1, 4))
+    
+    p_doc_tecnico = Paragraph(f"<b>Documento de Identidad:</b> {cierre_ot.documento_tecnico or ''}", styles['Normal'])
+    story.append(p_doc_tecnico)
+    story.append(Spacer(1, 6))
+    
+    # Agregar firma del técnico AQUÍ si existe
     try:
         logger.info(f"Verificando firma técnica - Valor: {repr(cierre_ot.firma_digital)}, Tipo: {type(cierre_ot.firma_digital)}")
         if cierre_ot.firma_digital and str(cierre_ot.firma_digital).strip():
             logger.info("Procesando firma técnica en ReportLab")
-            story.append(Spacer(1, 12))
-            firma_title = Paragraph("<b>Firma Digital del Técnico:</b>", styles['Normal'])
-            story.append(firma_title)
-            story.append(Spacer(1, 6))
+            story.append(Paragraph("<b>Firma:</b>", styles['Normal']))
+            story.append(Spacer(1, 4))
             
             try:
                 header, encoded = cierre_ot.firma_digital.split(",", 1)
@@ -1055,45 +1115,6 @@ def generar_pdf_reportlab(cierre_ot):
     except Exception as e:
         logger.warning("Error agregando firma técnica: %s", e)
         pass  # Silently continue with PDF
-
-    # Agregar firma del receptor si existe
-    try:
-        logger.info(f"Verificando firma receptor - Valor: {repr(cierre_ot.firma_receptor)}, Tipo: {type(cierre_ot.firma_receptor)}")
-        if cierre_ot.firma_receptor and str(cierre_ot.firma_receptor).strip():
-            logger.info("Procesando firma del receptor en ReportLab")
-            story.append(Spacer(1, 12))
-            firma_rec_title = Paragraph("<b>Firma Digital del Receptor:</b>", styles['Normal'])
-            story.append(firma_rec_title)
-            story.append(Spacer(1, 6))
-            
-            try:
-                header, encoded = cierre_ot.firma_receptor.split(",", 1)
-                logger.info("Firma receptor decodificada correctamente")
-            except ValueError:
-                encoded = cierre_ot.firma_receptor
-                logger.info("Firma receptor sin header, usando directamente")
-            image_data = base64.b64decode(encoded)
-            img_buffer = BytesIO(image_data)
-            img = PILImage.open(img_buffer)
-            logger.info(f"Imagen firma receptor cargada: {img.size}, mode: {img.mode}")
-            
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-                logger.info("Imagen firma receptor convertida a RGB")
-            
-            temp_img_path = f"/tmp/firma_rec_{cierre_ot.id}.png"
-            img.save(temp_img_path)
-            temp_files.append(temp_img_path)
-            logger.info(f"Imagen firma receptor guardada en: {temp_img_path}")
-            
-            firma_rec_img = Image(temp_img_path, width=200, height=100)
-            story.append(firma_rec_img)
-            logger.info("Firma receptor agregada al PDF")
-        else:
-            logger.warning(f"Firma receptor no disponible o vacía")
-    except Exception as e:
-        logger.warning("Error agregando firma del receptor: %s", e)
-        pass
     
     # Agregar imágenes antes si existen
     imagenes_antes = cierre_ot.imagenes.filter(tipo='antes')
