@@ -647,7 +647,7 @@ def detalles_solicitud(request, consecutivo):
         'descripcion': solicitud.descripcion_problema,
         'fecha_creacion': solicitud.fecha_creacion,
         'estado': solicitud.estado.nombre,
-        'equipo': getattr(solicitud.equipo, 'display_label', '') if hasattr(solicitud, 'equipo') else '',
+        'equipo': solicitud.equipo.display_label if solicitud.equipo else '',
         'ordenes_trabajo': []
     }
     for ot in ordenes_trabajo:
