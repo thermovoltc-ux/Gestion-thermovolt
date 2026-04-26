@@ -641,6 +641,7 @@ def cierre_ot(request, ot_id):
 def detalles_solicitud(request, consecutivo):
     solicitud = get_object_or_404(Solicitud, consecutivo=consecutivo)
     ordenes_trabajo = solicitud.ordenes_trabajo.all()
+    logger.info(f"[DETALLES_SOLICITUD] consecutivo={solicitud.consecutivo} equipo_obj={solicitud.equipo} equipo_id={getattr(solicitud.equipo, 'id', None)} display_label={getattr(solicitud.equipo, 'display_label', None)}")
     data = {
         'consecutivo': solicitud.consecutivo,
         'pdv': solicitud.PDV,
