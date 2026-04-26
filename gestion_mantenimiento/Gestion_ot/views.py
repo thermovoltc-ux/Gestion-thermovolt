@@ -816,7 +816,7 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
                         p = cell.add_paragraph()
                         p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
                         run = p.add_run()
-                        run.add_picture(temp_firma_rec_path, width=Inches(2))
+                        run.add_picture(temp_firma_rec_path, width=Inches(3.5))
                         firma_rec_agregada = True
                         logger.info("Firma receptor agregada en celda de tabla después de <<cc>>")
                     except Exception as e:
@@ -828,7 +828,7 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
                         p = cell.add_paragraph()
                         p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
                         run = p.add_run()
-                        run.add_picture(temp_firma_tec_path, width=Inches(2))
+                        run.add_picture(temp_firma_tec_path, width=Inches(3.5))
                         firma_tec_agregada = True
                         logger.info("Firma técnico agregada en celda de tabla después de <<cct>>")
                     except Exception as e:
@@ -842,7 +842,7 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
                         new_paragraph = paragraph._p.add_p()
                         new_paragraph.add_run("\n")
                         run = new_paragraph.add_run()
-                        run.add_picture(temp_firma_rec_path, width=Inches(2))
+                        run.add_picture(temp_firma_rec_path, width=Inches(3.5))
                         new_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
                         firma_rec_agregada = True
                         logger.info("Firma receptor agregada después de <<cc>> (fuera de tabla)")
@@ -855,7 +855,7 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
                         new_paragraph = paragraph._p.add_p()
                         new_paragraph.add_run("\n")
                         run = new_paragraph.add_run()
-                        run.add_picture(temp_firma_tec_path, width=Inches(2))
+                        run.add_picture(temp_firma_tec_path, width=Inches(3.5))
                         new_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
                         firma_tec_agregada = True
                         logger.info("Firma técnico agregada después de <<cct>> (fuera de tabla)")
@@ -898,7 +898,7 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
                 p = cell_tec.add_paragraph()
                 p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
                 run = p.add_run()
-                run.add_picture(temp_firma_path.name, width=Inches(2))
+                run.add_picture(temp_firma_path.name, width=Inches(3.5))
                 os.unlink(temp_firma_path.name)
                 firma_tec_agregada = True
             except Exception:
@@ -918,19 +918,26 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
                 p = cell_rec.add_paragraph()
                 p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
                 run = p.add_run()
-                run.add_picture(temp_firma_path.name, width=Inches(2))
+                run.add_picture(temp_firma_path.name, width=Inches(3.5))
                 os.unlink(temp_firma_path.name)
                 firma_rec_agregada = True
             except Exception:
                 firma_rec_agregada = False
 
-    # Agregar imágenes al final del documento
+    # Agregar imágenes al final del documento con formato mejorado
+    # Título decorativo centrado para "Antes"
     if imagenes_antes.exists():
-        heading_antes = doc.add_heading('Antes', level=2)
+        heading_antes = doc.add_paragraph()
+        run = heading_antes.add_run("━━━ ANTES ━━━")
+        run.font.size = Pt(14)
+        run.bold = True
         heading_antes.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        
         num_images = imagenes_antes.count()
         num_rows = (num_images + 1) // 2
         table = doc.add_table(rows=num_rows, cols=2)
+        table.style = 'Table Grid'
+        
         row_idx = 0
         col_idx = 0
         for img in imagenes_antes:
@@ -938,7 +945,7 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
             image_path, is_temp = obtener_imagen_temporal_para_pdf(img.imagen)
             if image_path:
                 run = cell.paragraphs[0].add_run()
-                run.add_picture(image_path, width=Inches(2))
+                run.add_picture(image_path, width=Inches(3.5), height=Inches(3))
                 cell.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
                 if is_temp:
                     os.unlink(image_path)
@@ -946,13 +953,23 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
             if col_idx == 2:
                 col_idx = 0
                 row_idx += 1
+        
+        # Espaciado después de la tabla
+        doc.add_paragraph()
     
+    # Título decorativo centrado para "Después"
     if imagenes_despues.exists():
-        heading_despues = doc.add_heading('Después', level=2)
+        heading_despues = doc.add_paragraph()
+        run = heading_despues.add_run("━━━ DESPUÉS ━━━")
+        run.font.size = Pt(14)
+        run.bold = True
         heading_despues.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        
         num_images = imagenes_despues.count()
         num_rows = (num_images + 1) // 2
         table = doc.add_table(rows=num_rows, cols=2)
+        table.style = 'Table Grid'
+        
         row_idx = 0
         col_idx = 0
         for img in imagenes_despues:
@@ -960,7 +977,7 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
             image_path, is_temp = obtener_imagen_temporal_para_pdf(img.imagen)
             if image_path:
                 run = cell.paragraphs[0].add_run()
-                run.add_picture(image_path, width=Inches(2))
+                run.add_picture(image_path, width=Inches(3.5), height=Inches(3))
                 cell.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
                 if is_temp:
                     os.unlink(image_path)
