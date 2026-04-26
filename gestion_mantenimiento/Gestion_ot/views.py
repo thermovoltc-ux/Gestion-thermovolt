@@ -758,22 +758,37 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
 
     replacements_count = 0
     firmas_en_plantilla = False
-
-    def add_signature_image_to_paragraph(paragraph, image_base64):
+    
+    # Crear archivos temporales para las firmas ANTES de procesar el documento
+    temp_firma_tec_path = None
+    temp_firma_rec_path = None
+    
+    def create_temp_image_file(image_base64, suffix='.png'):
+        """Crea un archivo temporal para una imagen y retorna la ruta"""
         try:
             header, encoded = image_base64.split(",", 1)
         except ValueError:
             encoded = image_base64
         image_data = base64.b64decode(encoded)
-        temp_firma_path = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-        temp_firma_path.write(image_data)
-        temp_firma_path.close()
-        run = paragraph.add_run()
-        run.add_break()
-        run.add_picture(temp_firma_path.name, width=Inches(2))
-        paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-        os.unlink(temp_firma_path.name)
-        return True
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        temp_file.write(image_data)
+        temp_file.close()
+        return temp_file.name
+
+    # Crear archivos temporales de firmas si existen
+    if firma_tec:
+        try:
+            temp_firma_tec_path = create_temp_image_file(firma_tec)
+            logger.info(f"Archivo temporal firma técnico creado: {temp_firma_tec_path}")
+        except Exception as e:
+            logger.warning("Error creando archivo temporal firma técnico: %s", e)
+    
+    if firma_rec:
+        try:
+            temp_firma_rec_path = create_temp_image_file(firma_rec)
+            logger.info(f"Archivo temporal firma receptor creado: {temp_firma_rec_path}")
+        except Exception as e:
+            logger.warning("Error creando archivo temporal firma receptor: %s", e)
 
     def replace_paragraph_text(paragraph):
         nonlocal replacements_count, firma_tec_agregada, firma_rec_agregada, firmas_en_plantilla
@@ -792,23 +807,37 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
                 paragraph._p.remove(run._r)
             paragraph.add_run(updated_text)
 
-        if '<<recibido>>' in original_text:
+        # Agregar firma del receptor DESPUÉS del documento de identidad (<<cc>>)
+        if '<<cc>>' in original_text:
             firmas_en_plantilla = True
-            if firma_rec:
+            if firma_rec and temp_firma_rec_path:
                 try:
-                    if add_signature_image_to_paragraph(paragraph, firma_rec):
-                        firma_rec_agregada = True
-                except Exception:
-                    pass
+                    # Agregar la firma en un NUEVO párrafo después del actual
+                    new_paragraph = paragraph._p.add_p()
+                    new_paragraph.add_run("\n")  # Nueva línea
+                    run = new_paragraph.add_run()
+                    run.add_picture(temp_firma_rec_path, width=Inches(2))
+                    new_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                    firma_rec_agregada = True
+                    logger.info("Firma receptor agregada después de <<cc>>")
+                except Exception as e:
+                    logger.warning("Error agregando firma receptor: %s", e)
 
-        if '<<nombret>>' in original_text:
+        # Agregar firma del técnico DESPUÉS del documento de identidad (<<cct>>)
+        if '<<cct>>' in original_text:
             firmas_en_plantilla = True
-            if firma_tec:
+            if firma_tec and temp_firma_tec_path:
                 try:
-                    if add_signature_image_to_paragraph(paragraph, firma_tec):
-                        firma_tec_agregada = True
-                except Exception:
-                    pass
+                    # Agregar la firma en un NUEVO párrafo después del actual
+                    new_paragraph = paragraph._p.add_p()
+                    new_paragraph.add_run("\n")  # Nueva línea
+                    run = new_paragraph.add_run()
+                    run.add_picture(temp_firma_tec_path, width=Inches(2))
+                    new_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                    firma_tec_agregada = True
+                    logger.info("Firma técnico agregada después de <<cct>>")
+                except Exception as e:
+                    logger.warning("Error agregando firma técnico: %s", e)
 
     def process_cell(cell):
         for paragraph in cell.paragraphs:
@@ -956,6 +985,21 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
     # Limpiar archivos temporales
     os.unlink(temp_docx.name)
     os.unlink(temp_pdf.name)
+    
+    # Limpiar archivos temporales de firmas
+    if temp_firma_tec_path and os.path.exists(temp_firma_tec_path):
+        try:
+            os.unlink(temp_firma_tec_path)
+            logger.info("Archivo temporal firma técnico eliminado")
+        except Exception as e:
+            logger.warning("Error eliminando archivo temporal firma técnico: %s", e)
+    
+    if temp_firma_rec_path and os.path.exists(temp_firma_rec_path):
+        try:
+            os.unlink(temp_firma_rec_path)
+            logger.info("Archivo temporal firma receptor eliminado")
+        except Exception as e:
+            logger.warning("Error eliminando archivo temporal firma receptor: %s", e)
     
     buffer.seek(0)
     return buffer, firma_tec_agregada, firma_rec_agregada
