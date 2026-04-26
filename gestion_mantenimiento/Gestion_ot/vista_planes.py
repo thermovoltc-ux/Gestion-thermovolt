@@ -45,27 +45,37 @@ def crear_plan_mantenimiento(request, equipo_id=None):
     # Obtener equipo_id desde parámetro URL o query string
     if not equipo_id:
         equipo_id = request.GET.get('equipo_id')
-    
+
     equipo = None
     if equipo_id:
-        equipo = get_object_or_404(Equipo, id=equipo_id)
-    
+        try:
+            equipo = Equipo.objects.get(id=equipo_id)
+        except Equipo.DoesNotExist:
+            equipo = None
+
+    error_equipo = None
+
     if request.method == 'POST':
         form = PlanMantenimientoForm(request.POST)
         if form.is_valid():
             plan = form.save(commit=False)
-            if equipo:
-                plan.equipo = equipo
-            plan.save()
-            # El signal post_save automáticamente genera las tareas
-            return redirect(f"{reverse('lista_planes')}?equipo_id={plan.equipo_id}")
+            # Validar que equipo esté presente
+            if not form.cleaned_data.get('equipo') and not equipo:
+                error_equipo = 'Debe seleccionar un equipo.'
+            else:
+                # Prioridad: lo que viene del form
+                plan.equipo = form.cleaned_data.get('equipo') or equipo
+                plan.save()
+                # El signal post_save automáticamente genera las tareas
+                return redirect(f"{reverse('lista_planes')}?equipo_id={plan.equipo_id}")
     else:
         form = PlanMantenimientoForm(initial={'equipo': equipo})
-    
+
     context = {
         'form': form,
         'equipo': equipo,
         'titulo': 'Crear Plan de Mantenimiento',
+        'error_equipo': error_equipo,
     }
     return render(request, 'Gestion_ot/planes/form_plan.html', context)
 

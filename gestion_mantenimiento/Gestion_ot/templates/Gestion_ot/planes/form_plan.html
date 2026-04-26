@@ -25,6 +25,9 @@
                 {% if form.equipo.errors %}
                     <div class="error-message">{{ form.equipo.errors }}</div>
                 {% endif %}
+                {% if error_equipo %}
+                    <div class="error-message">{{ error_equipo }}</div>
+                {% endif %}
             </div>
 
             <div class="form-group">
