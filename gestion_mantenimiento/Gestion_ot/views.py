@@ -790,7 +790,7 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
         except Exception as e:
             logger.warning("Error creando archivo temporal firma receptor: %s", e)
 
-    def replace_paragraph_text(paragraph):
+    def replace_paragraph_text(paragraph, cell=None):
         nonlocal replacements_count, firma_tec_agregada, firma_rec_agregada, firmas_en_plantilla
         original_text = paragraph.text
         if not any(key in original_text for key in replacements):
@@ -807,41 +807,64 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
                 paragraph._p.remove(run._r)
             paragraph.add_run(updated_text)
 
-        # Agregar firma del receptor DESPUÉS del documento de identidad (<<cc>>)
-        if '<<cc>>' in original_text:
-            firmas_en_plantilla = True
-            if firma_rec and temp_firma_rec_path:
-                try:
-                    # Agregar la firma en un NUEVO párrafo después del actual
-                    new_paragraph = paragraph._p.add_p()
-                    new_paragraph.add_run("\n")  # Nueva línea
-                    run = new_paragraph.add_run()
-                    run.add_picture(temp_firma_rec_path, width=Inches(2))
-                    new_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-                    firma_rec_agregada = True
-                    logger.info("Firma receptor agregada después de <<cc>>")
-                except Exception as e:
-                    logger.warning("Error agregando firma receptor: %s", e)
-
-        # Agregar firma del técnico DESPUÉS del documento de identidad (<<cct>>)
-        if '<<cct>>' in original_text:
-            firmas_en_plantilla = True
-            if firma_tec and temp_firma_tec_path:
-                try:
-                    # Agregar la firma en un NUEVO párrafo después del actual
-                    new_paragraph = paragraph._p.add_p()
-                    new_paragraph.add_run("\n")  # Nueva línea
-                    run = new_paragraph.add_run()
-                    run.add_picture(temp_firma_tec_path, width=Inches(2))
-                    new_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-                    firma_tec_agregada = True
-                    logger.info("Firma técnico agregada después de <<cct>>")
-                except Exception as e:
-                    logger.warning("Error agregando firma técnico: %s", e)
+        # Si la celda contiene <<cc>> o <<cct>>, agregar la firma como imagen en la celda debajo del texto
+        if cell is not None:
+            if '<<cc>>' in original_text:
+                firmas_en_plantilla = True
+                if firma_rec and temp_firma_rec_path:
+                    try:
+                        p = cell.add_paragraph()
+                        p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                        run = p.add_run()
+                        run.add_picture(temp_firma_rec_path, width=Inches(2))
+                        firma_rec_agregada = True
+                        logger.info("Firma receptor agregada en celda de tabla después de <<cc>>")
+                    except Exception as e:
+                        logger.warning("Error agregando firma receptor en celda: %s", e)
+            if '<<cct>>' in original_text:
+                firmas_en_plantilla = True
+                if firma_tec and temp_firma_tec_path:
+                    try:
+                        p = cell.add_paragraph()
+                        p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                        run = p.add_run()
+                        run.add_picture(temp_firma_tec_path, width=Inches(2))
+                        firma_tec_agregada = True
+                        logger.info("Firma técnico agregada en celda de tabla después de <<cct>>")
+                    except Exception as e:
+                        logger.warning("Error agregando firma técnico en celda: %s", e)
+        else:
+            # Para párrafos fuera de tabla, mantener lógica anterior (por si acaso)
+            if '<<cc>>' in original_text:
+                firmas_en_plantilla = True
+                if firma_rec and temp_firma_rec_path:
+                    try:
+                        new_paragraph = paragraph._p.add_p()
+                        new_paragraph.add_run("\n")
+                        run = new_paragraph.add_run()
+                        run.add_picture(temp_firma_rec_path, width=Inches(2))
+                        new_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                        firma_rec_agregada = True
+                        logger.info("Firma receptor agregada después de <<cc>> (fuera de tabla)")
+                    except Exception as e:
+                        logger.warning("Error agregando firma receptor fuera de tabla: %s", e)
+            if '<<cct>>' in original_text:
+                firmas_en_plantilla = True
+                if firma_tec and temp_firma_tec_path:
+                    try:
+                        new_paragraph = paragraph._p.add_p()
+                        new_paragraph.add_run("\n")
+                        run = new_paragraph.add_run()
+                        run.add_picture(temp_firma_tec_path, width=Inches(2))
+                        new_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                        firma_tec_agregada = True
+                        logger.info("Firma técnico agregada después de <<cct>> (fuera de tabla)")
+                    except Exception as e:
+                        logger.warning("Error agregando firma técnico fuera de tabla: %s", e)
 
     def process_cell(cell):
         for paragraph in cell.paragraphs:
-            replace_paragraph_text(paragraph)
+            replace_paragraph_text(paragraph, cell=cell)
         for nested_table in cell.tables:
             for row in nested_table.rows:
                 for nested_cell in row.cells:
