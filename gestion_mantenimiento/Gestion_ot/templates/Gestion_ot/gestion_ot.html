@@ -511,6 +511,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
       <div style="margin: 18px 0; padding: 16px; border-radius: 14px; background: rgba(96, 165, 250, 0.08); border: 1px solid rgba(59, 130, 246, 0.18);">
         <div id="modalNumeroActivoContainer"><p><strong>Número de Solicitud:</strong> <span id="modalNumeroActivo"></span></p></div>
         <div id="modalPDVContainer"><p><strong>Ubicacion:</strong> <span id="modalPDV"></span></p></div>
+        <div id="modalEquipoContainer"><p><strong>Equipo:</strong> <span id="modalEquipo"></span></p></div>
         <div id="modalDescripcionContainer"><p><strong>Descripción:</strong> <span id="modalDescripcion"></span></p></div>
         <div id="modalFechaCreacionContainer"><p><strong>Fecha de Creación:</strong> <span id="modalFechaCreacion"></span></p></div>
         <div id="modalEstadoContainer"><p><strong>Estado:</strong> <span id="modalEstado"></span></p></div>
@@ -567,10 +568,39 @@ document.addEventListener('DOMContentLoaded', function() {
     
     tarjetasPreventivas.forEach(tarjeta => {
         tarjeta.style.cursor = 'pointer';
+        let touchHandled = false;
+
         tarjeta.addEventListener('click', function(e) {
+            if (touchHandled) {
+                touchHandled = false;
+                return;
+            }
             e.stopPropagation();
             openPreventivoModal(this);
         });
+
+        tarjeta.addEventListener('touchstart', function(event) {
+            if (event.touches && event.touches.length === 1) {
+                this._touchStartX = event.touches[0].clientX;
+                this._touchStartY = event.touches[0].clientY;
+                this._touchStartTime = Date.now();
+            }
+        }, { passive: true });
+
+        tarjeta.addEventListener('touchend', function(event) {
+            if (!event.changedTouches || event.changedTouches.length !== 1) return;
+            const touchEndX = event.changedTouches[0].clientX;
+            const touchEndY = event.changedTouches[0].clientY;
+            const touchDuration = Date.now() - (this._touchStartTime || 0);
+            const moveDistance = Math.hypot(touchEndX - (this._touchStartX || 0), touchEndY - (this._touchStartY || 0));
+
+            if (touchDuration < 300 && moveDistance < 10) {
+                touchHandled = true;
+                event.stopPropagation();
+                event.preventDefault();
+                openPreventivoModal(this);
+            }
+        }, { passive: false });
     });
 
     const crearSolicitudPreventivoBtn = document.getElementById('crearSolicitudPreventivoBtn');
@@ -585,6 +615,50 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Manejo táctil para tarjetas de solicitudes OT normales
+    const tarjetasOT = document.querySelectorAll('.kanban-card:not(.kanban-card-preventivo)');
+    tarjetasOT.forEach(card => {
+        let touchHandledOT = false;
+
+        card.addEventListener('click', function(e) {
+            if (touchHandledOT) {
+                touchHandledOT = false;
+                return;
+            }
+            const numeroActivo = this.dataset.numeroActivo;
+            if (numeroActivo) {
+                e.stopPropagation();
+                openSolicitudModal(numeroActivo);
+            }
+        });
+
+        card.addEventListener('touchstart', function(event) {
+            if (event.touches && event.touches.length === 1) {
+                this._touchStartX = event.touches[0].clientX;
+                this._touchStartY = event.touches[0].clientY;
+                this._touchStartTime = Date.now();
+            }
+        }, { passive: true });
+
+        card.addEventListener('touchend', function(event) {
+            if (!event.changedTouches || event.changedTouches.length !== 1) return;
+            const touchEndX = event.changedTouches[0].clientX;
+            const touchEndY = event.changedTouches[0].clientY;
+            const touchDuration = Date.now() - (this._touchStartTime || 0);
+            const moveDistance = Math.hypot(touchEndX - (this._touchStartX || 0), touchEndY - (this._touchStartY || 0));
+
+            if (touchDuration < 300 && moveDistance < 10) {
+                const numeroActivo = this.dataset.numeroActivo;
+                if (numeroActivo) {
+                    touchHandledOT = true;
+                    event.stopPropagation();
+                    event.preventDefault();
+                    openSolicitudModal(numeroActivo);
+                }
+            }
+        }, { passive: false });
+    });
 
     function openPreventivoModal(tarjeta) {
         const preventivoModal = document.getElementById('preventivoModal');
@@ -601,6 +675,33 @@ document.addEventListener('DOMContentLoaded', function() {
         preventivoModal.style.display = 'block';
     }
 
+    // Soporta taps móviles en tarjetas preventivas
+    tarjetasPreventivas.forEach(tarjeta => {
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchStartTime = 0;
+
+        tarjeta.addEventListener('touchstart', function(event) {
+            if (event.touches && event.touches.length === 1) {
+                touchStartX = event.touches[0].clientX;
+                touchStartY = event.touches[0].clientY;
+                touchStartTime = Date.now();
+            }
+        }, { passive: true });
+
+        tarjeta.addEventListener('touchend', function(event) {
+            if (!event.changedTouches || event.changedTouches.length !== 1) return;
+            const touchEndX = event.changedTouches[0].clientX;
+            const touchEndY = event.changedTouches[0].clientY;
+            const touchDuration = Date.now() - touchStartTime;
+            const moveDistance = Math.hypot(touchEndX - touchStartX, touchEndY - touchStartY);
+
+            if (touchDuration < 300 && moveDistance < 10) {
+                event.stopPropagation();
+                openPreventivoModal(this);
+            }
+        }, { passive: true });
+    });
     window.closePreventivoModal = function() {
         const preventivoModal = document.getElementById('preventivoModal');
         if (preventivoModal) {

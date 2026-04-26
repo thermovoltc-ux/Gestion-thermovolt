@@ -193,6 +193,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 actualizarElemento('modalNumeroActivo', data.consecutivo);
                 actualizarElemento('modalPDV', data.pdv);
+                actualizarElemento('modalEquipo', data.equipo);
                 actualizarElemento('modalDescripcion', data.descripcion);
                 actualizarElemento('modalFechaCreacion', data.fecha_creacion);
                 actualizarElemento('modalEstado', data.estado);
