@@ -45,6 +45,15 @@
                     <td data-label="Fecha de actividad">{{ ot.fecha_actividad|date:'d/m/Y' }}</td>
                     <td data-label="Estado">{{ ot.estado }}</td>
                     <td data-label="Acciones">
+                        <button type="button" class="btn-accion btn-info info-ot-btn" 
+                            data-equipo="{{ ot.solicitud.equipo.display_label }}"
+                            data-descripcion="{{ ot.solicitud.descripcion_problema|escapejs }}"
+                            data-ubicacion="{{ ot.solicitud.ubicacion.nombre }}"
+                            data-fecha="{{ ot.solicitud.fecha_creacion|date:'d/m/Y H:i' }}"
+                            title="Ver información de la OT"
+                            style="border:none; background:none; cursor:pointer; padding:0; margin-right:8px;">
+                            <ion-icon name="eye-outline" style="font-size:1.3em; vertical-align:middle;"></ion-icon>
+                        </button>
                         <a class="action-link" href="{% url 'cierre_ot' ot.id %}">Gestionar</a>
                     </td>
                 </tr>
@@ -63,6 +72,51 @@
     </div>
     <script id="calendar-events-data" type="application/json">{{ calendar_events_json|safe }}</script>
 </div>
+
+<!-- Modal de información de la OT -->
+<div id="infoOtModal" class="modal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; overflow:auto; background:rgba(0,0,0,0.55);">
+    <div class="modal-content" style="background:#fff; margin:5% auto; border-radius:18px; padding:28px 32px; width:min(420px,92%); position:relative;">
+        <span class="close" id="closeInfoOtModal" style="position:absolute; top:18px; right:18px; font-size:1.45rem; color:#475569; cursor:pointer;">×</span>
+        <h2 style="margin-top:0; font-size:1.35rem; color:#111827;">Información de la OT</h2>
+        <div style="margin:18px 0; padding:16px; border-radius:14px; background:rgba(96,165,250,0.08); border:1px solid rgba(59,130,246,0.18);">
+            <p><strong>Equipo:</strong> <span id="infoEquipo"></span></p>
+            <p><strong>Descripción:</strong> <span id="infoDescripcion"></span></p>
+            <p><strong>Ubicación:</strong> <span id="infoUbicacion"></span></p>
+            <p><strong>Fecha de Solicitud:</strong> <span id="infoFecha"></span></p>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Modal info OT
+    var infoModal = document.getElementById('infoOtModal');
+    var closeInfo = document.getElementById('closeInfoOtModal');
+    var equipoSpan = document.getElementById('infoEquipo');
+    var descripcionSpan = document.getElementById('infoDescripcion');
+    var ubicacionSpan = document.getElementById('infoUbicacion');
+    var fechaSpan = document.getElementById('infoFecha');
+    document.querySelectorAll('.info-ot-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            equipoSpan.textContent = btn.getAttribute('data-equipo') || '';
+            descripcionSpan.textContent = btn.getAttribute('data-descripcion') || '';
+            ubicacionSpan.textContent = btn.getAttribute('data-ubicacion') || '';
+            fechaSpan.textContent = btn.getAttribute('data-fecha') || '';
+            infoModal.style.display = 'block';
+        });
+    });
+    if (closeInfo && infoModal) {
+        closeInfo.addEventListener('click', function() {
+            infoModal.style.display = 'none';
+        });
+        window.addEventListener('click', function(event) {
+            if (event.target === infoModal) {
+                infoModal.style.display = 'none';
+            }
+        });
+    }
+});
+</script>
 
 <script>
 window.addEventListener('load', function() {
