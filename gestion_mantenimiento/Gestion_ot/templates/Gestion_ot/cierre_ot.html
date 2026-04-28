@@ -7,7 +7,12 @@
 {% block content %}
 <link rel="stylesheet" href="{% static 'dist/cierre_ot.bundle.css' %}">
 <div class="cierre-ot-form-container">
-    <h1>Cierre de OT - {{ ot.solicitud.consecutivo }}</h1>
+    <h1 style="display: flex; align-items: center; gap: 12px;">
+        Cierre de OT - {{ ot.solicitud.consecutivo }}
+        <button type="button" class="btn-accion btn-info" id="infoOtBtn" title="Ver información de la OT" style="margin-left: 8px; border: none; background: none; cursor: pointer; padding: 0;">
+            <ion-icon name="eye-outline" style="font-size: 1.5em; vertical-align: middle;"></ion-icon>
+        </button>
+    </h1>
 
     <form method="POST" enctype="multipart/form-data">
         {% csrf_token %}
@@ -170,6 +175,42 @@
 
         <button type="submit" class="cierre-ot-btn cierre-ot-btn-primary">Guardar y enviar informe</button>
     </form>
+    </div>
+
+    <!-- Modal de información de la OT -->
+    <div id="infoOtModal" class="modal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; overflow:auto; background:rgba(0,0,0,0.55);">
+        <div class="modal-content" style="background:#fff; margin:5% auto; border-radius:18px; padding:28px 32px; width:min(420px,92%); position:relative;">
+            <span class="close" id="closeInfoOtModal" style="position:absolute; top:18px; right:18px; font-size:1.45rem; color:#475569; cursor:pointer;">×</span>
+            <h2 style="margin-top:0; font-size:1.35rem; color:#111827;">Información de la OT</h2>
+            <div style="margin:18px 0; padding:16px; border-radius:14px; background:rgba(96,165,250,0.08); border:1px solid rgba(59,130,246,0.18);">
+                <p><strong>Equipo:</strong> <span id="infoEquipo">{{ ot.solicitud.equipo.display_label }}</span></p>
+                <p><strong>Descripción:</strong> <span id="infoDescripcion">{{ ot.solicitud.descripcion_problema }}</span></p>
+                <p><strong>Ubicación:</strong> <span id="infoUbicacion">{{ ot.solicitud.ubicacion.nombre }}</span></p>
+                <p><strong>Fecha de Solicitud:</strong> <span id="infoFecha">{{ ot.solicitud.fecha_creacion|date:'d/m/Y H:i' }}</span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var infoBtn = document.getElementById('infoOtBtn');
+        var infoModal = document.getElementById('infoOtModal');
+        var closeInfo = document.getElementById('closeInfoOtModal');
+        if (infoBtn && infoModal && closeInfo) {
+            infoBtn.addEventListener('click', function() {
+                infoModal.style.display = 'block';
+            });
+            closeInfo.addEventListener('click', function() {
+                infoModal.style.display = 'none';
+            });
+            window.addEventListener('click', function(event) {
+                if (event.target === infoModal) {
+                    infoModal.style.display = 'none';
+                }
+            });
+        }
+    });
+    </script>
 </div>
 
 <!-- Overlay de firma móvil -->
