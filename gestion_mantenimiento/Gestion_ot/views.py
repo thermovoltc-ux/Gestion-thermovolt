@@ -453,6 +453,9 @@ def listar_ot(request):
     else:
         ots = OrdenTrabajo.objects.filter(tecnico_asignado=request.user.username)
 
+    # Ordenar de mayor a menor consecutivo de la solicitud
+    ots = ots.order_by('-solicitud__consecutivo')
+
     filter_label = None
     estado = request.GET.get('estado')
 
