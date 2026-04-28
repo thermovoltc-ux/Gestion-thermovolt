@@ -642,13 +642,25 @@ def detalles_solicitud(request, consecutivo):
     solicitud = get_object_or_404(Solicitud, consecutivo=consecutivo)
     ordenes_trabajo = solicitud.ordenes_trabajo.all()
     logger.info(f"[DETALLES_SOLICITUD] consecutivo={solicitud.consecutivo} equipo_obj={solicitud.equipo} equipo_id={getattr(solicitud.equipo, 'id', None)} display_label={getattr(solicitud.equipo, 'display_label', None)}")
+    # Construir label del equipo manualmente (igual que en plan de trabajo)
+    equipo_label = ''
+    if solicitud.equipo:
+        parts = []
+        if solicitud.equipo.codigo:
+            parts.append(str(solicitud.equipo.codigo))
+        if solicitud.equipo.ubicacion and solicitud.equipo.ubicacion.nombre:
+            parts.append(str(solicitud.equipo.ubicacion.nombre))
+        if solicitud.equipo.nombre:
+            parts.append(str(solicitud.equipo.nombre))
+        equipo_label = ' / '.join(parts)
+    
     data = {
         'consecutivo': solicitud.consecutivo,
         'pdv': solicitud.PDV,
         'descripcion': solicitud.descripcion_problema,
         'fecha_creacion': solicitud.fecha_creacion,
         'estado': solicitud.estado.nombre,
-        'equipo': str(solicitud.equipo.display_label) if solicitud.equipo else '',
+        'equipo': equipo_label,
         'ordenes_trabajo': []
     }
     for ot in ordenes_trabajo:
