@@ -84,6 +84,9 @@
             <p><strong>Ubicación:</strong> <span id="infoUbicacion"></span></p>
             <p><strong>Fecha de Solicitud:</strong> <span id="infoFecha"></span></p>
         </div>
+        <div style="text-align:right; margin-top:18px;">
+            <a id="gestionarOtBtn" href="#" class="action-link" style="background:#2563eb; color:#fff; padding:10px 18px; border-radius:8px; font-weight:600; text-decoration:none;">Gestionar</a>
+        </div>
     </div>
 </div>
 
@@ -96,12 +99,16 @@ document.addEventListener('DOMContentLoaded', function() {
     var descripcionSpan = document.getElementById('infoDescripcion');
     var ubicacionSpan = document.getElementById('infoUbicacion');
     var fechaSpan = document.getElementById('infoFecha');
+    var gestionarBtn = document.getElementById('gestionarOtBtn');
     document.querySelectorAll('.info-ot-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             equipoSpan.textContent = btn.getAttribute('data-equipo') || '';
             descripcionSpan.textContent = btn.getAttribute('data-descripcion') || '';
             ubicacionSpan.textContent = btn.getAttribute('data-ubicacion') || '';
             fechaSpan.textContent = btn.getAttribute('data-fecha') || '';
+            if (gestionarBtn) {
+                gestionarBtn.href = btn.getAttribute('data-gestionar-url') || btn.nextElementSibling?.href || '#';
+            }
             infoModal.style.display = 'block';
         });
     });
@@ -149,8 +156,24 @@ window.addEventListener('load', function() {
             eventTextColor: '#fff',
             eventClick: function(info) {
                 info.jsEvent.preventDefault();
-                if (info.event.url) {
-                    window.location.href = info.event.url;
+                // Buscar la OT por el consecutivo en el título del evento
+                var otMatch = info.event.title.match(/OT-(\d+)/);
+                var consecutivo = otMatch ? otMatch[1] : null;
+                var fila = null;
+                if (consecutivo) {
+                    // Buscar la fila de la tabla que corresponde a la OT
+                    document.querySelectorAll('.list-container table tbody tr').forEach(function(tr) {
+                        var td = tr.querySelector('td[data-label="Número de OT"]');
+                        if (td && td.textContent.replace(/\D/g, '') === consecutivo) {
+                            fila = tr;
+                        }
+                    });
+                }
+                if (fila) {
+                    var btn = fila.querySelector('.info-ot-btn');
+                    if (btn) {
+                        btn.click();
+                    }
                 }
             }
         });
