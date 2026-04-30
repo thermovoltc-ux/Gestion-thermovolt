@@ -87,7 +87,7 @@ $(document).ready(function() {
                 success: function(response) {
                     if (response.exists) {
                         if (confirm("Esta solicitud ya fue creada. Espere hasta que se finalice la solicitud. ¿Desea continuar?")) {
-                            clearForm();
+                            $("#solicitud-form")[0].submit();
                         }
                     } else {
                         $("#solicitud-form")[0].submit();
