@@ -39,7 +39,9 @@ def crear_solicitud(request):
             estado_solicitado, _ = Estado.objects.get_or_create(nombre='solicitado')
             nueva_solicitud.estado = estado_solicitado
 
-            if nueva_solicitud.fecha_creacion and timezone.is_naive(nueva_solicitud.fecha_creacion):
+            if not nueva_solicitud.fecha_creacion:
+                nueva_solicitud.fecha_creacion = timezone.now()
+            elif timezone.is_naive(nueva_solicitud.fecha_creacion):
                 nueva_solicitud.fecha_creacion = timezone.make_aware(
                     nueva_solicitud.fecha_creacion, timezone.get_current_timezone()
                 )

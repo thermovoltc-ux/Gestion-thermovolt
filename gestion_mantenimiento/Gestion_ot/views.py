@@ -261,7 +261,10 @@ def gestion_ot(request):
             filtro_fecha_inicio = timezone.make_aware(datetime.datetime.strptime(filtro_fecha_inicio, '%Y-%m-%d'), timezone.get_current_timezone())
         if isinstance(filtro_fecha_fin, str):
             filtro_fecha_fin = timezone.make_aware(datetime.datetime.strptime(filtro_fecha_fin, '%Y-%m-%d'), timezone.get_current_timezone())
-        solicitudes_pendientes = solicitudes_pendientes.filter(fecha_creacion__range=[filtro_fecha_inicio, filtro_fecha_fin])
+        # Incluir solicitudes con fecha_creacion en el rango o None
+        solicitudes_pendientes = solicitudes_pendientes.filter(
+            models.Q(fecha_creacion__range=[filtro_fecha_inicio, filtro_fecha_fin]) | models.Q(fecha_creacion__isnull=True)
+        )
         tareas_mantenimiento = tareas_mantenimiento.filter(fecha_programada__range=[filtro_fecha_inicio, filtro_fecha_fin])
     if filtro_pdv:
         solicitudes_pendientes = solicitudes_pendientes.filter(PDV=filtro_pdv)
