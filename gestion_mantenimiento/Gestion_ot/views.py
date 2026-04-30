@@ -258,10 +258,21 @@ def gestion_ot(request):
 
     if filtro_fecha_inicio and filtro_fecha_fin:
         if isinstance(filtro_fecha_inicio, str):
-            filtro_fecha_inicio = timezone.make_aware(datetime.datetime.strptime(filtro_fecha_inicio, '%Y-%m-%d'), timezone.get_current_timezone())
+            filtro_fecha_inicio = datetime.datetime.strptime(filtro_fecha_inicio, '%Y-%m-%d')
         if isinstance(filtro_fecha_fin, str):
-            filtro_fecha_fin = timezone.make_aware(datetime.datetime.strptime(filtro_fecha_fin, '%Y-%m-%d'), timezone.get_current_timezone())
-        # Incluir solicitudes con fecha_creacion en el rango o None
+            filtro_fecha_fin = datetime.datetime.strptime(filtro_fecha_fin, '%Y-%m-%d')
+
+        if isinstance(filtro_fecha_inicio, datetime.date) and not isinstance(filtro_fecha_inicio, datetime.datetime):
+            filtro_fecha_inicio = datetime.datetime.combine(filtro_fecha_inicio, datetime.time.min)
+        if isinstance(filtro_fecha_fin, datetime.date) and not isinstance(filtro_fecha_fin, datetime.datetime):
+            filtro_fecha_fin = datetime.datetime.combine(filtro_fecha_fin, datetime.time.max)
+
+        if filtro_fecha_inicio and timezone.is_naive(filtro_fecha_inicio):
+            filtro_fecha_inicio = timezone.make_aware(filtro_fecha_inicio, timezone.get_current_timezone())
+        if filtro_fecha_fin and timezone.is_naive(filtro_fecha_fin):
+            filtro_fecha_fin = timezone.make_aware(filtro_fecha_fin, timezone.get_current_timezone())
+
+        # Incluir solicitudes con fecha_creacion en el rango completo de días o None
         solicitudes_pendientes = solicitudes_pendientes.filter(
             models.Q(fecha_creacion__range=[filtro_fecha_inicio, filtro_fecha_fin]) | models.Q(fecha_creacion__isnull=True)
         )

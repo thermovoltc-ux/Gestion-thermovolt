@@ -174,27 +174,34 @@ def get_numero_activo(request):
 @login_required
 def verificar_solicitud(request):
     codigo = request.GET.get('codigo')
+    equipo_id = request.GET.get('equipo_id')
     equipo_nombre = request.GET.get('equipo')
 
-    if codigo and equipo_nombre:
+    if codigo or equipo_id or equipo_nombre:
         try:
             estado_finalizada, _ = Estado.objects.get_or_create(nombre='finalizada')
         except Exception as e:
             print(f"DEBUG verificar_solicitud: Error al obtener estado finalizada: {e}")
             return JsonResponse({'error': str(e)}, status=500)
 
-        # Buscar solicitudes para este equipo que NO estén finalizadas
-        solicitudes_existentes = Solicitud.objects.filter(
-            equipo__nombre=equipo_nombre
-        ).exclude(estado=estado_finalizada)
-        
-        print(f"DEBUG verificar_solicitud: Buscando solicitudes para equipo '{equipo_nombre}'")
-        print(f"DEBUG verificar_solicitud: Encontradas {solicitudes_existentes.count()} solicitudes no finalizadas")
-        
-        if solicitudes_existentes.exists():
-            return JsonResponse({'exists': True})
-    
-    return JsonResponse({'exists': False})
+        solicitudes_existentes = Solicitud.objects.exclude(estado=estado_finalizada)
+        if equipo_id:
+            try:
+                equipo_id_int = int(equipo_id)
+                solicitudes_existentes = solicitudes_existentes.filter(equipo_id=equipo_id_int)
+            except (ValueError, TypeError):
+                solicitudes_existentes = solicitudes_existentes.none()
+        elif codigo:
+            solicitudes_existentes = solicitudes_existentes.filter(equipo__codigo=codigo)
+        elif equipo_nombre:
+            solicitudes_existentes = solicitudes_existentes.filter(equipo__nombre=equipo_nombre)
+
+        count = solicitudes_existentes.count()
+        print(f"DEBUG verificar_solicitud: codigo={codigo} equipo_id={equipo_id} equipo_nombre={equipo_nombre} count={count}")
+        if count > 0:
+            return JsonResponse({'exists': True, 'count': count})
+
+    return JsonResponse({'exists': False, 'count': 0})
 
 @login_required
 def get_equipo_por_codigo(request):
