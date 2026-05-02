@@ -83,11 +83,11 @@ $(document).ready(function() {
             $.ajax({
                 url: "/solicitudes/verificar-solicitud/",
                 method: "GET",
-                data: { codigo: codigoVal, equipo: equipoVal },
+                data: { codigo: codigoVal, equipo_id: equipoId },
                 success: function(response) {
                     if (response.exists) {
                         if (confirm("Esta solicitud ya fue creada. Espere hasta que se finalice la solicitud. ¿Desea continuar?")) {
-                            clearForm();
+                            $("#solicitud-form")[0].submit();
                         }
                     } else {
                         $("#solicitud-form")[0].submit();
