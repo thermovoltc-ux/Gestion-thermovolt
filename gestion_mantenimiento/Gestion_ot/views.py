@@ -248,35 +248,35 @@ def gestion_ot(request):
 
     pdvs = Solicitud.objects.values_list('PDV', flat=True).distinct()
 
-    # Si no hay filtros aplicados, mostrar las solicitudes del mes actual
-    if not filtro_fecha_inicio and not filtro_fecha_fin:
-        now = timezone.now()
-        first_day_of_month = now.replace(day=1)
-        last_day_of_month = (first_day_of_month + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-        filtro_fecha_inicio = first_day_of_month.date()
-        filtro_fecha_fin = last_day_of_month.date()
+    if filtro_fecha_inicio or filtro_fecha_fin:
+        filtro_q = models.Q()
 
-    if filtro_fecha_inicio and filtro_fecha_fin:
-        if isinstance(filtro_fecha_inicio, str):
-            filtro_fecha_inicio = datetime.datetime.strptime(filtro_fecha_inicio, '%Y-%m-%d')
-        if isinstance(filtro_fecha_fin, str):
-            filtro_fecha_fin = datetime.datetime.strptime(filtro_fecha_fin, '%Y-%m-%d')
+        if filtro_fecha_inicio:
+            if isinstance(filtro_fecha_inicio, str):
+                filtro_fecha_inicio = datetime.datetime.strptime(filtro_fecha_inicio, '%Y-%m-%d')
+            if isinstance(filtro_fecha_inicio, datetime.date) and not isinstance(filtro_fecha_inicio, datetime.datetime):
+                filtro_fecha_inicio = datetime.datetime.combine(filtro_fecha_inicio, datetime.time.min)
+            if filtro_fecha_inicio and timezone.is_naive(filtro_fecha_inicio):
+                filtro_fecha_inicio = timezone.make_aware(filtro_fecha_inicio, timezone.get_current_timezone())
 
-        if isinstance(filtro_fecha_inicio, datetime.date) and not isinstance(filtro_fecha_inicio, datetime.datetime):
-            filtro_fecha_inicio = datetime.datetime.combine(filtro_fecha_inicio, datetime.time.min)
-        if isinstance(filtro_fecha_fin, datetime.date) and not isinstance(filtro_fecha_fin, datetime.datetime):
-            filtro_fecha_fin = datetime.datetime.combine(filtro_fecha_fin, datetime.time.max)
+            filtro_q &= models.Q(fecha_creacion__gte=filtro_fecha_inicio)
+            tareas_mantenimiento = tareas_mantenimiento.filter(fecha_programada__gte=filtro_fecha_inicio)
 
-        if filtro_fecha_inicio and timezone.is_naive(filtro_fecha_inicio):
-            filtro_fecha_inicio = timezone.make_aware(filtro_fecha_inicio, timezone.get_current_timezone())
-        if filtro_fecha_fin and timezone.is_naive(filtro_fecha_fin):
-            filtro_fecha_fin = timezone.make_aware(filtro_fecha_fin, timezone.get_current_timezone())
+        if filtro_fecha_fin:
+            if isinstance(filtro_fecha_fin, str):
+                filtro_fecha_fin = datetime.datetime.strptime(filtro_fecha_fin, '%Y-%m-%d')
+            if isinstance(filtro_fecha_fin, datetime.date) and not isinstance(filtro_fecha_fin, datetime.datetime):
+                filtro_fecha_fin = datetime.datetime.combine(filtro_fecha_fin, datetime.time.max)
+            if filtro_fecha_fin and timezone.is_naive(filtro_fecha_fin):
+                filtro_fecha_fin = timezone.make_aware(filtro_fecha_fin, timezone.get_current_timezone())
 
-        # Incluir solicitudes con fecha_creacion en el rango completo de días o None
-        solicitudes_pendientes = solicitudes_pendientes.filter(
-            models.Q(fecha_creacion__range=[filtro_fecha_inicio, filtro_fecha_fin]) | models.Q(fecha_creacion__isnull=True)
-        )
-        tareas_mantenimiento = tareas_mantenimiento.filter(fecha_programada__range=[filtro_fecha_inicio, filtro_fecha_fin])
+            filtro_q &= models.Q(fecha_creacion__lte=filtro_fecha_fin)
+            tareas_mantenimiento = tareas_mantenimiento.filter(fecha_programada__lte=filtro_fecha_fin)
+
+        if filtro_q:
+            solicitudes_pendientes = solicitudes_pendientes.filter(
+                filtro_q | models.Q(fecha_creacion__isnull=True)
+            )
     if filtro_pdv:
         solicitudes_pendientes = solicitudes_pendientes.filter(PDV=filtro_pdv)
 
