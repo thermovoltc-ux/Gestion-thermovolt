@@ -332,8 +332,8 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL') or EMAIL_HOST_USER
 
 # SendGrid se usa directamente en las vistas, no por SMTP
 
-# Additional email for CC copies (optional)
-EMAIL_ADICIONAL = os.environ.get('EMAIL_ADICIONAL', '')  # Additional email for copies
+# Additional email for BCC copies; usar thermovoltc@gmail.com si no está configurado
+EMAIL_ADICIONAL = os.environ.get('EMAIL_ADICIONAL', 'thermovoltc@gmail.com')
 
 LOGGING = {
     'version': 1,

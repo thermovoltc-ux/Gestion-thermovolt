@@ -1315,42 +1315,65 @@ def generar_pdf_reportlab(cierre_ot):
     return buffer, False, False
 
 
+def guardar_copia_pdf_envio(pdf_buffer, cierre_ot):
+    """Guarda una copia local del PDF enviado para auditoría y revisión."""
+    try:
+        output_dir = os.path.join(settings.MEDIA_ROOT, 'email_copies', 'informes')
+        os.makedirs(output_dir, exist_ok=True)
+        timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"informe_ot_{cierre_ot.orden_trabajo.solicitud.consecutivo}_{timestamp}.pdf"
+        path = os.path.join(output_dir, filename)
+        with open(path, 'wb') as output_file:
+            output_file.write(pdf_buffer.getvalue())
+        logger.info("Guardada copia local del PDF enviado: %s", path)
+        return path
+    except Exception as exc:
+        logger.warning("No se pudo guardar la copia local del PDF: %s", exc)
+        return None
+
 
 def enviar_pdf_por_email(pdf_buffer, cierre_ot):
-    """Envía el PDF por email usando Gmail SMTP - retorna True si es exitoso, False si falla"""
+    """Envía el PDF por email usando SendGrid cuando está disponible."""
     subject = f"Informe de Mantenimiento OT-{cierre_ot.orden_trabajo.solicitud.consecutivo}"
     message = "Adjunto se encuentra el informe de mantenimiento."
-    from_email = settings.DEFAULT_FROM_EMAIL
+    from_email = getattr(settings, 'SENDGRID_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL)
     recipient_list = [cierre_ot.correo_tecnico] if cierre_ot.correo_tecnico else []
-    
-    # Agregar email adicional si existe
-    if hasattr(settings, 'EMAIL_ADICIONAL') and settings.EMAIL_ADICIONAL:
-        recipient_list.append(settings.EMAIL_ADICIONAL)
-    
-    if not recipient_list:
-        logger.warning("No hay destinatarios para enviar el email")
-        return False
-    
-    try:
-        # Usar API de SendGrid directamente para evitar bloqueo SMTP de Railway
-        if hasattr(settings, 'SENDGRID_API_KEY') and settings.SENDGRID_API_KEY:
-            import base64
-            import io
+    bcc_list = []
 
-            # Crear payload para SendGrid API
+    # Add monitoring/copy address as BCC, and allow comma-separated values
+    copy_address = getattr(settings, 'EMAIL_ADICIONAL', None)
+    if copy_address:
+        if isinstance(copy_address, str):
+            copy_addresses = [email.strip() for email in copy_address.split(',') if email.strip()]
+        else:
+            copy_addresses = list(copy_address)
+        for email in copy_addresses:
+            if email and email not in recipient_list:
+                bcc_list.append(email)
+
+    if not recipient_list:
+        logger.warning("No hay destinatarios principales para enviar el email")
+        return False
+
+    guardar_copia_pdf_envio(pdf_buffer, cierre_ot)
+
+    try:
+        if hasattr(settings, 'SENDGRID_API_KEY') and settings.SENDGRID_API_KEY:
             pdf_content = pdf_buffer.getvalue()
             pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
-
-            # Verificar tamaño del PDF (SendGrid tiene límite de ~30MB por email)
             pdf_size_mb = len(pdf_content) / (1024 * 1024)
             if pdf_size_mb > 25:
                 logger.warning("PDF muy grande (%.2f MB) - podría fallar en SendGrid", pdf_size_mb)
 
+            personalization = {
+                "to": [{"email": email} for email in recipient_list],
+                "subject": subject
+            }
+            if bcc_list:
+                personalization["bcc"] = [{"email": email} for email in bcc_list]
+
             payload = {
-                "personalizations": [{
-                    "to": [{"email": email} for email in recipient_list],
-                    "subject": subject
-                }],
+                "personalizations": [personalization],
                 "from": {"email": from_email},
                 "content": [{"type": "text/plain", "value": message}],
                 "attachments": [{
@@ -1366,7 +1389,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
                 "Content-Type": "application/json"
             }
 
-            logger.info("Enviando email via SendGrid API from=%s to=%s, PDF=%.2f MB", from_email, recipient_list, pdf_size_mb)
+            logger.info("Enviando email via SendGrid API from=%s to=%s bcc=%s size=%.2fMB", from_email, recipient_list, bcc_list, pdf_size_mb)
             response = requests.post(
                 "https://api.sendgrid.com/v3/mail/send",
                 json=payload,
@@ -1376,19 +1399,15 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
 
             if response.status_code in (200, 202):
                 logger.info("Email enviado exitosamente via SendGrid API")
-                logger.info("SendGrid response headers: %s", response.headers)
                 return True
-            else:
-                logger.error("SendGrid API error %s: %s", response.status_code, response.text)
-                return False
+            logger.error("SendGrid API error %s: %s", response.status_code, response.text)
+            return False
 
-        # Fallback a SMTP local (desarrollo)
-        else:
-            email = EmailMessage(subject, message, from_email, recipient_list)
-            email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
-            email.send(fail_silently=False)
-            logger.info("Email enviado exitosamente via SMTP local")
-            return True
+        email = EmailMessage(subject, message, from_email, recipient_list, bcc=bcc_list)
+        email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
+        email.send(fail_silently=False)
+        logger.info("Email enviado exitosamente via SMTP local")
+        return True
 
     except Exception as e:
         logger.error("Error enviando email: %s", e)
