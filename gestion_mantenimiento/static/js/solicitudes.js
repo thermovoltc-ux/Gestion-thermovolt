@@ -13,7 +13,8 @@ $(document).ready(function() {
                     if (response.error) {
                         console.error(response.error);
                         $("#nombre_equipo").val('');
-                        $("#equipo").val('');
+                        const equipoField = document.getElementById('id_equipo') || document.getElementById('equipo');
+                        if (equipoField) equipoField.value = '';
                         $("#nombre_ubicacion").val('');
                         $("#nombre_ubicacion_area").empty();
                         $("#nombre_ubicacion_area").append(new Option("Seleccione una ubicación", ""));
@@ -22,7 +23,14 @@ $(document).ready(function() {
                         return;
                     }
                     $("#nombre_equipo").val(response.equipo);
-                    $("#equipo").val(response.equipo_id);
+                    // Asignar al campo Django form equipo (id_equipo)
+                    const equipoField = document.getElementById('id_equipo') || document.getElementById('equipo');
+                    if (equipoField) {
+                        equipoField.value = response.equipo_id;
+                        console.log(`[DEBUG] Asignado equipo_id=${response.equipo_id} al campo ${equipoField.id}`);
+                    } else {
+                        console.warn('[DEBUG] No se encontró el campo equipo para asignar');
+                    }
                     $("#nombre_ubicacion").val(response.ubicacion);
                     $("#nombre_ubicacion_area").empty();
                     $("#nombre_ubicacion_area").append(new Option("Seleccione una ubicación", ""));
@@ -38,7 +46,8 @@ $(document).ready(function() {
                 error: function() {
                     console.error("Error al obtener el equipo por código");
                     $("#nombre_equipo").val('');
-                    $("#equipo").val('');
+                    const equipoField = document.getElementById('id_equipo') || document.getElementById('equipo');
+                    if (equipoField) equipoField.value = '';
                     $("#nombre_ubicacion").val('');
                     $("#nombre_ubicacion_area").empty();
                     $("#nombre_ubicacion_area").append(new Option("Seleccione una ubicación", ""));
@@ -48,7 +57,8 @@ $(document).ready(function() {
             });
         } else {
             $("#nombre_equipo").val('');
-            $("#equipo").val('');
+            const equipoField = document.getElementById('id_equipo') || document.getElementById('equipo');
+            if (equipoField) equipoField.value = '';
             $("#nombre_ubicacion").val('');
             $("#nombre_ubicacion_area").empty();
             $("#nombre_ubicacion_area").append(new Option("Seleccione una ubicación", ""));

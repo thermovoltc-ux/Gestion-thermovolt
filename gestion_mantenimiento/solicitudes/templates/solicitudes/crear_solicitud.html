@@ -54,7 +54,10 @@
         <input type="text" id="nombre_equipo" placeholder="" readonly>
         <label for="nombre_equipo">Nombre del Equipo</label>
     </div>
-    <input type="hidden" name="equipo" id="equipo">
+    <!-- Campo equipo del formulario Django (invisible, actualizado por JavaScript) -->
+    <div style="display: none;">
+        {{ form.equipo }}
+    </div>
     <div class="form-group">
         <input type="text" id="numero_serie" name="numero_serie" placeholder="" readonly>
         <label for="numero_serie">N° de activo</label>
