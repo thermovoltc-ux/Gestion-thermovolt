@@ -668,20 +668,22 @@ def cierre_ot(request, ot_id):
 # Detalles de la solicitud
 @login_required
 def detalles_solicitud(request, consecutivo):
-    solicitud = get_object_or_404(Solicitud, consecutivo=consecutivo)
+    solicitud = get_object_or_404(Solicitud.objects.select_related('equipo__ubicacion'), consecutivo=consecutivo)
     ordenes_trabajo = solicitud.ordenes_trabajo.all()
     logger.info(f"[DETALLES_SOLICITUD] consecutivo={solicitud.consecutivo} equipo_obj={solicitud.equipo} equipo_id={getattr(solicitud.equipo, 'id', None)} display_label={getattr(solicitud.equipo, 'display_label', None)}")
-    # Construir label del equipo manualmente (igual que en plan de trabajo)
+    # Construir label del equipo usando display_label como primera opción
     equipo_label = ''
     if solicitud.equipo:
-        parts = []
-        if solicitud.equipo.codigo:
-            parts.append(str(solicitud.equipo.codigo))
-        if solicitud.equipo.ubicacion and solicitud.equipo.ubicacion.nombre:
-            parts.append(str(solicitud.equipo.ubicacion.nombre))
-        if solicitud.equipo.nombre:
-            parts.append(str(solicitud.equipo.nombre))
-        equipo_label = ' / '.join(parts)
+        equipo_label = getattr(solicitud.equipo, 'display_label', '') or ''
+        if not equipo_label:
+            parts = []
+            if solicitud.equipo.codigo:
+                parts.append(str(solicitud.equipo.codigo))
+            if solicitud.equipo.ubicacion and solicitud.equipo.ubicacion.nombre:
+                parts.append(str(solicitud.equipo.ubicacion.nombre))
+            if solicitud.equipo.nombre:
+                parts.append(str(solicitud.equipo.nombre))
+            equipo_label = ' / '.join(parts)
     
     data = {
         'consecutivo': solicitud.consecutivo,
@@ -689,7 +691,7 @@ def detalles_solicitud(request, consecutivo):
         'descripcion': solicitud.descripcion_problema,
         'fecha_creacion': solicitud.fecha_creacion,
         'estado': solicitud.estado.nombre,
-        'equipo': equipo_label,
+        'equipo': equipo_label or 'Sin equipo asignado',
         'ordenes_trabajo': []
     }
     for ot in ordenes_trabajo:
