@@ -671,19 +671,26 @@ def detalles_solicitud(request, consecutivo):
     solicitud = get_object_or_404(Solicitud.objects.select_related('equipo__ubicacion'), consecutivo=consecutivo)
     ordenes_trabajo = solicitud.ordenes_trabajo.all()
     logger.info(f"[DETALLES_SOLICITUD] consecutivo={solicitud.consecutivo} equipo_obj={solicitud.equipo} equipo_id={getattr(solicitud.equipo, 'id', None)} display_label={getattr(solicitud.equipo, 'display_label', None)}")
-    # Construir label del equipo usando display_label como primera opción
-    equipo_label = ''
+    # Construir label del equipo: intentar display_label, sino construir manualmente
+    equipo_label = 'Sin equipo asignado'
     if solicitud.equipo:
-        equipo_label = getattr(solicitud.equipo, 'display_label', '') or ''
-        if not equipo_label:
-            parts = []
-            if solicitud.equipo.codigo:
-                parts.append(str(solicitud.equipo.codigo))
-            if solicitud.equipo.ubicacion and solicitud.equipo.ubicacion.nombre:
-                parts.append(str(solicitud.equipo.ubicacion.nombre))
-            if solicitud.equipo.nombre:
-                parts.append(str(solicitud.equipo.nombre))
-            equipo_label = ' / '.join(parts)
+        # Intentar usar display_label primero
+        try:
+            equipo_label = getattr(solicitud.equipo, 'display_label', None)
+            if not equipo_label or equipo_label.strip() == '':
+                # Fallback: construir manualmente
+                parts = []
+                if hasattr(solicitud.equipo, 'codigo') and solicitud.equipo.codigo:
+                    parts.append(str(solicitud.equipo.codigo).strip())
+                if hasattr(solicitud.equipo, 'ubicacion') and solicitud.equipo.ubicacion and hasattr(solicitud.equipo.ubicacion, 'nombre') and solicitud.equipo.ubicacion.nombre:
+                    parts.append(str(solicitud.equipo.ubicacion.nombre).strip())
+                if hasattr(solicitud.equipo, 'nombre') and solicitud.equipo.nombre:
+                    parts.append(str(solicitud.equipo.nombre).strip())
+                
+                equipo_label = ' / '.join([p for p in parts if p]) if parts else 'Equipo sin nombre'
+        except Exception as e:
+            logger.error(f"Error al construir equipo_label para solicitud {solicitud.consecutivo}: {e}")
+            equipo_label = 'Error al cargar equipo'
     
     data = {
         'consecutivo': solicitud.consecutivo,
@@ -691,7 +698,7 @@ def detalles_solicitud(request, consecutivo):
         'descripcion': solicitud.descripcion_problema,
         'fecha_creacion': solicitud.fecha_creacion,
         'estado': solicitud.estado.nombre,
-        'equipo': equipo_label or 'Sin equipo asignado',
+        'equipo': equipo_label,
         'ordenes_trabajo': []
     }
     for ot in ordenes_trabajo:
