@@ -13,7 +13,7 @@ $(document).ready(function() {
                     if (response.error) {
                         console.error(response.error);
                         $("#nombre_equipo").val('');
-                        $("#equipo").val('');
+                        $("#equipo, #id_equipo").val('');
                         $("#nombre_ubicacion").val('');
                         $("#nombre_ubicacion_area").empty();
                         $("#nombre_ubicacion_area").append(new Option("Seleccione una ubicación", ""));
@@ -22,7 +22,7 @@ $(document).ready(function() {
                         return;
                     }
                     $("#nombre_equipo").val(response.equipo);
-                    $("#equipo").val(response.equipo_id);
+                    $("#equipo, #id_equipo").val(response.equipo_id);
                     $("#nombre_ubicacion").val(response.ubicacion);
                     $("#nombre_ubicacion_area").empty();
                     $("#nombre_ubicacion_area").append(new Option("Seleccione una ubicación", ""));
@@ -38,7 +38,7 @@ $(document).ready(function() {
                 error: function() {
                     console.error("Error al obtener el equipo por código");
                     $("#nombre_equipo").val('');
-                    $("#equipo").val('');
+                    $("#equipo, #id_equipo").val('');
                     $("#nombre_ubicacion").val('');
                     $("#nombre_ubicacion_area").empty();
                     $("#nombre_ubicacion_area").append(new Option("Seleccione una ubicación", ""));
@@ -48,7 +48,7 @@ $(document).ready(function() {
             });
         } else {
             $("#nombre_equipo").val('');
-            $("#equipo").val('');
+            $("#equipo, #id_equipo").val('');
             $("#nombre_ubicacion").val('');
             $("#nombre_ubicacion_area").empty();
             $("#nombre_ubicacion_area").append(new Option("Seleccione una ubicación", ""));
@@ -71,7 +71,7 @@ $(document).ready(function() {
         $("#fecha-creacion").val(fecha);
 
         let codigoVal = $("#codigo").val();
-        let equipoId = $("#equipo").val();
+        let equipoId = $("#equipo, #id_equipo").val();
         let equipoVal = $("#nombre_equipo").val();
 
         if (!equipoId) {
