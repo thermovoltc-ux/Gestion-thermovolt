@@ -529,13 +529,29 @@ def listar_ot(request):
         else:
             filter_label = f'Historial de OT para Ubicación ID {ubicacion_id}'
 
+    def get_ot_event_color(estado_nombre):
+        if estado_nombre == 'solicitado':
+            return '#6c757d'
+        if estado_nombre == 'en proceso':
+            return '#fd7e14'
+        if estado_nombre == 'en revision':
+            return '#0d6efd'
+        if estado_nombre == 'finalizada':
+            return '#198754'
+        return '#212529'
+
     calendar_events = []
     for ot in ots:
         if ot.fecha_actividad:
+            estado_nombre = ot.estado.nombre if ot.estado else ''
+            event_color = get_ot_event_color(estado_nombre)
             calendar_events.append({
                 'title': f"OT-{ot.solicitud.consecutivo} - {ot.tecnico_asignado}",
                 'start': ot.fecha_actividad.date().isoformat(),
                 'url': reverse('cierre_ot', args=[ot.id]),
+                'backgroundColor': event_color,
+                'borderColor': event_color,
+                'textColor': '#ffffff',
             })
 
     return render(request, 'Gestion_ot/listar_ot.html', {
