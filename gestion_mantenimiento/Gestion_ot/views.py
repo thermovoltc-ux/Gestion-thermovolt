@@ -371,11 +371,7 @@ def actualizar_estado_solicitud(request):
         solicitud.save()
         logger.debug(f"Solicitud actualizada: {solicitud}")
 
-        # Crear o actualizar la Orden de Trabajo
-        orden_trabajo_data = {
-            'tecnico_asignado': tecnico or '',
-            'estado': nuevo_estado
-        }
+        fecha_dt = None
         if fecha:
             try:
                 try:
@@ -384,15 +380,28 @@ def actualizar_estado_solicitud(request):
                     fecha_dt = datetime.datetime.strptime(fecha, '%d/%m/%Y')
                 if timezone.is_naive(fecha_dt):
                     fecha_dt = timezone.make_aware(fecha_dt, timezone.get_current_timezone())
-                orden_trabajo_data['fecha_actividad'] = fecha_dt
             except ValueError as parse_error:
                 logger.error(f"No se pudo parsear la fecha para orden de trabajo: {fecha}")
                 return JsonResponse({'status': 'error', 'message': f'Fecha inválida: {fecha}'}, status=400)
 
-        orden_trabajo, created = OrdenTrabajo.objects.update_or_create(
-            solicitud=solicitud,
-            defaults=orden_trabajo_data
-        )
+        orden_trabajo = OrdenTrabajo.objects.filter(solicitud=solicitud).first()
+        if orden_trabajo:
+            if tecnico:
+                orden_trabajo.tecnico_asignado = tecnico
+            if fecha_dt is not None:
+                orden_trabajo.fecha_actividad = fecha_dt
+            orden_trabajo.estado = nuevo_estado
+            orden_trabajo.save()
+            created = False
+        else:
+            orden_trabajo = OrdenTrabajo.objects.create(
+                solicitud=solicitud,
+                tecnico_asignado=tecnico or '',
+                estado=nuevo_estado,
+                fecha_actividad=fecha_dt
+            )
+            created = True
+
         logger.debug(f"Orden de Trabajo {'creada' if created else 'actualizada'}: {orden_trabajo}")
 
         return JsonResponse({'status': 'ok', 'message': 'Solicitud y Orden de Trabajo actualizadas correctamente'})
@@ -531,10 +540,35 @@ def cierre_ot(request, ot_id):
     logger.info("cierre_ot called ot_id=%s method=%s", ot_id, request.method)
     ot = get_object_or_404(OrdenTrabajo, id=ot_id)
     cierre_ot, created = CierreOt.objects.get_or_create(orden_trabajo=ot)
+    read_only = ot.estado and ot.estado.nombre in ['en revision', 'finalizada']
     form_antes = ImagenAntesForm()
     form_despues = ImagenDespuesForm()
 
     if request.method == 'POST':
+        if read_only:
+            messages.warning(request, 'Esta OT ya fue enviada a revisión y no puede modificarse.')
+            form = CierreOtForm(instance=cierre_ot)
+            actividad_formset = CierreOtActividadFormSet(instance=cierre_ot)
+            form_antes = ImagenAntesForm()
+            form_despues = ImagenDespuesForm()
+
+            for field in form.fields.values():
+                field.disabled = True
+            for subform in actividad_formset.forms:
+                for field in subform.fields.values():
+                    field.disabled = True
+            form_antes.fields['imagenes_antes'].disabled = True
+            form_despues.fields['imagenes_despues'].disabled = True
+
+            return render(request, 'Gestion_ot/cierre_ot.html', {
+                'form': form,
+                'actividad_formset': actividad_formset,
+                'form_antes': form_antes,
+                'form_despues': form_despues,
+                'ot': ot,
+                'read_only': read_only
+            })
+
         logger.debug("cierre_ot POST data keys=%s files keys=%s", list(request.POST.keys()), list(request.FILES.keys()))
 
         form = CierreOtForm(request.POST, request.FILES, instance=cierre_ot)
@@ -656,12 +690,23 @@ def cierre_ot(request, ot_id):
                 for actividad in plan.actividades.all():
                     CierreOtActividad.objects.get_or_create(cierre_ot=cierre_ot, actividad=actividad)
         actividad_formset = CierreOtActividadFormSet(instance=cierre_ot)
+
+    if read_only:
+        for field in form.fields.values():
+            field.disabled = True
+        for subform in actividad_formset.forms:
+            for field in subform.fields.values():
+                field.disabled = True
+        form_antes.fields['imagenes_antes'].disabled = True
+        form_despues.fields['imagenes_despues'].disabled = True
+
     return render(request, 'Gestion_ot/cierre_ot.html', {
         'form': form,
         'actividad_formset': actividad_formset,
         'form_antes': form_antes,
         'form_despues': form_despues,
-        'ot': ot
+        'ot': ot,
+        'read_only': read_only
     })
 
 

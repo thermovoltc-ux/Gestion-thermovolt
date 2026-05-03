@@ -173,7 +173,11 @@
             </div>
         </div>
 
-        <button type="submit" class="cierre-ot-btn cierre-ot-btn-primary">Guardar y enviar informe</button>
+        {% if read_only %}
+            <div class="cierre-ot-alert cierre-ot-alert-info">Esta OT ya fue enviada a revisión y se encuentra en modo solo lectura.</div>
+        {% else %}
+            <button type="submit" class="cierre-ot-btn cierre-ot-btn-primary">Guardar y enviar informe</button>
+        {% endif %}
     </form>
     </div>
 
