@@ -154,19 +154,30 @@ window.addEventListener('load', function() {
             events: events,
             eventClick: function(info) {
                 info.jsEvent.preventDefault();
-                // Buscar la OT por el consecutivo en el título del evento
-                var otMatch = info.event.title.match(/OT-(\d+)/);
-                var consecutivo = otMatch ? otMatch[1] : null;
                 var fila = null;
-                if (consecutivo) {
-                    // Buscar la fila de la tabla que corresponde a la OT
-                    document.querySelectorAll('.list-container table tbody tr').forEach(function(tr) {
-                        var td = tr.querySelector('td[data-label="Número de OT"]');
-                        if (td && td.textContent.replace(/\D/g, '') === consecutivo) {
-                            fila = tr;
-                        }
-                    });
+
+                // Primero intentar buscar la fila por el enlace de gestión de la OT.
+                if (info.event.url) {
+                    var link = document.querySelector('.list-container table tbody tr .action-link[href="' + info.event.url + '"]');
+                    if (link) {
+                        fila = link.closest('tr');
+                    }
                 }
+
+                // Si no hay coincidencia por URL, buscar por el número de OT en el título.
+                if (!fila) {
+                    var otMatch = info.event.title.match(/OT-0*(\d+)/);
+                    var consecutivo = otMatch ? otMatch[1] : null;
+                    if (consecutivo) {
+                        document.querySelectorAll('.list-container table tbody tr').forEach(function(tr) {
+                            var td = tr.querySelector('td[data-label="Número de OT"]');
+                            if (td && td.textContent.replace(/\D/g, '') === consecutivo) {
+                                fila = tr;
+                            }
+                        });
+                    }
+                }
+
                 if (fila) {
                     var btn = fila.querySelector('.info-ot-btn');
                     if (btn) {
