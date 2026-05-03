@@ -2002,6 +2002,40 @@ tr:hover {
   cursor: pointer;
 }
 
+/* Mejorar legibilidad de eventos en FullCalendar en móviles */
+.fc-event .fc-event-main {
+  white-space: normal !important;
+}
+
+.fc-event-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  word-break: break-word;
+}
+
+.fc-event-custom-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.fc-event-custom-status {
+  font-size: 0.75rem;
+  opacity: 0.92;
+  text-transform: capitalize;
+}
+
+@media (max-width: 770px) {
+  .fc-event-custom-title {
+    font-size: 0.84rem;
+  }
+
+  .fc-event-custom-status {
+    font-size: 0.72rem;
+  }
+}
+
 /* Ajustes de calendario para anchos pequeños */
 @media (max-width: 770px) {
   .calendar-container {

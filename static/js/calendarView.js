@@ -11,36 +11,70 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (calendarEl) {
         const events = [];
-        for (let solicitud of solicitudes) {
-            let color;
-            switch (solicitud.estado) {
+
+        const getEventColor = (estado) => {
+            switch (estado) {
                 case 'solicitado':
-                    color = 'gray';
-                    break;
+                    return '#6c757d';
                 case 'en proceso':
-                    color = 'orange';
-                    break;
+                    return '#fd7e14';
                 case 'en revision':
-                    color = 'blue';
-                    break;
+                    return '#0d6efd';
                 case 'finalizada':
-                    color = 'green';
-                    break;
+                    return '#198754';
                 default:
-                    color = 'black';
+                    return '#212529';
             }
+        };
+
+        const capitalizeStatus = (estado) => {
+            if (!estado) return '';
+            return estado
+                .toString()
+                .toLowerCase()
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        };
+
+        for (let solicitud of solicitudes) {
+            const color = getEventColor(solicitud.estado);
             events.push({
                 id: solicitud.consecutivo,
-                title: `Solicitud ${solicitud.consecutivo}`,
+                title: `OT ${solicitud.consecutivo}`,
                 start: solicitud.fecha_creacion,
-                color: color,
-                extendedProps: solicitud
+                backgroundColor: color,
+                borderColor: color,
+                textColor: '#ffffff',
+                extendedProps: {
+                    ...solicitud,
+                    statusLabel: capitalizeStatus(solicitud.estado)
+                }
             });
         }
 
         calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
             events: events,
+            eventContent: function(info) {
+                const statusText = info.event.extendedProps.statusLabel;
+                const container = document.createElement('div');
+                container.className = 'fc-event-custom';
+
+                const title = document.createElement('div');
+                title.className = 'fc-event-custom-title';
+                title.textContent = info.event.title;
+                container.appendChild(title);
+
+                if (statusText) {
+                    const status = document.createElement('div');
+                    status.className = 'fc-event-custom-status';
+                    status.textContent = statusText;
+                    container.appendChild(status);
+                }
+
+                return { domNodes: [container] };
+            },
             eventClick: function(info) {
                 if (typeof window.openSolicitudModal === 'function') {
                     window.openSolicitudModal(info.event.extendedProps.consecutivo);
