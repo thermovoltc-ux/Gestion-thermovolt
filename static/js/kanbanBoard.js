@@ -57,6 +57,7 @@ function updateSolicitudState(card, columnId) {
         nuevoEstado = "finalizada";
     }
 
+    const now = new Date().toISOString();
     fetch('/Gestion_ot/actualizar_estado_solicitud/', {
         method: 'POST',
         headers: {
@@ -66,7 +67,7 @@ function updateSolicitudState(card, columnId) {
         body: JSON.stringify({
             numero: numeroSolicitud,
             estado: nuevoEstado,
-            fecha_creacion: fechaActividad, 
+            fecha: now
         })
     })
     .then(response => response.json())

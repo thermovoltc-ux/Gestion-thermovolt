@@ -14,7 +14,7 @@ from urllib.parse import urljoin
 import os
 from django.contrib import messages
 import os
-from .models import OrdenTrabajo, Estado, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad
+from .models import OrdenTrabajo, Estado, GestionOt, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad
 from .forms import GestionOtForm, OrdenTrabajoForm, CierreOtForm, ImagenCierreOtForm, ImagenAntesForm, ImagenDespuesForm, CierreOtActividadFormSet
 from gestion_mantenimiento.solicitudes.models import Solicitud
 import logging
@@ -332,8 +332,8 @@ def actualizar_estado_solicitud(request):
         
         numero_solicitud = data.get('numero')
         nuevo_estado_nombre = data.get('estado')
-        tecnico = data.get('tecnico')
-        fecha = data.get('fecha')
+        tecnico = data.get('tecnico') or data.get('tecnico_asignado')
+        fecha = data.get('fecha') or data.get('fecha_creacion') or data.get('fecha_actividad')
 
         logger.debug(f"Numero de Solicitud: {numero_solicitud}")
         logger.debug(f"Nuevo Estado: {nuevo_estado_nombre}")
@@ -363,7 +363,8 @@ def actualizar_estado_solicitud(request):
                     fecha_dt = datetime.datetime.strptime(fecha, '%d/%m/%Y')
                 if timezone.is_naive(fecha_dt):
                     fecha_dt = timezone.make_aware(fecha_dt, timezone.get_current_timezone())
-                solicitud.fecha_actividad = fecha_dt
+                if hasattr(solicitud, 'fecha_actividad'):
+                    solicitud.fecha_actividad = fecha_dt
             except ValueError as parse_error:
                 logger.error(f"No se pudo parsear la fecha: {fecha}")
                 return JsonResponse({'status': 'error', 'message': f'Fecha inválida: {fecha}'}, status=400)
@@ -394,9 +395,18 @@ def actualizar_estado_solicitud(request):
             orden_trabajo.save()
             created = False
         else:
+            fallback_tecnico = None
+            gestion_ot = GestionOt.objects.filter(solicitud=solicitud).first()
+            if gestion_ot and gestion_ot.tecnico:
+                fallback_tecnico = gestion_ot.tecnico
+            else:
+                cierre_ot = CierreOt.objects.filter(orden_trabajo__solicitud=solicitud).first()
+                if cierre_ot and cierre_ot.nombre_tecnico:
+                    fallback_tecnico = cierre_ot.nombre_tecnico
+
             orden_trabajo = OrdenTrabajo.objects.create(
                 solicitud=solicitud,
-                tecnico_asignado=tecnico or '',
+                tecnico_asignado=tecnico or fallback_tecnico or '',
                 estado=nuevo_estado,
                 fecha_actividad=fecha_dt
             )

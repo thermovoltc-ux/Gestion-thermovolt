@@ -40,6 +40,22 @@ class OrdenTrabajo(models.Model):
     def __str__(self):
         return f"OT-{self.solicitud.consecutivo} - {self.tecnico_asignado}"
 
+    @property
+    def tecnico_display(self):
+        if self.tecnico_asignado:
+            return self.tecnico_asignado
+        try:
+            if self.cierreot.nombre_tecnico:
+                return self.cierreot.nombre_tecnico
+        except CierreOt.DoesNotExist:
+            pass
+        gestion_ot = getattr(self.solicitud, 'gestionot_set', None)
+        if gestion_ot is not None:
+            first_gestion = gestion_ot.first()
+            if first_gestion and first_gestion.tecnico:
+                return first_gestion.tecnico
+        return ''
+
 class CierreOt(models.Model):
     orden_trabajo = models.OneToOneField(OrdenTrabajo, on_delete=models.CASCADE)
     estado = models.ForeignKey(Estado, on_delete=models.SET_NULL, null=True, default=1)
