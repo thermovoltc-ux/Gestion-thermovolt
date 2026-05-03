@@ -15,6 +15,7 @@ class SolicitudForm(forms.ModelForm):
         widgets = {
             'fecha_creacion': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
             'prioridad': forms.Select(choices=Solicitud.PRIORIDAD_CHOICES),
+            'equipo': forms.HiddenInput(),
         }
 
     def clean_fecha_creacion(self):
