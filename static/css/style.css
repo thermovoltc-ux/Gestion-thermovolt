@@ -1632,18 +1632,18 @@ tr:hover {
 }
 
 @media (max-width: 480px) {
-  td {
+  .list-container td {
     font-size: 0.8rem;
     padding-left: 45%;
   }
 
-  td:before {
+  .list-container td:before {
     font-size: 0.78rem;
   }
 
-  /* Ocultar campos menos críticos para tablas largas, pero mantener el botón de acción en tablas de OT con 5 columnas */
-  .list-container td:nth-child(4),
-  .list-container td:nth-child(5):not(:last-child) {
+  /* Ocultar campos menos críticos sólo en tablas largas distintas a la lista de OT asignadas */
+  .list-container table:not(.assigned-ot-table) td:nth-child(4),
+  .list-container table:not(.assigned-ot-table) td:nth-child(5):not(:last-child) {
     display: none;
   }
 }

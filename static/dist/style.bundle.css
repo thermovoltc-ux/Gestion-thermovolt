@@ -1501,10 +1501,15 @@ tr:hover {
     font-size: 0.78rem;
   }
 
-  /* Ocultar campos menos críticos */
-  td:nth-child(4),
-  td:nth-child(5) {
+  /* Ocultar campos menos críticos sólo en tablas largas distintas a la lista de OT asignadas */
+  table:not(.assigned-ot-table) td:nth-child(4),
+  table:not(.assigned-ot-table) td:nth-child(5) {
     display: none;
+  }
+
+  .assigned-ot-table td:nth-child(4),
+  .assigned-ot-table td:nth-child(5) {
+    display: table-cell;
   }
 }
 
