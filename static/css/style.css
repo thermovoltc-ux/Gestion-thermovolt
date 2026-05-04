@@ -1623,6 +1623,12 @@ tr:hover {
   .list-container td:nth-child(4):before { content: "Descripción"; }
   .list-container td:nth-child(5):before { content: "Fecha de Creación"; }
   .list-container td:nth-child(6):before { content: "Estado"; }
+
+  .assigned-ot-table td:nth-child(1):before { content: "Número de OT"; }
+  .assigned-ot-table td:nth-child(2):before { content: "Técnico"; }
+  .assigned-ot-table td:nth-child(3):before { content: "Fecha de actividad"; }
+  .assigned-ot-table td:nth-child(4):before { content: "Estado"; }
+  .assigned-ot-table td:nth-child(5):before { content: "Acciones"; }
 }
 
 @media (max-width: 480px) {
