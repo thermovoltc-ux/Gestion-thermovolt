@@ -15,6 +15,7 @@ import logging
 from django.utils.dateformat import DateFormat
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
+from django.http import HttpResponseForbidden
 from django.contrib.auth import login as auth_login
 from django.contrib.auth.forms import AuthenticationForm
 from gestion_mantenimiento.users.forms import CustomAuthenticationForm
@@ -84,6 +85,9 @@ def enviar_correo_solicitud(solicitud):
 @login_required
 def lista_solicitudes(request):
     tipo_cuenta = request.session.get('tipo_cuenta')
+    # Prevent technicians from accessing the solicitudes listing
+    if tipo_cuenta == 'tecnico':
+        return HttpResponseForbidden('No autorizado')
     co = request.session.get('co')
 
     if (tipo_cuenta == 'administrador' and co):

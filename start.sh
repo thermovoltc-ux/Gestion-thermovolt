@@ -5,8 +5,12 @@ echo "STARTUP: checking and installing dependencies..."
 
 # Install Java - necesario para LibreOffice
 echo "Instalando Java runtime..."
-apt-get update || true
-apt-get install -y default-jre || apt-get install -y openjdk-11-jre || true
+if [ "$SKIP_SYSTEM_PACKAGES" = "true" ]; then
+  echo "SKIP_SYSTEM_PACKAGES=true -> Omitiendo instalación de paquetes del sistema (Java/LibreOffice)"
+else
+  apt-get update || true
+  apt-get install -y default-jre || apt-get install -y openjdk-11-jre || true
+fi
 
 # Verify Java
 if command -v java >/dev/null 2>&1; then
@@ -18,7 +22,11 @@ fi
 
 # Install LibreOffice - intenta instalar la suite completa primero
 echo "Instalando LibreOffice..."
-apt-get install -y libreoffice || apt-get install -y libreoffice-core libreoffice-writer libreoffice-calc || true
+if [ "$SKIP_SYSTEM_PACKAGES" = "true" ]; then
+  echo "SKIP_SYSTEM_PACKAGES=true -> Omitiendo instalación de LibreOffice"
+else
+  apt-get install -y libreoffice || apt-get install -y libreoffice-core libreoffice-writer libreoffice-calc || true
+fi
 
 # Verify LibreOffice
 LIBREOFFICE_CMD=""

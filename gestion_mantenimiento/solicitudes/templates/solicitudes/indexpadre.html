@@ -108,7 +108,7 @@
                                 <li>
                                     <a href="{% url 'listar_ot' %}">
                                         <span class="icon">
-                                            <ion-icon name="lock-closed-outline"></ion-icon>
+                                            <ion-icon name="construct-outline"></ion-icon>
                                         </span>
                                         <span class="title">Actividades</span>
                                     </a>
@@ -136,18 +136,9 @@
                     {% elif request.session.tipo_cuenta == 'tecnico' %}
                         <!-- Elementos accesibles solo para técnicos -->
                         <li>
-                            <a href="{% url 'lista_solicitudes' %}">
-                                <span class="icon">
-                                    <ion-icon name="people-outline"></ion-icon>
-                                </span>
-                                <span class="title">Recurso humano</span>
-                            </a>
-                        </li>
-
-                        <li>
                             <a href="{% url 'listar_ot' %}">
                                 <span class="icon">
-                                    <ion-icon name="lock-closed-outline"></ion-icon>
+                                    <ion-icon name="construct-outline"></ion-icon>
                                 </span>
                                 <span class="title">Actividades</span>
                             </a>
