@@ -91,8 +91,12 @@ def dashboard(request):
     ot_finalizada = ots_base.filter(estado__nombre='finalizada').count()
     ot_pendientes = ots_base.exclude(estado__nombre='finalizada').count()
 
-    solicitudes_totales = Solicitud.objects.count()
-    solicitudes_solicitadas = Solicitud.objects.filter(estado__nombre='solicitado').count()
+    solicitudes_qs = Solicitud.objects.all()
+    if tipo_cuenta == 'tecnico':
+        solicitudes_qs = solicitudes_qs.filter(creado_por=request.user.username)
+
+    solicitudes_totales = solicitudes_qs.count()
+    solicitudes_solicitadas = solicitudes_qs.filter(estado__nombre='solicitado').count()
 
     tareas_planificadas_qs = TareaMantenimiento.objects.select_related('plan__equipo__ubicacion')
     tareas_no_planificadas_qs = Solicitud.objects.select_related('equipo__ubicacion', 'ubicacion')

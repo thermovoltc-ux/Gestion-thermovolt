@@ -40,6 +40,9 @@ def crear_solicitud(request):
             estado_solicitado, _ = Estado.objects.get_or_create(nombre='solicitado')
             nueva_solicitud.estado = estado_solicitado
 
+            if request.session.get('tipo_cuenta') == 'tecnico':
+                nueva_solicitud.creado_por = request.user.username
+
             if not nueva_solicitud.fecha_creacion:
                 nueva_solicitud.fecha_creacion = timezone.now()
             elif timezone.is_naive(nueva_solicitud.fecha_creacion):
@@ -85,12 +88,11 @@ def enviar_correo_solicitud(solicitud):
 @login_required
 def lista_solicitudes(request):
     tipo_cuenta = request.session.get('tipo_cuenta')
-    # Prevent technicians from accessing the solicitudes listing
-    if tipo_cuenta == 'tecnico':
-        return HttpResponseForbidden('No autorizado')
     co = request.session.get('co')
 
-    if (tipo_cuenta == 'administrador' and co):
+    if tipo_cuenta == 'tecnico':
+        solicitudes = Solicitud.objects.filter(creado_por=request.user.username)
+    elif tipo_cuenta == 'administrador' and co:
         solicitudes = Solicitud.objects.filter(co=co)
     else:
         solicitudes = Solicitud.objects.all()
