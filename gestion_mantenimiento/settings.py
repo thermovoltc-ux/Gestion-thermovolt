@@ -18,6 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 import os
+import json
 
 # Cargar variables de entorno desde .env
 from dotenv import load_dotenv
@@ -334,6 +335,27 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL') or EMAIL_HOST_USER
 
 # Additional email for BCC copies; usar thermovoltc@gmail.com si no está configurado
 EMAIL_ADICIONAL = os.environ.get('EMAIL_ADICIONAL', 'thermovoltc@gmail.com')
+
+# Mapeo opcional PDV/Cliente -> emails de recepción de informes.
+# Se puede definir aquí como diccionario Python o via variable de entorno JSON
+# Ejemplo:
+# CLIENT_EMAIL_MAP = {
+#     "bostauros niquia": "calidadpuntos@bostauros.co",
+#     "tienda central": "calidad@ejemplo.com,ops@ejemplo.com",
+# }
+# Para configuración por entorno (Railway) exporte la variable JSON en CLIENT_EMAIL_MAP.
+CLIENT_EMAIL_MAP = {
+    "bostauros niquia": "calidadpuntos@bostauros.co",
+}
+
+# Allow overriding via environment variable (JSON string)
+_client_email_map = os.environ.get('CLIENT_EMAIL_MAP')
+if _client_email_map:
+    try:
+        CLIENT_EMAIL_MAP = json.loads(_client_email_map)
+    except Exception:
+        # Mantener el valor por defecto si el JSON no es válido
+        pass
 
 LOGGING = {
     'version': 1,

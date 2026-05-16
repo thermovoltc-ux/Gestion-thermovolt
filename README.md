@@ -120,3 +120,30 @@ Para Google OAuth:
 ## Licencia
 
 [Tu licencia aquí]
+
+## Envíos dinámicos de informes por PDV (CLIENT_EMAIL_MAP)
+
+La aplicación puede enrutar automáticamente los correos de cierre de OT a direcciones de email específicas por PDV/cliente.
+
+Cómo configurarlo:
+
+- Opción 1: Añadir el mapeo directamente en `gestion_mantenimiento/settings.py` (ya incluye un ejemplo):
+
+```
+CLIENT_EMAIL_MAP = {
+   "bostauros niquia": "calidadpuntos@bostauros.co",
+   "tienda central": "calidad@ejemplo.com,ops@ejemplo.com",
+}
+```
+
+- Opción 2 (recomendado para producción): definir la variable de entorno `CLIENT_EMAIL_MAP` con un JSON string (útil en Railway):
+
+```
+CLIENT_EMAIL_MAP='{"bostauros niquia": "calidadpuntos@bostauros.co"}'
+```
+
+Comportamiento:
+- Al cerrar una OT, el sistema buscará el PDV asociado y, si existe una entrada en `CLIENT_EMAIL_MAP`, enviará el informe a esas direcciones además del técnico.
+- Si no hay mapeo, el sistema intentará usar `solicitud.email_solicitante` como fallback.
+
+Recuerda añadir los emails reales en `CLIENT_EMAIL_MAP` o por variable de entorno antes de desplegar.
