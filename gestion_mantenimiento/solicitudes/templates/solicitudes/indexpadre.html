@@ -136,6 +136,14 @@
                     {% elif request.session.tipo_cuenta == 'tecnico' %}
                         <!-- Elementos accesibles solo para técnicos -->
                         <li>
+                            <a href="{% url 'lista_solicitudes' %}">
+                                <span class="icon">
+                                    <ion-icon name="document-text-outline"></ion-icon>
+                                </span>
+                                <span class="title">Solicitudes</span>
+                            </a>
+                        </li>
+                        <li>
                             <a href="{% url 'listar_ot' %}">
                                 <span class="icon">
                                     <ion-icon name="construct-outline"></ion-icon>

@@ -17,7 +17,11 @@
 </div>
 
 <div class="cardBox">
-    <a href="{% url 'gestion_ot' %}?estado=solicitado" class="card" style="display:flex; text-decoration:none; color:inherit;">
+    {% if tipo_cuenta == 'tecnico' %}
+        <a href="{% url 'lista_solicitudes' %}" class="card" style="display:flex; text-decoration:none; color:inherit;">
+    {% else %}
+        <a href="{% url 'gestion_ot' %}?estado=solicitado" class="card" style="display:flex; text-decoration:none; color:inherit;">
+    {% endif %}
         <div>
             <div class="numbers">{{ solicitudes_solicitadas }}</div>
             <div class="cardName">Solicitudes</div>
