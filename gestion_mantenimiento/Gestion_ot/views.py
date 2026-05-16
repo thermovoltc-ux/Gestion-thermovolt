@@ -40,6 +40,7 @@ import base64
 import shutil
 import subprocess
 from PIL import Image as PILImage
+import threading
 
 try:
     import pythoncom
@@ -672,39 +673,49 @@ def cierre_ot(request, ot_id):
                 'ot': ot
             })
 
-        # Generar y enviar PDF
-        try:
-            result = generar_pdf_informe(cierre_ot, request)
-            firma_tec_agregada = False
-            firma_rec_agregada = False
-            if isinstance(result, tuple) and len(result) == 3:
-                pdf_buffer, firma_tec_agregada, firma_rec_agregada = result
-            else:
-                pdf_buffer = result
-            logger.info("PDF generado correctamente, tamaño=%s bytes", len(pdf_buffer.getvalue()))
+        # Generar y enviar PDF en segundo plano para no bloquear la petición HTTP
+        def _background_pdf_and_email(cierre_id):
+            try:
+                cierre = CierreOt.objects.get(pk=cierre_id)
+                try:
+                    result = generar_pdf_informe(cierre)
+                except Exception as exc:
+                    logger.error("Error generando PDF en background: %s", exc)
+                    # Intentar fallback con ReportLab
+                    try:
+                        result = generar_pdf_reportlab(cierre)
+                    except Exception as exc2:
+                        logger.error("Fallback ReportLab falló en background: %s", exc2)
+                        return
 
-            logger.info("Correo técnico: %s", cierre_ot.correo_tecnico)
-            email_enviado = enviar_pdf_por_email(pdf_buffer, cierre_ot)
-            
-            if email_enviado:
-                logger.info("Email enviado correctamente")
-                success_msg = f"OT cerrada exitosamente. PDF generado y email enviado. Firma tec agregada: {firma_tec_agregada}, Firma rec agregada: {firma_rec_agregada}"
-            else:
-                logger.warning("Advertencia: PDF generado pero email no se pudo enviar")
-                success_msg = f"OT cerrada exitosamente. PDF generado pero EMAIL NO SE ENVIÓ (revisar configuración). Firma tec agregada: {firma_tec_agregada}, Firma rec agregada: {firma_rec_agregada}"
-            
-            messages.success(request, success_msg)
+                # Normalizar resultado
+                firma_tec_agregada = False
+                firma_rec_agregada = False
+                if isinstance(result, tuple) and len(result) == 3:
+                    pdf_buffer, firma_tec_agregada, firma_rec_agregada = result
+                else:
+                    pdf_buffer = result
+
+                # Enviar por email (si aplica)
+                try:
+                    enviar_pdf_por_email(pdf_buffer, cierre)
+                except Exception as exc:
+                    logger.error("Error enviando email en background: %s", exc)
+                    return
+
+            except CierreOt.DoesNotExist:
+                logger.error("CierreOt con id %s no encontrado en background", cierre_id)
+                return
+
+        try:
+            thread = threading.Thread(target=_background_pdf_and_email, args=(cierre_ot.id,), daemon=True)
+            thread.start()
+            messages.success(request, 'OT cerrada exitosamente. El PDF se está generando y enviando en segundo plano.')
             return redirect('listar_ot')
         except Exception as e:
-            logger.error("Error generando PDF: %s", e)
-            messages.error(request, f"Error procesando cierre: {e}")
-            return render(request, 'Gestion_ot/cierre_ot.html', {
-                'form': form,
-                'actividad_formset': actividad_formset,
-                'form_antes': form_antes,
-                'form_despues': form_despues,
-                'ot': ot
-            })
+            logger.error("No se pudo iniciar el proceso en background para PDF/email: %s", e)
+            messages.warning(request, f"OT guardada pero no se pudo iniciar el envío de PDF automáticamente: {e}")
+            return redirect('listar_ot')
 
     else:
         form = CierreOtForm(instance=cierre_ot)
