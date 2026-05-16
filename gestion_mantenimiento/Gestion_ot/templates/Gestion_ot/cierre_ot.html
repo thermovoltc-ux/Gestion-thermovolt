@@ -382,6 +382,8 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Todos los elementos del DOM encontrados correctamente');
 
     form.addEventListener('submit', function(e) {
+        e.preventDefault(); // Prevenir envío por defecto para usar fetch con timeout
+        
         try {
             console.log('Formulario enviado - iniciando procesamiento de firmas');
 
@@ -414,11 +416,53 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            console.log('Firmas procesadas, enviando formulario...');
+            // Deshabilitar botón y mostrar loading
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Guardando y enviando...';
+            }
+
+            console.log('Firmas procesadas, enviando formulario con fetch (timeout: 15s)...');
+            
+            // Enviar con fetch y timeout de 15 segundos
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            
+            fetch(form.action || window.location.pathname, {
+                method: 'POST',
+                body: formData,
+                signal: controller.signal
+            })
+            .then(response => {
+                clearTimeout(timeoutId);
+                console.log('Respuesta recibida:', response.status);
+                // Independientemente de si es error o success, dejar que Django redirija
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else {
+                    // Si no es redirect, esperar un poco antes de recargar
+                    setTimeout(() => window.location.reload(), 2000);
+                }
+            })
+            .catch(error => {
+                clearTimeout(timeoutId);
+                console.error('Error en fetch:', error.message);
+                // Si hay timeout o error, redirigir a la lista de OT después de 3 segundos
+                setTimeout(() => {
+                    window.location.href = '/Gestion_ot/listar_ot/';
+                }, 3000);
+            });
+            
         } catch (error) {
             console.error('Error procesando formulario:', error);
-            e.preventDefault(); // Prevenir envío si hay error
             alert('Error procesando el formulario: ' + error.message);
+            // Re-habilitar el botón si hay error en el procesamiento
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Guardar y enviar informe';
+            }
         }
     });
 });
