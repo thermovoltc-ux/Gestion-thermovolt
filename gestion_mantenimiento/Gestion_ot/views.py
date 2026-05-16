@@ -1440,7 +1440,61 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     subject = f"Informe de Mantenimiento OT-{cierre_ot.orden_trabajo.solicitud.consecutivo}"
     message = "Adjunto se encuentra el informe de mantenimiento."
     from_email = getattr(settings, 'SENDGRID_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL)
-    recipient_list = [cierre_ot.correo_tecnico] if cierre_ot.correo_tecnico else []
+    # Build recipient list: include technician + client PDV-specific addresses (configurable)
+    recipient_list = []
+    if cierre_ot.correo_tecnico:
+        recipient_list.append(cierre_ot.correo_tecnico)
+
+    # Try to resolve a client/PDV email from settings.CLIENT_EMAIL_MAP using Solicitud.PDV
+    pdv_name = None
+    try:
+        solicitud = cierre_ot.orden_trabajo.solicitud
+        pdv_name = solicitud.PDV or (solicitud.equipo.ubicacion.nombre if solicitud.equipo and solicitud.equipo.ubicacion else None)
+    except Exception:
+        pdv_name = None
+
+    client_emails = []
+    client_map = getattr(settings, 'CLIENT_EMAIL_MAP', {})
+    if isinstance(client_map, str):
+        try:
+            client_map = json.loads(client_map)
+        except Exception:
+            client_map = {}
+
+    if pdv_name and client_map:
+        key = pdv_name.strip().lower()
+        # exact key match
+        email_val = client_map.get(key)
+        if email_val:
+            if isinstance(email_val, str):
+                client_emails = [e.strip() for e in email_val.split(',') if e.strip()]
+            else:
+                client_emails = list(email_val)
+        else:
+            # try contains-match over keys
+            for k, v in client_map.items():
+                try:
+                    if k and k.lower() in key:
+                        if isinstance(v, str):
+                            client_emails = [e.strip() for e in v.split(',') if e.strip()]
+                        else:
+                            client_emails = list(v)
+                        break
+                except Exception:
+                    continue
+
+    # fallback to solicitud.email_solicitante
+    if not client_emails:
+        try:
+            sol = cierre_ot.orden_trabajo.solicitud
+            if getattr(sol, 'email_solicitante', None):
+                client_emails = [sol.email_solicitante]
+        except Exception:
+            pass
+
+    for e in client_emails:
+        if e and e not in recipient_list:
+            recipient_list.append(e)
     bcc_list = []
 
     # Add monitoring/copy address as BCC, and allow comma-separated values

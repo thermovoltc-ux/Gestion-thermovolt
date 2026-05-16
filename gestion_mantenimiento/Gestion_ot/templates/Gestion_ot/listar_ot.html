@@ -48,7 +48,7 @@
                         <button type="button" class="btn-accion btn-info info-ot-btn" 
                             data-equipo="{{ ot.solicitud.equipo.display_label }}"
                             data-descripcion="{{ ot.solicitud.descripcion_problema|escapejs }}"
-                            data-ubicacion="{{ ot.solicitud.ubicacion.nombre }}"
+                            data-ubicacion="{% if ot.solicitud.ubicacion %}{{ ot.solicitud.ubicacion.nombre }}{% elif ot.solicitud.equipo and ot.solicitud.equipo.ubicacion %}{{ ot.solicitud.equipo.ubicacion.nombre }}{% else %}{% endif %}"
                             data-fecha="{{ ot.solicitud.fecha_creacion|date:'d/m/Y H:i' }}"
                             title="Ver información de la OT"
                             style="border:none; background:none; cursor:pointer; padding:0; margin-right:8px;">
@@ -104,7 +104,17 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.addEventListener('click', function() {
             equipoSpan.textContent = btn.getAttribute('data-equipo') || '';
             descripcionSpan.textContent = btn.getAttribute('data-descripcion') || '';
-            ubicacionSpan.textContent = btn.getAttribute('data-ubicacion') || '';
+            // fallback if data-ubicacion is empty: try to extract from data-equipo (display_label)
+            let ubic = btn.getAttribute('data-ubicacion') || '';
+            if (!ubic) {
+                const equipoStr = btn.getAttribute('data-equipo') || '';
+                // equipo.display_label is like "CODE/PDV/Name" — attempt to extract middle segment
+                const parts = equipoStr.split('/').map(p=>p.trim()).filter(Boolean);
+                if (parts.length >= 2) {
+                    ubic = parts[1];
+                }
+            }
+            ubicacionSpan.textContent = ubic;
             fechaSpan.textContent = btn.getAttribute('data-fecha') || '';
             if (gestionarBtn) {
                 gestionarBtn.href = btn.getAttribute('data-gestionar-url') || btn.nextElementSibling?.href || '#';
