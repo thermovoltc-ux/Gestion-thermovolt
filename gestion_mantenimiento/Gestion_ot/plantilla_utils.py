@@ -137,7 +137,7 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
             parent=styles['BodyText'],
             fontSize=9,
             leading=11,
-            alignment=TA_CENTER
+            alignment=TA_LEFT
         )
         
         # ==================== ENCABEZADO ====================
@@ -235,15 +235,17 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         tabla_desc.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F2937')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
             ('VALIGN', (0, 0), (0, 0), 'MIDDLE'),
-            ('VALIGN', (0, 1), (-1, -1), 'MIDDLE'),
+            ('VALIGN', (0, 1), (-1, -1), 'TOP'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('ROWHEIGHTS', (0, 1), (-1, 1), None),
         ]))
         story.append(tabla_desc)
         story.append(Spacer(1, 0.1*inch))
@@ -259,15 +261,17 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         tabla_obs.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F2937')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
             ('VALIGN', (0, 0), (0, 0), 'MIDDLE'),
-            ('VALIGN', (0, 1), (-1, -1), 'MIDDLE'),
+            ('VALIGN', (0, 1), (-1, -1), 'TOP'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('ROWHEIGHTS', (0, 1), (-1, 1), None),
         ]))
         story.append(tabla_obs)
         story.append(Spacer(1, 0.15*inch))
