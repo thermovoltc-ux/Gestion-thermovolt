@@ -354,8 +354,8 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
                 firma_tech_path, _ = _obtener_imagen_temporal(cierre_ot.firma_digital)
                 if firma_tech_path and os.path.exists(firma_tech_path):
                     try:
-                        firma_tech_img = PlatypusImage(firma_tech_path, width=2.5*inch, height=1.2*inch)
-                        logger.info("✅ Firma técnico cargada (2.5\" x 1.2\")")
+                        firma_tech_img = PlatypusImage(firma_tech_path, width=3.2*inch, height=1.4*inch)
+                        logger.info("✅ Firma técnico cargada (3.2\" x 1.4\")")
                     except Exception as e:
                         logger.error(f"❌ Error creando imagen firma técnico: {e}")
         except Exception as e:
@@ -366,8 +366,8 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
                 firma_recep_path, _ = _obtener_imagen_temporal(cierre_ot.firma_receptor)
                 if firma_recep_path and os.path.exists(firma_recep_path):
                     try:
-                        firma_recep_img = PlatypusImage(firma_recep_path, width=2.5*inch, height=1.2*inch)
-                        logger.info("✅ Firma receptor cargada (2.5\" x 1.2\")")
+                        firma_recep_img = PlatypusImage(firma_recep_path, width=3.2*inch, height=1.4*inch)
+                        logger.info("✅ Firma receptor cargada (3.2\" x 1.4\")")
                     except Exception as e:
                         logger.error(f"❌ Error creando imagen firma receptor: {e}")
         except Exception as e:
@@ -386,7 +386,7 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
                 ('TOPPADDING', (0, 0), (-1, -1), 6),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                ('ROWHEIGHTS', (0, 0), (-1, 0), 1.5*inch),
+                ('ROWHEIGHTS', (0, 0), (-1, 0), 1.6*inch),
             ]))
             story.append(tabla_imgs)
         
