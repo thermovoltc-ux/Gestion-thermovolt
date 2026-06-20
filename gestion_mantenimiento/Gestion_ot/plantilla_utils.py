@@ -6,12 +6,124 @@ Soporta tanto desarrollo (con docx2pdf + LibreOffice) como producción (Railway 
 import os
 import io
 import logging
+import base64
 from datetime import datetime
 from docx import Document
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
 logger = logging.getLogger(__name__)
+
+
+def _insertar_firma_en_docx(doc, cierre_ot):
+    """
+    Inserta las firmas del técnico y receptor en el DOCX
+    
+    Args:
+        doc: Documento de python-docx
+        cierre_ot: Instancia de CierreOt con firmas
+    """
+    # Tabla de firmas
+    firmas_por_agregar = False
+    
+    # Verificar si hay firmas
+    if cierre_ot.firma_digital or cierre_ot.firma_receptor:
+        firmas_por_agregar = True
+    
+    if not firmas_por_agregar:
+        logger.info("No hay firmas para agregar")
+        return
+    
+    try:
+        doc.add_page_break()
+        doc.add_paragraph("Confirmación de trabajo recibido:", style='Heading 2')
+        doc.add_paragraph()  # Salto
+        
+        # Crear tabla de firmas (2x2)
+        tabla_firmas = doc.add_table(rows=3, cols=2)
+        tabla_firmas.style = 'Light Grid Accent 1'
+        
+        # Encabezados
+        tabla_firmas.rows[0].cells[0].text = "Realizador por"
+        tabla_firmas.rows[0].cells[1].text = "Recibido por"
+        
+        # Fila de firmas (insertar imágenes)
+        cell_firma_tec = tabla_firmas.rows[1].cells[0]
+        cell_firma_rec = tabla_firmas.rows[1].cells[1]
+        
+        # Agregar firma del técnico
+        if cierre_ot.firma_digital:
+            try:
+                firma_img = _decodificar_data_url(cierre_ot.firma_digital)
+                if firma_img:
+                    paragraph = cell_firma_tec.paragraphs[0]
+                    run = paragraph.add_run()
+                    run.add_picture(firma_img, width=900000)  # ~0.9 pulgadas
+                    logger.info("✅ Firma del técnico insertada")
+            except Exception as e:
+                logger.warning(f"Error insertando firma técnico: {e}")
+                cell_firma_tec.text = "[Firma técnico no disponible]"
+        else:
+            cell_firma_tec.text = "[Sin firma]"
+        
+        # Agregar firma del receptor
+        if cierre_ot.firma_receptor:
+            try:
+                firma_img = _decodificar_data_url(cierre_ot.firma_receptor)
+                if firma_img:
+                    paragraph = cell_firma_rec.paragraphs[0]
+                    run = paragraph.add_run()
+                    run.add_picture(firma_img, width=900000)  # ~0.9 pulgadas
+                    logger.info("✅ Firma del receptor insertada")
+            except Exception as e:
+                logger.warning(f"Error insertando firma receptor: {e}")
+                cell_firma_rec.text = "[Firma receptor no disponible]"
+        else:
+            cell_firma_rec.text = "[Sin firma]"
+        
+        # Fila de nombres y documentos
+        tabla_firmas.rows[2].cells[0].text = f"Documento: {cierre_ot.documento_tecnico or 'N/A'}"
+        tabla_firmas.rows[2].cells[1].text = f"Documento: {cierre_ot.documento_receptor or 'N/A'}"
+        
+        logger.info("✅ Tabla de firmas agregada al documento")
+        
+    except Exception as e:
+        logger.error(f"Error agregando tabla de firmas: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
+
+def _decodificar_data_url(data_url):
+    """
+    Decodifica un Data URL (base64) a BytesIO con imagen
+    
+    Args:
+        data_url: String con formato 'data:image/png;base64,iVBORw0KG...'
+    
+    Returns:
+        BytesIO con imagen o None si falla
+    """
+    try:
+        # Extraer la parte base64
+        if ',' not in data_url:
+            logger.warning("Data URL inválido (sin coma separadora)")
+            return None
+        
+        header, data = data_url.split(',', 1)
+        
+        # Decodificar base64
+        imagen_bytes = base64.b64decode(data)
+        
+        # Retornar como BytesIO
+        imagen_buffer = io.BytesIO(imagen_bytes)
+        imagen_buffer.seek(0)
+        
+        logger.info(f"Data URL decodificado exitosamente ({len(imagen_bytes)} bytes)")
+        return imagen_buffer
+        
+    except Exception as e:
+        logger.error(f"Error decodificando Data URL: {e}")
+        return None
 
 
 def _agregar_imagenes_a_docx(doc, cierre_ot):
@@ -182,6 +294,12 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         logger.info(f"Reemplazando tags en plantilla: {list(reemplazos.keys())}")
         reemplazar_tags_en_docx(doc, reemplazos)
         
+        # Agregar firmas antes de las imágenes
+        try:
+            _insertar_firma_en_docx(doc, cierre_ot)
+        except Exception as e:
+            logger.warning(f"Error agregando firmas: {e}")
+        
         # Agregar imágenes al final del documento
         try:
             _agregar_imagenes_a_docx(doc, cierre_ot)
@@ -193,7 +311,7 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         doc.save(docx_temporal)
         docx_temporal.seek(0)
         
-        logger.info("DOCX generado en memoria con imágenes")
+        logger.info("DOCX generado en memoria con firmas e imágenes")
         
         # Intentar convertir a PDF
         pdf_buffer = _convertir_docx_a_pdf(docx_temporal)
