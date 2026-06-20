@@ -65,10 +65,10 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         BytesIO con contenido PDF
     """
     if plantilla_path is None:
-        # Ruta por defecto
+        # Ruta por defecto: plantilla_ot.docx en la raíz del proyecto
         plantilla_path = os.path.join(
             os.path.dirname(__file__),
-            '..',
+            '../..',
             'plantilla_ot.docx'
         )
     
