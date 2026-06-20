@@ -281,31 +281,11 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         story.append(Paragraph("Confirmación de trabajo recibido:", heading_style))
         story.append(Spacer(1, 0.1*inch))
         
-        # Obtener imágenes de firmas
-        firma_tech_img = None
-        firma_tech_path, _ = _obtener_imagen_temporal(cierre_ot.firma_digital)
-        if firma_tech_path and os.path.exists(firma_tech_path):
-            try:
-                firma_tech_img = PlatypusImage(firma_tech_path, width=1.5*inch, height=0.8*inch)
-                logger.info("✅ Firma técnico encontrada")
-            except Exception as e:
-                logger.warning(f"Error imagen firma técnico: {e}")
-        
-        firma_recep_img = None
-        firma_recep_path, _ = _obtener_imagen_temporal(cierre_ot.firma_receptor)
-        if firma_recep_path and os.path.exists(firma_recep_path):
-            try:
-                firma_recep_img = PlatypusImage(firma_recep_path, width=1.5*inch, height=0.8*inch)
-                logger.info("✅ Firma receptor encontrada")
-            except Exception as e:
-                logger.warning(f"Error imagen firma receptor: {e}")
-        
-        # Tabla de firmas (nombres, docs, y espacios para firmas)
+        # Tabla 1: Nombres y documentos
         firma_data = [
             ['Realizador por:', 'Recibido por:'],
             [cierre_ot.nombre_tecnico or 'N/A', cierre_ot.nombre_receptor or 'N/A'],
-            [f"Doc: {cierre_ot.documento_tecnico or 'N/A'}", f"Doc: {cierre_ot.documento_receptor or 'N/A'}"],
-            [firma_tech_img or Paragraph('_' * 20, body_style), firma_recep_img or Paragraph('_' * 20, body_style)]
+            [f"Doc: {cierre_ot.documento_tecnico or 'N/A'}", f"Doc: {cierre_ot.documento_receptor or 'N/A'}"]
         ]
         
         tabla_firmas = Table(firma_data, colWidths=[3.75*inch, 3.75*inch])
@@ -319,9 +299,56 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('ROWHEIGHTS', (0, 3), (-1, 3), 1*inch),
         ]))
         story.append(tabla_firmas)
+        
+        # Tabla 2: Imágenes de firmas (separada)
+        story.append(Spacer(1, 0.05*inch))
+        
+        firma_tech_img = None
+        firma_recep_img = None
+        
+        # Obtener imágenes de firmas
+        try:
+            if cierre_ot.firma_digital:
+                firma_tech_path, _ = _obtener_imagen_temporal(cierre_ot.firma_digital)
+                if firma_tech_path and os.path.exists(firma_tech_path):
+                    try:
+                        firma_tech_img = PlatypusImage(firma_tech_path, width=1.5*inch, height=0.8*inch)
+                        logger.info("✅ Firma técnico cargada")
+                    except Exception as e:
+                        logger.error(f"❌ Error creando imagen firma técnico: {e}")
+        except Exception as e:
+            logger.error(f"❌ Error procesando firma técnico: {e}")
+        
+        try:
+            if cierre_ot.firma_receptor:
+                firma_recep_path, _ = _obtener_imagen_temporal(cierre_ot.firma_receptor)
+                if firma_recep_path and os.path.exists(firma_recep_path):
+                    try:
+                        firma_recep_img = PlatypusImage(firma_recep_path, width=1.5*inch, height=0.8*inch)
+                        logger.info("✅ Firma receptor cargada")
+                    except Exception as e:
+                        logger.error(f"❌ Error creando imagen firma receptor: {e}")
+        except Exception as e:
+            logger.error(f"❌ Error procesando firma receptor: {e}")
+        
+        # Construir tabla de imágenes solo si hay al menos una
+        if firma_tech_img or firma_recep_img:
+            img_cells = [
+                firma_tech_img if firma_tech_img else Paragraph('', body_style),
+                firma_recep_img if firma_recep_img else Paragraph('', body_style)
+            ]
+            tabla_imgs = Table([img_cells], colWidths=[3.75*inch, 3.75*inch])
+            tabla_imgs.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('ROWHEIGHTS', (0, 0), (-1, 0), 1*inch),
+            ]))
+            story.append(tabla_imgs)
         
         # ==================== IMÁGENES ANTES/DESPUÉS ====================
         
