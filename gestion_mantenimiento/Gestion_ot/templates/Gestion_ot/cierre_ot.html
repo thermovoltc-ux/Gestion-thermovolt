@@ -251,32 +251,45 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
+    // Función para inicializar canvas con fondo blanco
+    function setupCanvasBackground(canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
     // Firma del técnico
+    setupCanvasBackground(canvasTecnico);
     const signaturePadTecnico = new SignaturePad(canvasTecnico, {
         minWidth: 1,
         maxWidth: 3,
-        penColor: 'rgb(0,0,0)'
+        penColor: 'rgb(0,0,0)',
+        backgroundColor: 'rgb(255,255,255)'
     });
-    console.log('SignaturePad técnico inicializado:', signaturePadTecnico);
+    console.log('✅ SignaturePad técnico inicializado:', signaturePadTecnico);
     console.log('Canvas técnico visible:', canvasTecnico.offsetWidth > 0 && canvasTecnico.offsetHeight > 0);
 
     const clearButtonTecnico = document.getElementById('clear-signature-tecnico');
     clearButtonTecnico.addEventListener('click', function() {
         signaturePadTecnico.clear();
+        setupCanvasBackground(canvasTecnico);
         console.log('Firma del técnico limpiada');
     });
 
     // Firma del receptor
+    setupCanvasBackground(canvasReceptor);
     const signaturePadReceptor = new SignaturePad(canvasReceptor, {
         minWidth: 1,
         maxWidth: 3,
-        penColor: 'rgb(0,0,0)'
+        penColor: 'rgb(0,0,0)',
+        backgroundColor: 'rgb(255,255,255)'
     });
-    console.log('SignaturePad receptor inicializado:', signaturePadReceptor);
+    console.log('✅ SignaturePad receptor inicializado:', signaturePadReceptor);
     console.log('Canvas receptor visible:', canvasReceptor.offsetWidth > 0 && canvasReceptor.offsetHeight > 0);
     const clearButtonReceptor = document.getElementById('clear-signature-receptor');
     clearButtonReceptor.addEventListener('click', function() {
         signaturePadReceptor.clear();
+        setupCanvasBackground(canvasReceptor);
     });
 
     const signatureOverlay = document.getElementById('signature-overlay');
@@ -296,6 +309,9 @@ document.addEventListener('DOMContentLoaded', function() {
         overlayCanvas.height = Math.round(height * ratio);
         const ctx = overlayCanvas.getContext('2d');
         ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        // Fondo blanco
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, overlayCanvas.offsetWidth, overlayCanvas.offsetHeight);
     }
 
     function openSignatureOverlay(type) {
@@ -313,7 +329,8 @@ document.addEventListener('DOMContentLoaded', function() {
             overlayPad = new SignaturePad(overlayCanvas, {
                 minWidth: 2,
                 maxWidth: 4,
-                penColor: 'rgb(0,0,0)'
+                penColor: 'rgb(0,0,0)',
+                backgroundColor: 'rgb(255,255,255)'
             });
 
             const sourcePad = type === 'tecnico' ? signaturePadTecnico : signaturePadReceptor;
@@ -341,7 +358,13 @@ document.addEventListener('DOMContentLoaded', function() {
     closeOverlayBtn.addEventListener('click', closeSignatureOverlay);
 
     clearOverlayBtn.addEventListener('click', function() {
-        if (overlayPad) overlayPad.clear();
+        if (overlayPad) {
+            overlayPad.clear();
+            // Restaurar fondo blanco después de limpiar
+            const ctx = overlayCanvas.getContext('2d');
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        }
     });
 
     saveOverlayBtn.addEventListener('click', function() {
@@ -352,9 +375,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const dataURL = overlayPad.toDataURL();
         if (currentSignType === 'tecnico') {
             signaturePadTecnico.clear();
+            setupCanvasBackground(canvasTecnico);
             signaturePadTecnico.fromDataURL(dataURL);
         } else {
             signaturePadReceptor.clear();
+            setupCanvasBackground(canvasReceptor);
             signaturePadReceptor.fromDataURL(dataURL);
         }
 

@@ -49,18 +49,25 @@ def _obtener_imagen_temporal(file_field_o_url):
                 
                 # Crear imagen temporal
                 img = PILImage.open(io.BytesIO(image_data))
+                logger.info(f"✅ Imagen decodificada - Modo: {img.mode}, Tamaño: {img.size}")
                 
-                # Convertir a RGB si es necesario
-                if img.mode != 'RGB':
+                # Manejar transparencia si es RGBA
+                if img.mode == 'RGBA':
+                    logger.info("Detectado RGBA - Reemplazando transparencia con fondo blanco")
+                    white_bg = PILImage.new('RGB', img.size, (255, 255, 255))
+                    white_bg.paste(img, mask=img.split()[3])  # split()[3] es el canal alpha
+                    img = white_bg
+                elif img.mode != 'RGB':
                     img = img.convert('RGB')
+                    logger.info(f"Convertido a RGB desde {img.mode}")
                 
                 # Guardar en archivo temporal
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
-                    img.save(tmp.name, format='PNG')
-                    logger.info(f"✅ Data URL decodificada y guardada en: {tmp.name}")
+                    img.save(tmp.name, format='PNG', quality=95)
+                    logger.info(f"✅ Data URL procesada y guardada en: {tmp.name}")
                     return tmp.name, True
             except Exception as e:
-                logger.error(f"❌ Error procesando data URL: {e}")
+                logger.error(f"❌ Error procesando data URL: {e}", exc_info=True)
                 return None, False
         
         # Manejar URLs HTTP
