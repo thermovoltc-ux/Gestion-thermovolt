@@ -217,10 +217,11 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
     Genera PDF SIMPLE desde plantilla DOCX
     
     1. Carga plantilla
-    2. Reemplaza tags
-    3. Inserta firmas
-    4. Inserta imágenes
-    5. Convierte a PDF
+    2. Inserta logo dinámicamente
+    3. Reemplaza tags
+    4. Inserta firmas
+    5. Inserta imágenes
+    6. Convierte a PDF
     """
     if plantilla_path is None:
         plantilla_path = os.path.join(
@@ -236,6 +237,12 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         
         logger.info(f"📄 Cargando plantilla: {plantilla_path}")
         doc = Document(plantilla_path)
+        
+        # Insertar logo dinámicamente al inicio
+        try:
+            _insertar_logo_dinamico(doc)
+        except Exception as e:
+            logger.warning(f"⚠️ Error insertando logo dinámico: {e}")
         
         # Preparar datos para reemplazo
         try:
@@ -304,6 +311,50 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         import traceback
         logger.error(traceback.format_exc())
         return None
+
+
+def _insertar_logo_dinamico(doc):
+    """
+    Inserta el logo THERMOVOLT dinámicamente en el primer párrafo del documento
+    Busca el logo en:
+    1. static/images/Logoinforme.jpg
+    2. Si no existe, usa placeholder
+    """
+    try:
+        # Rutas donde podría estar el logo
+        rutas_posibles = [
+            os.path.join(os.path.dirname(__file__), '../../static/images/Logoinforme.jpg'),
+            os.path.join(os.path.dirname(__file__), '../static/images/Logoinforme.jpg'),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), '../../static/images/Logoinforme.jpg')),
+        ]
+        
+        logo_path = None
+        for ruta in rutas_posibles:
+            if os.path.exists(ruta):
+                logo_path = ruta
+                logger.info(f"✅ Logo encontrado en: {ruta}")
+                break
+        
+        if not logo_path:
+            logger.warning("⚠️ Logo no encontrado, usando placeholder")
+            return
+        
+        # Insertar logo en el primer párrafo
+        p_logo = doc.paragraphs[0]
+        p_logo.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        
+        # Limpiar el párrafo
+        for run in p_logo.runs:
+            r = run._r
+            r.getparent().remove(r)
+        
+        # Agregar imagen
+        run = p_logo.add_run()
+        run.add_picture(logo_path, width=Inches(2.5))
+        logger.info("✅ Logo dinámico insertado")
+    
+    except Exception as e:
+        logger.warning(f"Error insertando logo dinámico: {e}")
 
 
 def _convertir_docx_a_pdf(docx_buffer):
