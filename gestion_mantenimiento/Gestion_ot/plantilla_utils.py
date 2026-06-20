@@ -1,203 +1,288 @@
 """
 Generador de PDFs desde plantilla DOCX con reemplazo de tags
 Soporta tanto desarrollo (con docx2pdf + LibreOffice) como producción (Railway con ReportLab)
+Versión Mejorada: Maneja imágenes remotas, firmas posicionadas y conversión PDF robusta
 """
 
 import os
 import io
 import logging
 import base64
+import requests
+import tempfile
 from datetime import datetime
 from docx import Document
+from docx.shared import Inches, Pt
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
 logger = logging.getLogger(__name__)
 
 
+def _obtener_imagen_temporal(file_field_o_url):
+    """
+    Obtiene ruta temporal de una imagen desde:
+    - FileField de Django (local)
+    - URL remota (Cloudinary)
+    - Data URL base64
+    
+    Args:
+        file_field_o_url: FileField, URL string, o data URL base64
+    
+    Returns:
+        Tuple (ruta_temporal, es_temporal) - (str, bool) o (None, False) si falla
+    """
+    if not file_field_o_url:
+        return None, False
+    
+    try:
+        # Si es una URL string (Cloudinary)
+        if isinstance(file_field_o_url, str):
+            if file_field_o_url.startswith('http://') or file_field_o_url.startswith('https://'):
+                # Descargar desde URL remota
+                logger.info(f"Descargando imagen remota: {file_field_o_url[:80]}")
+                response = requests.get(file_field_o_url, timeout=15)
+                response.raise_for_status()
+                
+                # Guardar en temporal
+                suffix = '.png' if 'png' in file_field_o_url.lower() else '.jpg'
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                    tmp.write(response.content)
+                    tmp_path = tmp.name
+                
+                logger.info(f"Imagen remota descargada a: {tmp_path}")
+                return tmp_path, True
+            
+            # Si es data URL base64
+            elif file_field_o_url.startswith('data:'):
+                header, data = file_field_o_url.split(',', 1)
+                imagen_bytes = base64.b64decode(data)
+                
+                suffix = '.png' if 'png' in header else '.jpg'
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                    tmp.write(imagen_bytes)
+                    tmp_path = tmp.name
+                
+                logger.info(f"Data URL decodificado a: {tmp_path}")
+                return tmp_path, True
+        
+        # Si es un FileField de Django
+        else:
+            # Intentar obtener URL remota primero (Cloudinary)
+            if hasattr(file_field_o_url, 'url'):
+                url = file_field_o_url.url
+                if url and (url.startswith('http://') or url.startswith('https://')):
+                    return _obtener_imagen_temporal(url)  # Recursivo
+            
+            # Fallback a path local
+            if hasattr(file_field_o_url, 'path'):
+                local_path = file_field_o_url.path
+                if local_path and os.path.exists(local_path):
+                    logger.info(f"Usando imagen local: {local_path}")
+                    return local_path, False
+    
+    except Exception as e:
+        logger.warning(f"Error obteniendo imagen temporal: {e}")
+    
+    return None, False
+
+
 def _insertar_firma_en_docx(doc, cierre_ot):
     """
     Inserta las firmas del técnico y receptor en el DOCX
+    Maneja data URLs y posicionamiento correcto
     
     Args:
         doc: Documento de python-docx
         cierre_ot: Instancia de CierreOt con firmas
     """
-    # Tabla de firmas
-    firmas_por_agregar = False
-    
-    # Verificar si hay firmas
-    if cierre_ot.firma_digital or cierre_ot.firma_receptor:
-        firmas_por_agregar = True
-    
-    if not firmas_por_agregar:
+    if not cierre_ot.firma_digital and not cierre_ot.firma_receptor:
         logger.info("No hay firmas para agregar")
         return
     
     try:
         doc.add_page_break()
-        doc.add_paragraph("Confirmación de trabajo recibido:", style='Heading 2')
-        doc.add_paragraph()  # Salto
+        heading = doc.add_paragraph("Confirmación de trabajo recibido:")
+        heading.style = 'Heading 2'
         
-        # Crear tabla de firmas (2x2)
+        # Crear tabla de firmas (3 filas: encabezados, firmas, documentos)
         tabla_firmas = doc.add_table(rows=3, cols=2)
         tabla_firmas.style = 'Light Grid Accent 1'
         
-        # Encabezados
-        tabla_firmas.rows[0].cells[0].text = "Realizador por"
-        tabla_firmas.rows[0].cells[1].text = "Recibido por"
+        # Fila 1: Encabezados
+        tabla_firmas.rows[0].cells[0].text = "Realizador por:"
+        tabla_firmas.rows[0].cells[1].text = "Recibido por:"
         
-        # Fila de firmas (insertar imágenes)
+        # Fila 2: Firmas
         cell_firma_tec = tabla_firmas.rows[1].cells[0]
         cell_firma_rec = tabla_firmas.rows[1].cells[1]
         
-        # Agregar firma del técnico
+        # Limpiar celdas
+        for paragraph in cell_firma_tec.paragraphs:
+            for run in paragraph.runs:
+                r = run._r
+                r.getparent().remove(r)
+        for paragraph in cell_firma_rec.paragraphs:
+            for run in paragraph.runs:
+                r = run._r
+                r.getparent().remove(r)
+        
+        # Agregar firma técnico
         if cierre_ot.firma_digital:
-            try:
-                firma_img = _decodificar_data_url(cierre_ot.firma_digital)
-                if firma_img:
-                    paragraph = cell_firma_tec.paragraphs[0]
-                    run = paragraph.add_run()
-                    run.add_picture(firma_img, width=900000)  # ~0.9 pulgadas
-                    logger.info("✅ Firma del técnico insertada")
-            except Exception as e:
-                logger.warning(f"Error insertando firma técnico: {e}")
-                cell_firma_tec.text = "[Firma técnico no disponible]"
+            tmp_path, es_temp = _obtener_imagen_temporal(cierre_ot.firma_digital)
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    p = cell_firma_tec.add_paragraph()
+                    p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                    run = p.add_run()
+                    # Tamaño: 2.5 pulgadas de ancho
+                    run.add_picture(tmp_path, width=Inches(2.5))
+                    logger.info("✅ Firma técnico agregada")
+                    if es_temp:
+                        try:
+                            os.unlink(tmp_path)
+                        except:
+                            pass
+                except Exception as e:
+                    logger.warning(f"Error insertando firma técnico: {e}")
+                    cell_firma_tec.paragraphs[0].text = "[Firma no disponible]"
+            else:
+                cell_firma_tec.paragraphs[0].text = "[Sin firma]"
         else:
-            cell_firma_tec.text = "[Sin firma]"
+            cell_firma_tec.paragraphs[0].text = "[Sin firma]"
         
-        # Agregar firma del receptor
+        # Agregar firma receptor
         if cierre_ot.firma_receptor:
-            try:
-                firma_img = _decodificar_data_url(cierre_ot.firma_receptor)
-                if firma_img:
-                    paragraph = cell_firma_rec.paragraphs[0]
-                    run = paragraph.add_run()
-                    run.add_picture(firma_img, width=900000)  # ~0.9 pulgadas
-                    logger.info("✅ Firma del receptor insertada")
-            except Exception as e:
-                logger.warning(f"Error insertando firma receptor: {e}")
-                cell_firma_rec.text = "[Firma receptor no disponible]"
+            tmp_path, es_temp = _obtener_imagen_temporal(cierre_ot.firma_receptor)
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    p = cell_firma_rec.add_paragraph()
+                    p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                    run = p.add_run()
+                    run.add_picture(tmp_path, width=Inches(2.5))
+                    logger.info("✅ Firma receptor agregada")
+                    if es_temp:
+                        try:
+                            os.unlink(tmp_path)
+                        except:
+                            pass
+                except Exception as e:
+                    logger.warning(f"Error insertando firma receptor: {e}")
+                    cell_firma_rec.paragraphs[0].text = "[Firma no disponible]"
+            else:
+                cell_firma_rec.paragraphs[0].text = "[Sin firma]"
         else:
-            cell_firma_rec.text = "[Sin firma]"
+            cell_firma_rec.paragraphs[0].text = "[Sin firma]"
         
-        # Fila de nombres y documentos
+        # Fila 3: Documentos de identidad
         tabla_firmas.rows[2].cells[0].text = f"Documento: {cierre_ot.documento_tecnico or 'N/A'}"
         tabla_firmas.rows[2].cells[1].text = f"Documento: {cierre_ot.documento_receptor or 'N/A'}"
         
-        logger.info("✅ Tabla de firmas agregada al documento")
+        logger.info("✅ Tabla de firmas completada")
         
     except Exception as e:
         logger.error(f"Error agregando tabla de firmas: {e}")
         import traceback
         logger.error(traceback.format_exc())
 
-
-def _decodificar_data_url(data_url):
-    """
-    Decodifica un Data URL (base64) a BytesIO con imagen
-    
-    Args:
-        data_url: String con formato 'data:image/png;base64,iVBORw0KG...'
-    
-    Returns:
-        BytesIO con imagen o None si falla
-    """
-    try:
-        # Extraer la parte base64
-        if ',' not in data_url:
-            logger.warning("Data URL inválido (sin coma separadora)")
-            return None
-        
-        header, data = data_url.split(',', 1)
-        
-        # Decodificar base64
-        imagen_bytes = base64.b64decode(data)
-        
-        # Retornar como BytesIO
-        imagen_buffer = io.BytesIO(imagen_bytes)
-        imagen_buffer.seek(0)
-        
-        logger.info(f"Data URL decodificado exitosamente ({len(imagen_bytes)} bytes)")
-        return imagen_buffer
-        
-    except Exception as e:
-        logger.error(f"Error decodificando Data URL: {e}")
-        return None
-
-
 def _agregar_imagenes_a_docx(doc, cierre_ot):
     """
     Agrega imágenes ANTES y DESPUÉS al final del documento DOCX
+    Maneja imágenes remotas (Cloudinary) correctamente
     
     Args:
         doc: Documento de python-docx
         cierre_ot: Instancia de CierreOt con imágenes relacionadas
     """
-    from django.core.files.storage import default_storage
-    
-    # Obtener imágenes
     imagenes_antes = cierre_ot.imagenes.filter(tipo='antes')
     imagenes_despues = cierre_ot.imagenes.filter(tipo='despues')
     
-    # Agregar título de imágenes
-    if imagenes_antes.exists() or imagenes_despues.exists():
-        # Agregar salto de página
+    if not (imagenes_antes.exists() or imagenes_despues.exists()):
+        logger.info("No hay imágenes para agregar")
+        return
+    
+    try:
         doc.add_page_break()
         
         # Sección ANTES
         if imagenes_antes.exists():
-            doc.add_paragraph("─ ANTES ─", style='Heading 2')
-            doc.add_paragraph()  # Salto de línea
+            heading = doc.add_paragraph("─ ANTES ─")
+            heading.style = 'Heading 2'
+            heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
             
             for img in imagenes_antes:
                 try:
-                    # Obtener ruta de la imagen
-                    img_path = img.imagen.path if hasattr(img.imagen, 'path') else None
+                    img_path, es_temp = _obtener_imagen_temporal(img.imagen)
                     
                     if img_path and os.path.exists(img_path):
-                        # Agregar imagen con altura máxima de 2.5 pulgadas
                         try:
-                            doc.add_picture(img_path, width=2000000)  # ~2.1 pulgadas
-                            logger.info(f"Imagen ANTES agregada: {img.imagen.name}")
+                            # Crear párrafo para la imagen
+                            p = doc.add_paragraph()
+                            p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                            run = p.add_run()
+                            # Ancho máximo: 4 pulgadas
+                            run.add_picture(img_path, width=Inches(4))
+                            logger.info(f"✅ Imagen ANTES agregada: {img.imagen.name}")
+                            
+                            if es_temp:
+                                try:
+                                    os.unlink(img_path)
+                                except:
+                                    pass
                         except Exception as e:
                             logger.warning(f"Error insertando imagen ANTES: {e}")
                     else:
-                        logger.warning(f"Ruta de imagen no disponible: {img.imagen.name}")
+                        logger.warning(f"No se pudo obtener ruta para imagen: {img.imagen.name}")
+                
                 except Exception as e:
                     logger.warning(f"Error procesando imagen ANTES: {e}")
             
-            if imagenes_despues.exists():
-                doc.add_page_break()
+            doc.add_paragraph()  # Separador
         
         # Sección DESPUÉS
         if imagenes_despues.exists():
-            doc.add_paragraph("─ DESPUÉS ─", style='Heading 2')
-            doc.add_paragraph()  # Salto de línea
+            heading = doc.add_paragraph("─ DESPUÉS ─")
+            heading.style = 'Heading 2'
+            heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
             
             for img in imagenes_despues:
                 try:
-                    # Obtener ruta de la imagen
-                    img_path = img.imagen.path if hasattr(img.imagen, 'path') else None
+                    img_path, es_temp = _obtener_imagen_temporal(img.imagen)
                     
                     if img_path and os.path.exists(img_path):
-                        # Agregar imagen con altura máxima de 2.5 pulgadas
                         try:
-                            doc.add_picture(img_path, width=2000000)  # ~2.1 pulgadas
-                            logger.info(f"Imagen DESPUÉS agregada: {img.imagen.name}")
+                            p = doc.add_paragraph()
+                            p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                            run = p.add_run()
+                            run.add_picture(img_path, width=Inches(4))
+                            logger.info(f"✅ Imagen DESPUÉS agregada: {img.imagen.name}")
+                            
+                            if es_temp:
+                                try:
+                                    os.unlink(img_path)
+                                except:
+                                    pass
                         except Exception as e:
                             logger.warning(f"Error insertando imagen DESPUÉS: {e}")
                     else:
-                        logger.warning(f"Ruta de imagen no disponible: {img.imagen.name}")
+                        logger.warning(f"No se pudo obtener ruta para imagen: {img.imagen.name}")
+                
                 except Exception as e:
                     logger.warning(f"Error procesando imagen DESPUÉS: {e}")
         
         logger.info(f"✅ Imágenes agregadas: {imagenes_antes.count()} antes, {imagenes_despues.count()} después")
+        
+    except Exception as e:
+        logger.error(f"Error agregando imágenes a DOCX: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
 
 
 def reemplazar_tags_en_docx(doc, reemplazos):
     """
-    Reemplaza tags <<tag>> en un documento DOCX
+    Reemplaza tags <<tag>> en un documento DOCX de forma robusta
+    Maneja párrafos, tablas, celdas anidadas y preserva formato
     
     Args:
         doc: Documento de python-docx
@@ -208,42 +293,88 @@ def reemplazar_tags_en_docx(doc, reemplazos):
             'OT': '96',
             'cliente': 'Produpan',
             'equipo': 'Cava de refrigeración',
-            ...
         }
     """
-    # Reemplazar en párrafos
-    for paragraph in doc.paragraphs:
+    replacements_count = 0
+    
+    def reemplazar_en_runs(runs, reemplazos):
+        """Reemplaza tags en los runs de un párrafo"""
+        nonlocal replacements_count
+        
+        # Concatenar texto de todos los runs para encontrar placeholders
+        texto_completo = ''.join([run.text for run in runs])
+        
+        # Si no hay placeholders, no hacer nada
+        if not any(f"<<{tag}>>" in texto_completo for tag in reemplazos.keys()):
+            return
+        
+        # Reemplazar cada tag
         for tag, valor in reemplazos.items():
             placeholder = f"<<{tag}>>"
-            if placeholder in paragraph.text:
-                # Reemplazar preservando formato
-                for run in paragraph.runs:
-                    if placeholder in run.text:
-                        run.text = run.text.replace(placeholder, str(valor))
-
-    # Reemplazar en tablas
+            valor_str = str(valor) if valor is not None else ''
+            
+            if placeholder in texto_completo:
+                # Reconstruir runs con reemplazo
+                nuevo_texto = texto_completo.replace(placeholder, valor_str)
+                texto_completo = nuevo_texto
+                replacements_count += 1
+        
+        # Limpiar todos los runs
+        for run in runs[::-1]:
+            r = run._r
+            r.getparent().remove(r)
+        
+        # Crear nuevo run con el texto reemplazado
+        if runs:
+            # Usar el primer run como base para preservar formato
+            run = runs[0] if runs else None
+            if run:
+                p = run._p.getparent()
+                new_run = p.add_run(nuevo_texto)
+                # Intentar copiar formato del primer run original
+                if runs and hasattr(runs[0], 'font'):
+                    for attr in ['bold', 'italic', 'underline', 'size', 'color']:
+                        try:
+                            setattr(new_run.font, attr, getattr(runs[0].font, attr))
+                        except:
+                            pass
+    
+    # Procesar párrafos
+    for paragraph in doc.paragraphs:
+        if paragraph.runs:
+            reemplazar_en_runs(paragraph.runs, reemplazos)
+    
+    # Procesar tablas recursivamente
+    def procesar_celdas(celdas):
+        for cell in celdas:
+            # Procesar párrafos en la celda
+            for paragraph in cell.paragraphs:
+                if paragraph.runs:
+                    reemplazar_en_runs(paragraph.runs, reemplazos)
+            
+            # Procesar tablas anidadas
+            for nested_table in cell.tables:
+                for row in nested_table.rows:
+                    procesar_celdas(row.cells)
+    
     for table in doc.tables:
         for row in table.rows:
-            for cell in row.cells:
-                for paragraph in cell.paragraphs:
-                    for tag, valor in reemplazos.items():
-                        placeholder = f"<<{tag}>>"
-                        if placeholder in paragraph.text:
-                            for run in paragraph.runs:
-                                if placeholder in run.text:
-                                    run.text = run.text.replace(placeholder, str(valor))
+            procesar_celdas(row.cells)
+    
+    logger.info(f"Reemplazos realizados: {replacements_count}")
 
 
 def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
     """
-    Genera PDF a partir de plantilla DOCX reemplazando tags e insertando imágenes
+    Genera PDF a partir de plantilla DOCX reemplazando tags, insertando firmas e imágenes
+    Versión mejorada con manejo correcto de imágenes remotas (Cloudinary)
     
     Args:
         cierre_ot: Instancia de CierreOt
         plantilla_path: Ruta a plantilla_ot.docx (si None, usa ruta por defecto)
     
     Returns:
-        BytesIO con contenido PDF
+        BytesIO con contenido PDF o None si falla
     """
     if plantilla_path is None:
         # Ruta por defecto: plantilla_ot.docx en la raíz del proyecto
@@ -256,29 +387,30 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
     try:
         # Verificar que plantilla existe
         if not os.path.exists(plantilla_path):
-            logger.warning(f"Plantilla no encontrada en {plantilla_path}")
+            logger.warning(f"⚠️ Plantilla no encontrada en {plantilla_path}")
             return None
         
-        # Cargar plantilla
-        logger.info(f"Cargando plantilla desde: {plantilla_path}")
+        logger.info(f"📄 Cargando plantilla desde: {plantilla_path}")
         doc = Document(plantilla_path)
         
         # Preparar datos para reemplazo
         try:
             solicitud = cierre_ot.orden_trabajo.solicitud
             equipo_nombre = solicitud.equipo.nombre if solicitud.equipo else "N/A"
-            cliente_nombre = solicitud.ubicacion.nombre if solicitud.ubicacion else "N/A"
+            cliente_nombre = solicitud.ubicacion.nombre if solicitud.ubicacion else solicitud.PDV or "N/A"
+            fecha_formato = cierre_ot.fecha_inicio_actividad.strftime('%d/%m/%Y') if cierre_ot.fecha_inicio_actividad else datetime.now().strftime('%d/%m/%Y')
         except Exception as e:
-            logger.error(f"Error extrayendo datos: {e}")
+            logger.error(f"❌ Error extrayendo datos de cierre_ot: {e}")
             equipo_nombre = "N/A"
             cliente_nombre = "N/A"
+            fecha_formato = datetime.now().strftime('%d/%m/%Y')
         
-        # Tags a reemplazar
+        # Tags a reemplazar (mapear correctamente a la plantilla)
         reemplazos = {
-            'OT': str(solicitud.consecutivo),
+            'OT': str(solicitud.consecutivo) if solicitud else '',
             'equipo': equipo_nombre,
             'cliente': cliente_nombre,
-            'fecha': cierre_ot.fecha_inicio_actividad.strftime('%d/%m/%Y') if cierre_ot.fecha_inicio_actividad else datetime.now().strftime('%d/%m/%Y'),
+            'fecha': fecha_formato,
             'tipomtto': cierre_ot.tipo_mantenimiento or 'N/A',
             'tipointervencion': cierre_ot.tipo_intervencion or 'N/A',
             'causafalla': cierre_ot.causa_falla or 'N/A',
@@ -291,40 +423,43 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
             'cc': cierre_ot.documento_receptor or 'N/A',
         }
         
-        logger.info(f"Reemplazando tags en plantilla: {list(reemplazos.keys())}")
+        logger.info(f"🔍 Reemplazando {len(reemplazos)} tags en plantilla")
         reemplazar_tags_en_docx(doc, reemplazos)
+        logger.info("✅ Tags reemplazados exitosamente")
         
-        # Agregar firmas antes de las imágenes
+        # Agregar firmas (incluida la lógica de inserción en plantilla existente)
         try:
             _insertar_firma_en_docx(doc, cierre_ot)
+            logger.info("✅ Firmas insertadas")
         except Exception as e:
-            logger.warning(f"Error agregando firmas: {e}")
+            logger.warning(f"⚠️ Error agregando firmas: {e}")
         
         # Agregar imágenes al final del documento
         try:
             _agregar_imagenes_a_docx(doc, cierre_ot)
+            logger.info("✅ Imágenes agregadas")
         except Exception as e:
-            logger.warning(f"Error agregando imágenes: {e}")
+            logger.warning(f"⚠️ Error agregando imágenes: {e}")
         
-        # Guardar DOCX temporal
+        # Guardar DOCX temporal en memoria
         docx_temporal = io.BytesIO()
         doc.save(docx_temporal)
         docx_temporal.seek(0)
         
-        logger.info("DOCX generado en memoria con firmas e imágenes")
+        logger.info("📝 DOCX generado en memoria con firmas e imágenes")
         
         # Intentar convertir a PDF
         pdf_buffer = _convertir_docx_a_pdf(docx_temporal)
         
         if pdf_buffer:
-            logger.info(f"PDF generado exitosamente desde plantilla")
+            logger.info("✅ PDF generado exitosamente desde plantilla")
             return pdf_buffer
         else:
-            logger.warning("No se pudo convertir DOCX a PDF")
+            logger.warning("⚠️ No se pudo convertir DOCX a PDF")
             return None
             
     except Exception as e:
-        logger.error(f"Error generando PDF desde plantilla: {e}")
+        logger.error(f"❌ Error generando PDF desde plantilla: {e}")
         import traceback
         logger.error(traceback.format_exc())
         return None
