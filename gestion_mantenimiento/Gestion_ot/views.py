@@ -1101,16 +1101,26 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     solicitud = cierre_ot.orden_trabajo.solicitud
     consecutivo = solicitud.consecutivo
     equipo_nombre = solicitud.equipo.nombre if solicitud.equipo else "N/A"
-    cliente_nombre = solicitud.ubicacion.nombre if solicitud.ubicacion else "N/A"
+    
+    # Obtener ubicación - extraer solo el segundo nivel (Planta de Producción)
+    ubicacion_full = solicitud.ubicacion.nombre if solicitud.ubicacion else "N/A"
+    if ubicacion_full and "/" in ubicacion_full:
+        # CVR-PLT-01/Planta de Producción/Cava de res → Planta de Producción
+        partes = ubicacion_full.split("/")
+        cliente_nombre = partes[1] if len(partes) > 1 else partes[0]
+    else:
+        cliente_nombre = ubicacion_full
+    
     fecha_str = cierre_ot.fecha_inicio_actividad.strftime('%d/%m/%Y') if cierre_ot.fecha_inicio_actividad else datetime.now().strftime('%d/%m/%Y')
     
     subject = f"Informe de Mantenimiento OT-{consecutivo}"
     
-    # Nombre del PDF: OT_20260620_96.pdf
+    # Nombre del PDF: OT - 115 - 20/6/2026 8:51:39
     fecha_obj = cierre_ot.fecha_inicio_actividad or datetime.now()
-    pdf_filename = f"OT_{fecha_obj.strftime('%Y%m%d')}_{consecutivo}.pdf"
+    fecha_hora_str = fecha_obj.strftime('%d/%m/%Y %H:%M:%S')
+    pdf_filename = f"OT - {consecutivo} - {fecha_hora_str}.pdf"
     
-    from_email = settings.DEFAULT_FROM_EMAIL
+    from_email = "thermovoltc@gmail.com"
     
     # Build recipient list
     recipient_list = []
