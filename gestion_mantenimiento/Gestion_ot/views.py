@@ -1102,14 +1102,8 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     consecutivo = solicitud.consecutivo
     equipo_nombre = solicitud.equipo.nombre if solicitud.equipo else "N/A"
     
-    # Obtener ubicación - extraer solo el segundo nivel (Planta de Producción)
-    ubicacion_full = solicitud.ubicacion.nombre if solicitud.ubicacion else "N/A"
-    if ubicacion_full and "/" in ubicacion_full:
-        # CVR-PLT-01/Planta de Producción/Cava de res → Planta de Producción
-        partes = ubicacion_full.split("/")
-        cliente_nombre = partes[1] if len(partes) > 1 else partes[0]
-    else:
-        cliente_nombre = ubicacion_full
+    # Usar PDV como nombre del cliente
+    cliente_nombre = solicitud.PDV if solicitud.PDV else "N/A"
     
     fecha_str = cierre_ot.fecha_inicio_actividad.strftime('%d/%m/%Y') if cierre_ot.fecha_inicio_actividad else datetime.now().strftime('%d/%m/%Y')
     
