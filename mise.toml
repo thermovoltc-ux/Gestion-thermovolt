@@ -1,0 +1,8 @@
+[settings]
+# Disable GitHub attestation verification for Python
+# This is needed for Railway deployment where GitHub attestations might not work
+python.github_attestations = false
+
+[env]
+# Python version to use
+python = "3.9"
