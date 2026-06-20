@@ -3,44 +3,31 @@ set -ex
 
 echo "STARTUP: checking and installing dependencies..."
 
-# Install Java - necesario para LibreOffice
-echo "Instalando Java runtime..."
-if [ "$SKIP_SYSTEM_PACKAGES" = "true" ]; then
-  echo "SKIP_SYSTEM_PACKAGES=true -> Omitiendo instalación de paquetes del sistema (Java/LibreOffice)"
-else
-  apt-get update || true
-  apt-get install -y default-jre || apt-get install -y openjdk-11-jre || true
+# Update package lists
+echo "Actualizando lista de paquetes..."
+apt-get update || true
+
+# Install Pandoc + Texlive (más ligero que LibreOffice, mejor para DOCX→PDF)
+echo "Instalando Pandoc para conversión de documentos..."
+if [ "$SKIP_SYSTEM_PACKAGES" != "true" ]; then
+  apt-get install -y pandoc texlive-xetex texlive-fonts-recommended 2>&1 | tail -5 || true
 fi
 
-# Verify Java
-if command -v java >/dev/null 2>&1; then
-  JAVA_VERSION=$(java -version 2>&1 | head -1)
-  echo "✓ Java instalado: $JAVA_VERSION"
+# Verify Pandoc
+if command -v pandoc >/dev/null 2>&1; then
+  PANDOC_VERSION=$(pandoc --version | head -1)
+  echo "✓ Pandoc disponible: $PANDOC_VERSION"
 else
-  echo "⚠ Advertencia: Java no se pudo instalar"
+  echo "⚠️ Pandoc no disponible - Se usará fallback"
 fi
 
-# Install LibreOffice - intenta instalar la suite completa primero
-echo "Instalando LibreOffice..."
-if [ "$SKIP_SYSTEM_PACKAGES" = "true" ]; then
-  echo "SKIP_SYSTEM_PACKAGES=true -> Omitiendo instalación de LibreOffice"
-else
-  # Opción 1: Instalar suite completa
-  if apt-get install -y libreoffice 2>/dev/null; then
-    echo "✓ LibreOffice suite completa instalada"
-  # Opción 2: Instalar solo los componentes necesarios
-  elif apt-get install -y libreoffice-core libreoffice-writer libreoffice-calc 2>/dev/null; then
-    echo "✓ LibreOffice (componentes necesarios) instalado"
-  # Opción 3: Intenta con paquetes individuales
-  else
-    echo "⚠ Intentando instalar dependencias individuales..."
-    apt-get install -y libreoffice-common || true
-    apt-get install -y ure || true
-    apt-get install -y libkrb5-3 || true
-  fi
+# Intentar instalar LibreOffice como alternativa (más pesado)
+echo "Intentando instalar LibreOffice como alternativa secundaria..."
+if [ "$SKIP_SYSTEM_PACKAGES" != "true" ]; then
+  apt-get install -y libreoffice-core libreoffice-writer --no-install-recommends 2>&1 | tail -3 || true
 fi
 
-# Verify LibreOffice
+# Verify LibreOffice - Buscar el comando correcto
 LIBREOFFICE_CMD=""
 if command -v soffice >/dev/null 2>&1; then
   LIBREOFFICE_CMD="soffice"
@@ -49,29 +36,25 @@ elif command -v libreoffice >/dev/null 2>&1; then
   LIBREOFFICE_CMD="libreoffice"
   echo "✓ LibreOffice disponible"
 else
-  echo "❌ Advertencia CRÍTICA: LibreOffice no está disponible - el fallback a ReportLab se usará automáticamente"
-  echo "❌ Por favor instala: apt-get install -y libreoffice"
+  echo "ℹ️ LibreOffice no disponible"
+  LIBREOFFICE_CMD=""
 fi
 
-# Configure LibreOffice to work in headless mode
-echo "Configurando LibreOffice para modo headless..."
+# Configure LibreOffice to work in headless mode (solo si está disponible)
 if [ -n "$LIBREOFFICE_CMD" ]; then
-  # Crear directorio de configuración si no existe
+  echo "Configurando LibreOffice para modo headless..."
+  # Crear directorio de configuración
   mkdir -p ~/.config/libreoffice/4/user
   
-  # Intentar inicializar LibreOffice sin interfaz para crear configuración
-  # Esto puede ayudar a evitar problemas en la primera ejecución
-  echo "Preconfiguración de LibreOffice (timeout 30s)..."
-  timeout 30 $LIBREOFFICE_CMD --headless --norestore --invisible --convert-to pdf /dev/null 2>&1 || true
-  
-  # Verificar que LibreOffice ahora responde
-  if timeout 5 $LIBREOFFICE_CMD --headless --version >/dev/null 2>&1; then
-    echo "✓ LibreOffice preconfigurado y respondiendo"
+  # Verificar que LibreOffice responde
+  echo "Verificando LibreOffice..."
+  if timeout 10 $LIBREOFFICE_CMD --version >/dev/null 2>&1; then
+    echo "✓ LibreOffice funcionando correctamente"
   else
-    echo "⚠ LibreOffice instalado pero podría tener problemas en headless mode"
+    echo "⚠ LibreOffice instalado pero con posibles problemas"
   fi
 else
-  echo "⚠ LibreOffice no disponible - PDF fallback activo"
+  echo "ℹ️ Continuando sin LibreOffice - Se usará fallback con ReportLab"
 fi
 
 echo "✓ STARTUP: dependencias instaladas y configuradas"

@@ -10,6 +10,7 @@ import logging
 import base64
 import requests
 import tempfile
+import subprocess
 from datetime import datetime
 from docx import Document
 from docx.shared import Inches, Pt
@@ -455,7 +456,7 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
 def _convertir_docx_a_pdf(docx_buffer, cierre_ot=None):
     """
     Convierte BytesIO DOCX a BytesIO PDF
-    Intenta primero con docx2pdf + LibreOffice, luego fallback con ReportLab
+    Intenta: 1) Pandoc, 2) docx2pdf + LibreOffice, 3) ReportLab fallback
     
     Args:
         docx_buffer: BytesIO con contenido DOCX
@@ -465,26 +466,23 @@ def _convertir_docx_a_pdf(docx_buffer, cierre_ot=None):
         BytesIO con PDF o None si falla
     """
     try:
-        # Detectar si es producción
-        is_railway = os.environ.get('RAILWAY_ENVIRONMENT_NAME')
-        
-        if not is_railway:
-            # En local, intentar docx2pdf
-            try:
-                from docx2pdf import convert
-                import tempfile
-                
-                logger.info("💻 Local: Intentando conversión DOCX→PDF con docx2pdf + LibreOffice")
-                
-                # Guardar DOCX temporal
-                with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as tmp_docx:
-                    tmp_docx.write(docx_buffer.getvalue())
-                    tmp_docx_path = tmp_docx.name
-                
-                # Convertir a PDF
-                tmp_pdf_path = tmp_docx_path.replace('.docx', '.pdf')
-                convert(tmp_docx_path, tmp_pdf_path)
-                
+        # Opción 1: Intentar con Pandoc (mejor calidad, más ligero)
+        logger.info("📄 Intentando conversión DOCX→PDF con Pandoc")
+        try:
+            # Guardar DOCX temporal
+            with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as tmp_docx:
+                tmp_docx.write(docx_buffer.getvalue())
+                tmp_docx_path = tmp_docx.name
+            
+            # Convertir a PDF con Pandoc
+            tmp_pdf_path = tmp_docx_path.replace('.docx', '.pdf')
+            result = subprocess.run(
+                ['pandoc', tmp_docx_path, '-o', tmp_pdf_path, '--pdf-engine=xelatex'],
+                capture_output=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0 and os.path.exists(tmp_pdf_path):
                 # Leer PDF
                 with open(tmp_pdf_path, 'rb') as f:
                     pdf_buffer = io.BytesIO(f.read())
@@ -494,13 +492,46 @@ def _convertir_docx_a_pdf(docx_buffer, cierre_ot=None):
                 if os.path.exists(tmp_pdf_path):
                     os.unlink(tmp_pdf_path)
                 
-                logger.info("✅ Conversión docx2pdf exitosa")
+                logger.info("✅ Conversión Pandoc exitosa")
                 return pdf_buffer
-                
-            except Exception as e:
-                logger.warning(f"docx2pdf falló: {e}")
+            else:
+                logger.warning(f"Pandoc falló: {result.stderr.decode() if result.stderr else 'sin error'}")
+                os.unlink(tmp_docx_path)
+        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+            logger.info(f"Pandoc no disponible: {e}")
+        except Exception as e:
+            logger.warning(f"Error con Pandoc: {e}")
         
-        # Fallback: convertir DOCX a PDF leyendo contenido con ReportLab
+        # Opción 2: Intentar con docx2pdf + LibreOffice
+        logger.info("💻 Intentando conversión DOCX→PDF con docx2pdf + LibreOffice")
+        try:
+            from docx2pdf import convert
+            
+            # Guardar DOCX temporal
+            with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as tmp_docx:
+                tmp_docx.write(docx_buffer.getvalue())
+                tmp_docx_path = tmp_docx.name
+            
+            # Convertir a PDF
+            tmp_pdf_path = tmp_docx_path.replace('.docx', '.pdf')
+            convert(tmp_docx_path, tmp_pdf_path)
+            
+            # Leer PDF
+            with open(tmp_pdf_path, 'rb') as f:
+                pdf_buffer = io.BytesIO(f.read())
+            
+            # Limpiar temporales
+            os.unlink(tmp_docx_path)
+            if os.path.exists(tmp_pdf_path):
+                os.unlink(tmp_pdf_path)
+            
+            logger.info("✅ Conversión docx2pdf exitosa")
+            return pdf_buffer
+            
+        except Exception as e:
+            logger.warning(f"docx2pdf falló: {e}")
+        
+        # Opción 3: Fallback con ReportLab
         logger.info("🚂 Usando ReportLab para convertir DOCX a PDF")
         return _docx_a_pdf_reportlab(docx_buffer, cierre_ot)
     
