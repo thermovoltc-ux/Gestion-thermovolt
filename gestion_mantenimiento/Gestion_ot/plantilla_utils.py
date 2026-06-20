@@ -297,60 +297,47 @@ def reemplazar_tags_en_docx(doc, reemplazos):
     """
     replacements_count = 0
     
-    def reemplazar_en_runs(runs, reemplazos):
-        """Reemplaza tags en los runs de un párrafo"""
+    def reemplazar_en_paragraph(paragraph):
+        """Reemplaza tags en un párrafo completo"""
         nonlocal replacements_count
         
-        # Concatenar texto de todos los runs para encontrar placeholders
-        texto_completo = ''.join([run.text for run in runs])
+        # Concatenar texto de todos los runs
+        texto_completo = ''.join([run.text for run in paragraph.runs])
         
         # Si no hay placeholders, no hacer nada
         if not any(f"<<{tag}>>" in texto_completo for tag in reemplazos.keys()):
             return
         
-        # Reemplazar cada tag
+        # Hacer reemplazos
+        nuevo_texto = texto_completo
         for tag, valor in reemplazos.items():
             placeholder = f"<<{tag}>>"
             valor_str = str(valor) if valor is not None else ''
             
-            if placeholder in texto_completo:
-                # Reconstruir runs con reemplazo
-                nuevo_texto = texto_completo.replace(placeholder, valor_str)
-                texto_completo = nuevo_texto
+            if placeholder in nuevo_texto:
+                nuevo_texto = nuevo_texto.replace(placeholder, valor_str)
                 replacements_count += 1
         
-        # Limpiar todos los runs
-        for run in runs[::-1]:
-            r = run._r
-            r.getparent().remove(r)
-        
-        # Crear nuevo run con el texto reemplazado
-        if runs:
-            # Usar el primer run como base para preservar formato
-            run = runs[0] if runs else None
-            if run:
-                p = run._p.getparent()
-                new_run = p.add_run(nuevo_texto)
-                # Intentar copiar formato del primer run original
-                if runs and hasattr(runs[0], 'font'):
-                    for attr in ['bold', 'italic', 'underline', 'size', 'color']:
-                        try:
-                            setattr(new_run.font, attr, getattr(runs[0].font, attr))
-                        except:
-                            pass
+        # Si el texto cambió, reconstruir runs
+        if nuevo_texto != texto_completo:
+            # Limpiar todos los runs EXCEPTO el primero (para no romper estructura)
+            for run in paragraph.runs[::-1]:
+                r_element = run._element
+                r_element.getparent().remove(r_element)
+            
+            # Agregar nuevo run con el texto completo
+            paragraph.add_run(nuevo_texto)
     
-    # Procesar párrafos
+    # Procesar párrafos normales
     for paragraph in doc.paragraphs:
-        if paragraph.runs:
-            reemplazar_en_runs(paragraph.runs, reemplazos)
+        reemplazar_en_paragraph(paragraph)
     
     # Procesar tablas recursivamente
     def procesar_celdas(celdas):
         for cell in celdas:
             # Procesar párrafos en la celda
             for paragraph in cell.paragraphs:
-                if paragraph.runs:
-                    reemplazar_en_runs(paragraph.runs, reemplazos)
+                reemplazar_en_paragraph(paragraph)
             
             # Procesar tablas anidadas
             for nested_table in cell.tables:
@@ -361,7 +348,7 @@ def reemplazar_tags_en_docx(doc, reemplazos):
         for row in table.rows:
             procesar_celdas(row.cells)
     
-    logger.info(f"Reemplazos realizados: {replacements_count}")
+    logger.info(f"🔍 Reemplazos realizados: {replacements_count}")
 
 
 def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
