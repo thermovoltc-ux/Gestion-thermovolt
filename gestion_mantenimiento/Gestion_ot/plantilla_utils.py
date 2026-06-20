@@ -136,7 +136,8 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
             name='CustomBody',
             parent=styles['BodyText'],
             fontSize=9,
-            leading=11
+            leading=11,
+            alignment=TA_CENTER
         )
         
         # ==================== ENCABEZADO ====================
@@ -234,9 +235,9 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         tabla_desc.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F2937')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (0, 0), 'MIDDLE'),
-            ('VALIGN', (0, 1), (-1, -1), 'TOP'),
+            ('VALIGN', (0, 1), (-1, -1), 'MIDDLE'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('FONTSIZE', (0, 1), (-1, -1), 9),
@@ -258,9 +259,9 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         tabla_obs.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F2937')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (0, 0), 'MIDDLE'),
-            ('VALIGN', (0, 1), (-1, -1), 'TOP'),
+            ('VALIGN', (0, 1), (-1, -1), 'MIDDLE'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('FONTSIZE', (0, 1), (-1, -1), 9),
@@ -276,12 +277,31 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         story.append(Paragraph("Confirmación de trabajo recibido:", heading_style))
         story.append(Spacer(1, 0.1*inch))
         
-        # Tabla de firmas
+        # Obtener imágenes de firmas
+        firma_tech_img = None
+        firma_tech_path, _ = _obtener_imagen_temporal(cierre_ot.firma_digital)
+        if firma_tech_path and os.path.exists(firma_tech_path):
+            try:
+                firma_tech_img = PlatypusImage(firma_tech_path, width=1.5*inch, height=0.8*inch)
+                logger.info("✅ Firma técnico encontrada")
+            except Exception as e:
+                logger.warning(f"Error imagen firma técnico: {e}")
+        
+        firma_recep_img = None
+        firma_recep_path, _ = _obtener_imagen_temporal(cierre_ot.firma_receptor)
+        if firma_recep_path and os.path.exists(firma_recep_path):
+            try:
+                firma_recep_img = PlatypusImage(firma_recep_path, width=1.5*inch, height=0.8*inch)
+                logger.info("✅ Firma receptor encontrada")
+            except Exception as e:
+                logger.warning(f"Error imagen firma receptor: {e}")
+        
+        # Tabla de firmas (nombres, docs, y espacios para firmas)
         firma_data = [
             ['Realizador por:', 'Recibido por:'],
             [cierre_ot.nombre_tecnico or 'N/A', cierre_ot.nombre_receptor or 'N/A'],
             [f"Doc: {cierre_ot.documento_tecnico or 'N/A'}", f"Doc: {cierre_ot.documento_receptor or 'N/A'}"],
-            ['[FIRMA]', '[FIRMA]']
+            [firma_tech_img or Paragraph('_' * 20, body_style), firma_recep_img or Paragraph('_' * 20, body_style)]
         ]
         
         tabla_firmas = Table(firma_data, colWidths=[3.75*inch, 3.75*inch])
@@ -295,88 +315,96 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('ROWHEIGHTS', (0, 3), (-1, 3), 1*inch),
         ]))
         story.append(tabla_firmas)
         
-        # Insertar firmas como imágenes
-        story.append(Spacer(1, 0.1*inch))
-        
-        # Fila para imágenes de firmas
-        firma_imgs = []
-        
-        if cierre_ot.firma_digital:
-            tmp_path, _ = _obtener_imagen_temporal(cierre_ot.firma_digital)
-            if tmp_path and os.path.exists(tmp_path):
-                try:
-                    firma_imgs.append(PlatypusImage(tmp_path, width=1.5*inch, height=0.8*inch))
-                    logger.info("✅ Firma técnico agregada")
-                except:
-                    firma_imgs.append(Paragraph('[Firma]', body_style))
-        else:
-            firma_imgs.append(Paragraph('[Firma]', body_style))
-        
-        if cierre_ot.firma_receptor:
-            tmp_path, _ = _obtener_imagen_temporal(cierre_ot.firma_receptor)
-            if tmp_path and os.path.exists(tmp_path):
-                try:
-                    firma_imgs.append(PlatypusImage(tmp_path, width=1.5*inch, height=0.8*inch))
-                    logger.info("✅ Firma receptor agregada")
-                except:
-                    firma_imgs.append(Paragraph('[Firma]', body_style))
-        else:
-            firma_imgs.append(Paragraph('[Firma]', body_style))
-        
-        if len(firma_imgs) == 2:
-            tabla_imgs_firmas = Table([firma_imgs], colWidths=[3.75*inch, 3.75*inch])
-            tabla_imgs_firmas.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-            story.append(tabla_imgs_firmas)
-        
         # ==================== IMÁGENES ANTES/DESPUÉS ====================
         
-        imagenes_antes = cierre_ot.imagenes.filter(tipo='antes')
-        imagenes_despues = cierre_ot.imagenes.filter(tipo='despues')
+        imagenes_antes = list(cierre_ot.imagenes.filter(tipo='antes'))
+        imagenes_despues = list(cierre_ot.imagenes.filter(tipo='despues'))
         
-        if imagenes_antes.exists() or imagenes_despues.exists():
+        if imagenes_antes or imagenes_despues:
             story.append(PageBreak())
             
-            # ANTES
-            if imagenes_antes.exists():
-                story.append(Paragraph("─ ANTES ─", heading_style))
-                story.append(Spacer(1, 0.1*inch))
-                
-                for img in imagenes_antes:
-                    try:
-                        img_path, _ = _obtener_imagen_temporal(img.imagen)
-                        if img_path and os.path.exists(img_path):
-                            img_platypus = PlatypusImage(img_path, width=5*inch, height=3.75*inch)
-                            story.append(img_platypus)
-                            story.append(Spacer(1, 0.1*inch))
-                            logger.info("✅ Imagen ANTES agregada")
-                    except Exception as e:
-                        logger.warning(f"Error imagen ANTES: {e}")
+            heading_antes_style = ParagraphStyle(
+                name='HeadingAntes',
+                parent=styles['Heading2'],
+                fontSize=12,
+                textColor=colors.HexColor('#1F2937'),
+                spaceAfter=6,
+                spaceBefore=6,
+                alignment=TA_CENTER,
+                fontName='Helvetica-Bold'
+            )
             
-            # Espacio
-            if imagenes_antes.exists() and imagenes_despues.exists():
-                story.append(Spacer(1, 0.2*inch))
+            # ANTES
+            if imagenes_antes:
+                story.append(Paragraph("FOTOS ANTES DEL TRABAJO", heading_antes_style))
+                story.append(Spacer(1, 0.15*inch))
+                
+                # Agrupar imágenes de a 2 por fila
+                for i in range(0, len(imagenes_antes), 2):
+                    fila_imgs = []
+                    for j in range(2):
+                        if i + j < len(imagenes_antes):
+                            try:
+                                img_path, _ = _obtener_imagen_temporal(imagenes_antes[i + j].imagen)
+                                if img_path and os.path.exists(img_path):
+                                    img_obj = PlatypusImage(img_path, width=3.3*inch, height=2.5*inch)
+                                    fila_imgs.append(img_obj)
+                                    logger.info("✅ Imagen ANTES agregada")
+                                else:
+                                    fila_imgs.append(Paragraph('[Imagen no disponible]', body_style))
+                            except Exception as e:
+                                logger.warning(f"Error imagen ANTES: {e}")
+                                fila_imgs.append(Paragraph('[Error imagen]', body_style))
+                        else:
+                            fila_imgs.append(Paragraph('', body_style))
+                    
+                    if fila_imgs:
+                        tabla_imgs_antes = Table([fila_imgs], colWidths=[3.5*inch, 3.5*inch])
+                        tabla_imgs_antes.setStyle(TableStyle([
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                            ('BORDERS', (0, 0), (-1, -1), 0, colors.white),
+                        ]))
+                        story.append(tabla_imgs_antes)
+                        story.append(Spacer(1, 0.2*inch))
             
             # DESPUÉS
-            if imagenes_despues.exists():
-                story.append(Paragraph("─ DESPUÉS ─", heading_style))
-                story.append(Spacer(1, 0.1*inch))
+            if imagenes_despues:
+                story.append(Paragraph("FOTOS DESPUÉS DEL TRABAJO", heading_antes_style))
+                story.append(Spacer(1, 0.15*inch))
                 
-                for img in imagenes_despues:
-                    try:
-                        img_path, _ = _obtener_imagen_temporal(img.imagen)
-                        if img_path and os.path.exists(img_path):
-                            img_platypus = PlatypusImage(img_path, width=5*inch, height=3.75*inch)
-                            story.append(img_platypus)
-                            story.append(Spacer(1, 0.1*inch))
-                            logger.info("✅ Imagen DESPUÉS agregada")
-                    except Exception as e:
-                        logger.warning(f"Error imagen DESPUÉS: {e}")
+                # Agrupar imágenes de a 2 por fila
+                for i in range(0, len(imagenes_despues), 2):
+                    fila_imgs = []
+                    for j in range(2):
+                        if i + j < len(imagenes_despues):
+                            try:
+                                img_path, _ = _obtener_imagen_temporal(imagenes_despues[i + j].imagen)
+                                if img_path and os.path.exists(img_path):
+                                    img_obj = PlatypusImage(img_path, width=3.3*inch, height=2.5*inch)
+                                    fila_imgs.append(img_obj)
+                                    logger.info("✅ Imagen DESPUÉS agregada")
+                                else:
+                                    fila_imgs.append(Paragraph('[Imagen no disponible]', body_style))
+                            except Exception as e:
+                                logger.warning(f"Error imagen DESPUÉS: {e}")
+                                fila_imgs.append(Paragraph('[Error imagen]', body_style))
+                        else:
+                            fila_imgs.append(Paragraph('', body_style))
+                    
+                    if fila_imgs:
+                        tabla_imgs_despues = Table([fila_imgs], colWidths=[3.5*inch, 3.5*inch])
+                        tabla_imgs_despues.setStyle(TableStyle([
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                            ('BORDERS', (0, 0), (-1, -1), 0, colors.white),
+                        ]))
+                        story.append(tabla_imgs_despues)
+                        story.append(Spacer(1, 0.2*inch))
         
         # Generar PDF
         pdf_doc.build(story)
