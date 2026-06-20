@@ -1458,9 +1458,21 @@ def guardar_copia_pdf_envio(pdf_buffer, cierre_ot):
 
 
 def enviar_pdf_por_email(pdf_buffer, cierre_ot):
-    """Envía el PDF por email usando Mailgun API (funciona en Railway sin restricciones SMTP)."""
-    subject = f"Informe de Mantenimiento OT-{cierre_ot.orden_trabajo.solicitud.consecutivo}"
-    message = "Adjunto se encuentra el informe de mantenimiento."
+    """Envía el PDF por email usando Brevo API con formato HTML presentable."""
+    from django.core.mail import EmailMultiAlternatives
+    
+    solicitud = cierre_ot.orden_trabajo.solicitud
+    consecutivo = solicitud.consecutivo
+    equipo_nombre = solicitud.equipo.nombre if solicitud.equipo else "N/A"
+    cliente_nombre = solicitud.ubicacion.nombre if solicitud.ubicacion else "N/A"
+    fecha_str = cierre_ot.fecha_inicio_actividad.strftime('%d/%m/%Y') if cierre_ot.fecha_inicio_actividad else datetime.now().strftime('%d/%m/%Y')
+    
+    subject = f"Informe de Mantenimiento OT-{consecutivo}"
+    
+    # Nombre del PDF: OT_20260620_96.pdf
+    fecha_obj = cierre_ot.fecha_inicio_actividad or datetime.now()
+    pdf_filename = f"OT_{fecha_obj.strftime('%Y%m%d')}_{consecutivo}.pdf"
+    
     from_email = settings.DEFAULT_FROM_EMAIL
     
     # Build recipient list
@@ -1471,7 +1483,6 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     # Try to resolve client/PDV email
     pdv_name = None
     try:
-        solicitud = cierre_ot.orden_trabajo.solicitud
         pdv_name = solicitud.PDV or (solicitud.equipo.ubicacion.nombre if solicitud.equipo and solicitud.equipo.ubicacion else None)
     except Exception:
         pdv_name = None
@@ -1507,9 +1518,8 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     # Fallback to solicitud.email_solicitante
     if not client_emails:
         try:
-            sol = cierre_ot.orden_trabajo.solicitud
-            if getattr(sol, 'email_solicitante', None):
-                client_emails = [sol.email_solicitante]
+            if getattr(solicitud, 'email_solicitante', None):
+                client_emails = [solicitud.email_solicitante]
         except Exception:
             pass
 
@@ -1535,21 +1545,78 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     guardar_copia_pdf_envio(pdf_buffer, cierre_ot)
 
     try:
-        logger.info("📬 Enviando email via Mailgun:")
-        logger.info("   - From: %s", from_email)
-        logger.info("   - To: %s", recipient_list)
-        logger.info("   - BCC: %s", bcc_list if bcc_list else "Ninguno")
-        logger.info("   - Subject: %s", subject)
+        # Crear mensaje HTML presentable
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+                <!-- Header -->
+                <div style="background-color: #1a3a52; color: white; padding: 30px 20px; text-align: center;">
+                    <h2 style="margin: 0; font-size: 24px;">Informe de Mantenimiento</h2>
+                    <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Thermovolt Servicios</p>
+                </div>
+                
+                <!-- Body -->
+                <div style="padding: 30px 20px;">
+                    <p style="margin-top: 0;">Cordial saludo,</p>
+                    
+                    <p>Adjunto se encuentra el informe de los trabajos realizados en <strong>{cliente_nombre}</strong>.</p>
+                    
+                    <!-- Info Box -->
+                    <div style="background-color: #f5f5f5; border-left: 4px solid #2c5aa0; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                        <p style="margin: 5px 0;"><strong>Orden de Trabajo:</strong> OT-{consecutivo}</p>
+                        <p style="margin: 5px 0;"><strong>Equipo:</strong> {equipo_nombre}</p>
+                        <p style="margin: 5px 0;"><strong>Cliente:</strong> {cliente_nombre}</p>
+                        <p style="margin: 5px 0;"><strong>Fecha:</strong> {fecha_str}</p>
+                        <p style="margin: 5px 0;"><strong>Documento:</strong> {pdf_filename}</p>
+                    </div>
+                    
+                    <p>El archivo PDF adjunto contiene todos los detalles de la intervención realizada, incluyendo descripción del trabajo, materiales utilizados y confirmación de recepción.</p>
+                    
+                    <p>Si tiene preguntas o necesita aclaraciones adicionales, no dude en contactarnos.</p>
+                </div>
+                
+                <!-- Footer -->
+                <div style="background-color: #f9f9f9; padding: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666;">
+                    <p style="margin: 0; text-align: center;">
+                        <strong>Thermovolt</strong> | Servicios de Mantenimiento Industrial<br>
+                        <a href="mailto:info@thermovolt.com" style="color: #2c5aa0; text-decoration: none;">info@thermovolt.com</a>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
         
-        email = EmailMessage(subject, message, from_email, recipient_list, bcc=bcc_list)
-        email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
+        # Crear email con versión texto y HTML
+        text_content = f"Cordial saludo,\n\nAdjunto se encuentra el informe de los trabajos realizados en {cliente_nombre}.\n\nOT-{consecutivo}\nEquipo: {equipo_nombre}\nCliente: {cliente_nombre}\nFecha: {fecha_str}\n\nThermovolt Servicios"
+        
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=from_email,
+            to=recipient_list,
+            bcc=bcc_list
+        )
+        
+        # Agregar versión HTML
+        email.attach_alternative(html_content, "text/html")
+        
+        # Adjuntar PDF con nombre mejorado
+        email.attach(pdf_filename, pdf_buffer.getvalue(), 'application/pdf')
+        
+        logger.info(f"📬 Enviando email via Brevo")
+        logger.info(f"   - Destinatarios: {recipient_list}")
+        logger.info(f"   - Archivo: {pdf_filename}")
+        
         email.send(fail_silently=False)
         
-        logger.info("✅ Email enviado EXITOSAMENTE via Mailgun")
+        logger.info("✅ Email enviado EXITOSAMENTE via Brevo")
         return True
         
     except Exception as e:
         logger.error("❌ Error enviando email: %s", str(e))
         logger.error("   - Tipo: %s", type(e).__name__)
         return False
+
 
