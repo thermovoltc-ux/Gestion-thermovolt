@@ -1,5 +1,5 @@
 #!/bin/sh
-set -ex
+set -e  # Detener en primer error
 
 echo "STARTUP: checking and installing dependencies..."
 
@@ -7,42 +7,75 @@ echo "STARTUP: checking and installing dependencies..."
 echo "Actualizando lista de paquetes..."
 apt-get update || true
 
-# Instalar LibreOffice CORRECTAMENTE (componentes mínimos necesarios)
-echo "Instalando LibreOffice para conversión DOCX→PDF..."
+# Instalar dependencias necesarias para LibreOffice
+echo "Instalando dependencias del sistema..."
 if [ "$SKIP_SYSTEM_PACKAGES" != "true" ]; then
-  # Instalar dependencias principales sin recomendaciones (más rápido)
-  apt-get install -y libreoffice-core --no-install-recommends 2>&1 | tail -5 || true
-  apt-get install -y libreoffice-writer --no-install-recommends 2>&1 | tail -3 || true
+  # Instalar bibliotecas básicas
+  apt-get install -y libssl1.1 2>/dev/null || apt-get install -y libssl3 || true
+  apt-get install -y libcairo2 libcups2 libdbus-1-3 libfontconfig1 libfreetype6 2>/dev/null || true
 fi
 
-# Verificar LibreOffice - buscar el comando
-LIBREOFFICE_CMD=""
-for cmd in soffice libreoffice; do
-  if command -v $cmd >/dev/null 2>&1; then
-    LIBREOFFICE_CMD=$cmd
-    echo "✓ LibreOffice encontrado: $cmd"
-    break
-  fi
-done
+# Instalar LibreOffice PASO A PASO
+echo "Instalando LibreOffice..."
+if [ "$SKIP_SYSTEM_PACKAGES" != "true" ]; then
+  echo "  → Instalando libreoffice-core..."
+  apt-get install -y --no-install-recommends libreoffice-core 2>&1 | grep -i "setting up\|already\|done" || true
+  
+  echo "  → Instalando libreoffice-writer..."
+  apt-get install -y --no-install-recommends libreoffice-writer 2>&1 | grep -i "setting up\|already\|done" || true
+  
+  echo "  → Instalando libreoffice-calc..."
+  apt-get install -y --no-install-recommends libreoffice-calc 2>&1 | grep -i "setting up\|already\|done" || true
+  
+  echo "  → Instalando dependencias gráficas mínimas..."
+  apt-get install -y libxrender1 libxext6 2>/dev/null || true
+fi
 
-if [ -z "$LIBREOFFICE_CMD" ]; then
-  echo "❌ LibreOffice NO se instaló correctamente"
-  echo "⚠️ Se usará fallback con ReportLab (formato básico)"
+# Encontrar y verificar LibreOffice
+echo "Buscando LibreOffice..."
+LIBREOFFICE_CMD=""
+
+if command -v soffice >/dev/null 2>&1; then
+  LIBREOFFICE_CMD="soffice"
+  echo "✓ LibreOffice encontrado: soffice"
+elif command -v libreoffice >/dev/null 2>&1; then
+  LIBREOFFICE_CMD="libreoffice"
+  echo "✓ LibreOffice encontrado: libreoffice"
 else
-  echo "✓ LibreOffice disponible para conversión de documentos"
+  echo "❌ LibreOffice NO se instaló - Se usará fallback con ReportLab"
+  LIBREOFFICE_CMD=""
+fi
+
+# Configurar LibreOffice
+if [ -n "$LIBREOFFICE_CMD" ]; then
+  echo "Configurando LibreOffice para modo headless..."
   
   # Crear directorios de configuración
   mkdir -p ~/.config/libreoffice/4/user
+  mkdir -p /tmp/libreoffice-lock
   
-  # Verificar que responde
-  if timeout 5 $LIBREOFFICE_CMD --version >/dev/null 2>&1; then
+  # Exportar variables de entorno
+  export SAL_USE_VCLPLUGIN=gtk
+  export HOME=/app
+  
+  # Verificar que LibreOffice responde
+  echo "Verificando LibreOffice (timeout 10s)..."
+  set +e  # No fallar si esto no funciona
+  timeout 10 $LIBREOFFICE_CMD --headless --version >/dev/null 2>&1
+  RESULT=$?
+  set -e
+  
+  if [ $RESULT -eq 0 ]; then
     echo "✓ LibreOffice verificado y funcionando"
   else
-    echo "⚠️ LibreOffice instalado pero con problemas de respuesta"
+    echo "⚠️ LibreOffice no respondió - pero continuamos"
   fi
+else
+  echo "ℹ️ Sin LibreOffice - Se usará fallback con ReportLab (PDF básico)"
 fi
 
 echo "✓ STARTUP: dependencias configuradas"
+
 
 
 echo "STARTUP: running all migrations"
