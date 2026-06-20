@@ -14,6 +14,7 @@ from urllib.parse import urljoin
 import os
 from django.contrib import messages
 import os
+import smtplib
 from .models import OrdenTrabajo, Estado, GestionOt, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad
 from .forms import GestionOtForm, OrdenTrabajoForm, CierreOtForm, ImagenCierreOtForm, ImagenAntesForm, ImagenDespuesForm, CierreOtActividadFormSet
 from gestion_mantenimiento.solicitudes.models import Solicitud
@@ -1608,18 +1609,38 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         # Fallback: Intentar enviar por SMTP (Django EmailBackend)
         logger.info("📬 ENVIANDO VIA SMTP:")
         logger.info("   - Backend: %s", settings.EMAIL_BACKEND)
+        logger.info("   - Host: %s", settings.EMAIL_HOST)
+        logger.info("   - Port: %s", settings.EMAIL_PORT)
+        logger.info("   - Use TLS: %s", getattr(settings, 'EMAIL_USE_TLS', 'No configurado'))
         logger.info("   - From: %s", from_email)
         logger.info("   - To: %s", recipient_list)
         logger.info("   - BCC: %s", bcc_list if bcc_list else "Ninguno")
         
-        email = EmailMessage(subject, message, from_email, recipient_list, bcc=bcc_list)
-        email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
-        email.send(fail_silently=False)
-        logger.info("✅ Email enviado EXITOSAMENTE via SMTP")
-        return True
-
+        try:
+            email = EmailMessage(subject, message, from_email, recipient_list, bcc=bcc_list)
+            email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
+            logger.info("   📧 EmailMessage creado, intentando enviar...")
+            email.send(fail_silently=False)
+            logger.info("✅ Email enviado EXITOSAMENTE via SMTP")
+            return True
+        except smtplib.SMTPAuthenticationError as e:
+            logger.error("❌ ERROR AUTENTICACION SMTP: %s", str(e))
+            logger.error("   - Verifica que EMAIL_HOST_PASSWORD es correcto")
+            logger.error("   - Debe ser sin espacios: cobusxzmypxyyzoo")
+            logger.error("   - Verifica que 2FA está activado en Google")
+            return False
+        except smtplib.SMTPException as e:
+            logger.error("❌ ERROR SMTP: %s", str(e))
+            return False
+        except Exception as e:
+            logger.error("❌ Error enviando email por SMTP: %s", e)
+            logger.error("   - Tipo de error: %s", type(e).__name__)
+            import traceback
+            logger.error("   - Traceback: %s", traceback.format_exc())
+            return False
+    
     except Exception as e:
-        logger.error("❌ Error enviando email (ambos métodos fallaron): %s", e)
+        logger.error("❌ Error crítico en envio de email: %s", e)
         logger.error("   - Tipo de error: %s", type(e).__name__)
         import traceback
         logger.error("   - Traceback: %s", traceback.format_exc())
