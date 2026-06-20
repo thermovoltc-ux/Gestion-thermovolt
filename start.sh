@@ -7,57 +7,42 @@ echo "STARTUP: checking and installing dependencies..."
 echo "Actualizando lista de paquetes..."
 apt-get update || true
 
-# Install Pandoc + Texlive (más ligero que LibreOffice, mejor para DOCX→PDF)
-echo "Instalando Pandoc para conversión de documentos..."
+# Instalar LibreOffice CORRECTAMENTE (componentes mínimos necesarios)
+echo "Instalando LibreOffice para conversión DOCX→PDF..."
 if [ "$SKIP_SYSTEM_PACKAGES" != "true" ]; then
-  apt-get install -y pandoc texlive-xetex texlive-fonts-recommended 2>&1 | tail -5 || true
+  # Instalar dependencias principales sin recomendaciones (más rápido)
+  apt-get install -y libreoffice-core --no-install-recommends 2>&1 | tail -5 || true
+  apt-get install -y libreoffice-writer --no-install-recommends 2>&1 | tail -3 || true
 fi
 
-# Verify Pandoc
-if command -v pandoc >/dev/null 2>&1; then
-  PANDOC_VERSION=$(pandoc --version | head -1)
-  echo "✓ Pandoc disponible: $PANDOC_VERSION"
-else
-  echo "⚠️ Pandoc no disponible - Se usará fallback"
-fi
-
-# Intentar instalar LibreOffice como alternativa (más pesado)
-echo "Intentando instalar LibreOffice como alternativa secundaria..."
-if [ "$SKIP_SYSTEM_PACKAGES" != "true" ]; then
-  apt-get install -y libreoffice-core libreoffice-writer --no-install-recommends 2>&1 | tail -3 || true
-fi
-
-# Verify LibreOffice - Buscar el comando correcto
+# Verificar LibreOffice - buscar el comando
 LIBREOFFICE_CMD=""
-if command -v soffice >/dev/null 2>&1; then
-  LIBREOFFICE_CMD="soffice"
-  echo "✓ LibreOffice (soffice) disponible"
-elif command -v libreoffice >/dev/null 2>&1; then
-  LIBREOFFICE_CMD="libreoffice"
-  echo "✓ LibreOffice disponible"
-else
-  echo "ℹ️ LibreOffice no disponible"
-  LIBREOFFICE_CMD=""
-fi
+for cmd in soffice libreoffice; do
+  if command -v $cmd >/dev/null 2>&1; then
+    LIBREOFFICE_CMD=$cmd
+    echo "✓ LibreOffice encontrado: $cmd"
+    break
+  fi
+done
 
-# Configure LibreOffice to work in headless mode (solo si está disponible)
-if [ -n "$LIBREOFFICE_CMD" ]; then
-  echo "Configurando LibreOffice para modo headless..."
-  # Crear directorio de configuración
+if [ -z "$LIBREOFFICE_CMD" ]; then
+  echo "❌ LibreOffice NO se instaló correctamente"
+  echo "⚠️ Se usará fallback con ReportLab (formato básico)"
+else
+  echo "✓ LibreOffice disponible para conversión de documentos"
+  
+  # Crear directorios de configuración
   mkdir -p ~/.config/libreoffice/4/user
   
-  # Verificar que LibreOffice responde
-  echo "Verificando LibreOffice..."
-  if timeout 10 $LIBREOFFICE_CMD --version >/dev/null 2>&1; then
-    echo "✓ LibreOffice funcionando correctamente"
+  # Verificar que responde
+  if timeout 5 $LIBREOFFICE_CMD --version >/dev/null 2>&1; then
+    echo "✓ LibreOffice verificado y funcionando"
   else
-    echo "⚠ LibreOffice instalado pero con posibles problemas"
+    echo "⚠️ LibreOffice instalado pero con problemas de respuesta"
   fi
-else
-  echo "ℹ️ Continuando sin LibreOffice - Se usará fallback con ReportLab"
 fi
 
-echo "✓ STARTUP: dependencias instaladas y configuradas"
+echo "✓ STARTUP: dependencias configuradas"
 
 
 echo "STARTUP: running all migrations"
