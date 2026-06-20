@@ -815,19 +815,36 @@ def detalles_solicitud(request, consecutivo):
 
 
 def generar_pdf_informe(cierre_ot, request=None):
-    """Genera un PDF usando plantilla Word si existe, sino usa ReportLab"""
-    template_path = os.path.join(settings.BASE_DIR, 'gestion_mantenimiento', 'static', 'plantilla_ot.docx')
-    logger.info(f"Intentando generar PDF para OT {cierre_ot.orden_trabajo.solicitud.consecutivo}")
-    logger.info(f"Ruta de plantilla: {template_path}")
-    logger.info(f"¿Plantilla existe?: {os.path.exists(template_path)}")
+    """Genera un PDF usando plantilla Word si existe y LibreOffice está disponible, sino usa ReportLab"""
+    # En Railway (producción), LibreOffice no está disponible, así que usar ReportLab directamente
+    is_railway = os.environ.get('RAILWAY_ENVIRONMENT_NAME') is not None
+    is_production = not getattr(settings, 'DEBUG', True)
     
-    if os.path.exists(template_path):
-        logger.info("Usando plantilla Word para generar PDF")
+    logger.info(f"📝 Generando PDF para OT {cierre_ot.orden_trabajo.solicitud.consecutivo}")
+    logger.info(f"   - Entorno: {'Railway' if is_railway else 'Local/Dev'}")
+    logger.info(f"   - DEBUG: {getattr(settings, 'DEBUG', True)}")
+    
+    template_path = os.path.join(settings.BASE_DIR, 'gestion_mantenimiento', 'static', 'plantilla_ot.docx')
+    template_exists = os.path.exists(template_path)
+    logger.info(f"   - Plantilla DOCX existe: {template_exists}")
+    
+    # En Railway/producción, siempre usar ReportLab (LibreOffice no está disponible)
+    if is_railway or is_production:
+        logger.info("🚂 Detectado Railway/Producción - usando ReportLab (LibreOffice no disponible)")
+        return generar_pdf_reportlab(cierre_ot)
+    
+    # En ambiente local/dev, intentar DOCX si la plantilla existe
+    if template_exists:
+        logger.info("📄 Intentando generar PDF desde plantilla Word")
         firma_tec = request.POST.get('firma_digital') if request else None
         firma_rec = request.POST.get('firma_receptor') if request else None
-        return generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec, firma_rec)
+        try:
+            return generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec, firma_rec)
+        except Exception as e:
+            logger.warning(f"⚠️  Error con plantilla Word: {e} - usando ReportLab como fallback")
+            return generar_pdf_reportlab(cierre_ot)
     else:
-        logger.warning("Plantilla no encontrada, usando ReportLab como fallback")
+        logger.info("📋 Plantilla no encontrada, usando ReportLab")
         return generar_pdf_reportlab(cierre_ot)
 
 def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_rec=None):
@@ -1556,7 +1573,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
                 "Content-Type": "application/json"
             }
 
-            logger.info("📧 ENVIANDO VIA SENDGRID API:")
+            logger.info("📧 INTENTANDO ENVIO VIA SENDGRID API:")
             logger.info("   - From: %s", from_email)
             logger.info("   - To: %s", recipient_list)
             logger.info("   - BCC: %s", bcc_list if bcc_list else "Ninguno")
@@ -1572,32 +1589,38 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
 
             logger.info("📨 Respuesta SendGrid - Status Code: %d", response.status_code)
             if response.status_code in (200, 202):
-                logger.info("✅ Email enviado exitosamente via SendGrid API")
+                logger.info("✅ Email enviado EXITOSAMENTE via SendGrid API")
                 return True
             
-            # ❌ Diagnóstico de error
-            logger.error("❌ SendGrid API error %d: %s", response.status_code, response.text)
+            # ❌ SendGrid falló - intentar fallback SMTP
+            logger.warning("⚠️  SendGrid API error %d: %s", response.status_code, response.text)
             
             # Detalles específicos para error 401
             if response.status_code == 401:
-                logger.error("🔐 ERROR DE AUTENTICACIÓN (401):")
-                logger.error("   - Probable causa 1: API Key inválida o expirada")
-                logger.error("   - Probable causa 2: Email 'from' no verificado en SendGrid")
-                logger.error("   - Probable causa 3: Problema con el servidor de SendGrid")
-                logger.error("   - SOLUCIÓN: Verifica que SENDGRID_API_KEY sea correcto en Railway")
-                logger.error("   - Email From: %s", from_email)
+                logger.warning("🔐 ERROR 401 SendGrid - Intentando fallback a SMTP")
+                if "Maximum credits exceeded" in response.text:
+                    logger.warning("   → Causa: Plan de SendGrid sin créditos (plan gratuito agotado)")
+                else:
+                    logger.warning("   → Causa: Posible API Key inválida o email 'from' no verificado")
             
-            return False
+            logger.info("🔄 Intentando enviar por SMTP como fallback...")
 
+        # Fallback: Intentar enviar por SMTP (Django EmailBackend)
+        logger.info("📬 ENVIANDO VIA SMTP:")
+        logger.info("   - Backend: %s", settings.EMAIL_BACKEND)
+        logger.info("   - From: %s", from_email)
+        logger.info("   - To: %s", recipient_list)
+        logger.info("   - BCC: %s", bcc_list if bcc_list else "Ninguno")
+        
         email = EmailMessage(subject, message, from_email, recipient_list, bcc=bcc_list)
         email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
         email.send(fail_silently=False)
-        logger.info("Email enviado exitosamente via SMTP local")
+        logger.info("✅ Email enviado EXITOSAMENTE via SMTP")
         return True
 
     except Exception as e:
-        logger.error("Error enviando email: %s", e)
-        logger.error("Tipo de error: %s", type(e).__name__)
+        logger.error("❌ Error enviando email (ambos métodos fallaron): %s", e)
+        logger.error("   - Tipo de error: %s", type(e).__name__)
         import traceback
-        logger.error("Traceback completo: %s", traceback.format_exc())
+        logger.error("   - Traceback: %s", traceback.format_exc())
         return False
