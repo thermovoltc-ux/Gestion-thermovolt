@@ -816,37 +816,24 @@ def detalles_solicitud(request, consecutivo):
 
 
 def generar_pdf_informe(cierre_ot, request=None):
-    """Genera un PDF usando plantilla Word si existe y LibreOffice está disponible, sino usa ReportLab"""
-    # En Railway (producción), LibreOffice no está disponible, así que usar ReportLab directamente
-    is_railway = os.environ.get('RAILWAY_ENVIRONMENT_NAME') is not None
-    is_production = not getattr(settings, 'DEBUG', True)
+    """Genera un PDF desde plantilla DOCX si existe, sino usa ReportLab como fallback"""
+    from .plantilla_utils import generar_pdf_desde_plantilla as generar_desde_plantilla
     
     logger.info(f"📝 Generando PDF para OT {cierre_ot.orden_trabajo.solicitud.consecutivo}")
-    logger.info(f"   - Entorno: {'Railway' if is_railway else 'Local/Dev'}")
-    logger.info(f"   - DEBUG: {getattr(settings, 'DEBUG', True)}")
     
-    template_path = os.path.join(settings.BASE_DIR, 'gestion_mantenimiento', 'static', 'plantilla_ot.docx')
-    template_exists = os.path.exists(template_path)
-    logger.info(f"   - Plantilla DOCX existe: {template_exists}")
+    # Intentar con plantilla primero
+    try:
+        pdf_buffer = generar_desde_plantilla(cierre_ot)
+        if pdf_buffer:
+            logger.info("✅ PDF generado EXITOSAMENTE desde plantilla DOCX")
+            return pdf_buffer
+    except Exception as e:
+        logger.warning(f"⚠️  Error generando desde plantilla: {e}")
     
-    # En Railway/producción, siempre usar ReportLab (LibreOffice no está disponible)
-    if is_railway or is_production:
-        logger.info("🚂 Detectado Railway/Producción - usando ReportLab (LibreOffice no disponible)")
-        return generar_pdf_reportlab(cierre_ot)
-    
-    # En ambiente local/dev, intentar DOCX si la plantilla existe
-    if template_exists:
-        logger.info("📄 Intentando generar PDF desde plantilla Word")
-        firma_tec = request.POST.get('firma_digital') if request else None
-        firma_rec = request.POST.get('firma_receptor') if request else None
-        try:
-            return generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec, firma_rec)
-        except Exception as e:
-            logger.warning(f"⚠️  Error con plantilla Word: {e} - usando ReportLab como fallback")
-            return generar_pdf_reportlab(cierre_ot)
-    else:
-        logger.info("📋 Plantilla no encontrada, usando ReportLab")
-        return generar_pdf_reportlab(cierre_ot)
+    # Fallback a ReportLab
+    logger.info("📋 Usando ReportLab como fallback")
+    return generar_pdf_reportlab(cierre_ot)
+
 
 def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_rec=None):
     """Genera PDF desde plantilla Word"""
