@@ -27,6 +27,28 @@ from reportlab.platypus import (
 logger = logging.getLogger(__name__)
 
 
+def _limpiar_texto(texto):
+    """
+    Limpia caracteres especiales no deseados del texto
+    - Elimina caracteres como ■ (cuadrados negros)
+    - Preserva saltos de línea naturales
+    """
+    if not texto:
+        return texto
+    
+    # Caracteres especiales a eliminar
+    caracteres_especiales = ['■', '●', '◆', '▪', '✓', '✗']
+    
+    for char in caracteres_especiales:
+        texto = texto.replace(char, '').replace(char.encode('utf-8').decode('utf-8'), '')
+    
+    # Limpiar espacios múltiples manteniendo saltos de línea
+    lineas = texto.split('\n')
+    lineas_limpias = [linea.strip() for linea in lineas if linea.strip()]
+    
+    return '\n'.join(lineas_limpias)
+
+
 def _obtener_imagen_temporal(file_field_o_url):
     """
     Obtiene ruta temporal de una imagen desde FileField, URL, data URL o base64
@@ -266,7 +288,7 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         
         # ==================== DESCRIPCIÓN ====================
         
-        desc_texto = cierre_ot.descripcion_falla or 'N/A'
+        desc_texto = _limpiar_texto(cierre_ot.descripcion_falla) or 'N/A'
         tabla_desc_data = [
             ['DESCRIPCIÓN DEL TRABAJO REALIZADO'],
             [desc_texto]
@@ -292,7 +314,7 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         
         # ==================== OBSERVACIONES ====================
         
-        obs_texto = cierre_ot.observaciones or 'N/A'
+        obs_texto = _limpiar_texto(cierre_ot.observaciones) or 'N/A'
         tabla_obs_data = [
             ['OBSERVACIONES'],
             [obs_texto]
@@ -384,9 +406,9 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                ('ROWHEIGHTS', (0, 0), (-1, 0), 1.6*inch),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                ('ROWHEIGHTS', (0, 0), (-1, 0), 1.5*inch),
             ]))
             story.append(tabla_imgs)
         
