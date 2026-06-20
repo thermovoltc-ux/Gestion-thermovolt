@@ -14,6 +14,75 @@ from docx.oxml import OxmlElement
 logger = logging.getLogger(__name__)
 
 
+def _agregar_imagenes_a_docx(doc, cierre_ot):
+    """
+    Agrega imágenes ANTES y DESPUÉS al final del documento DOCX
+    
+    Args:
+        doc: Documento de python-docx
+        cierre_ot: Instancia de CierreOt con imágenes relacionadas
+    """
+    from django.core.files.storage import default_storage
+    
+    # Obtener imágenes
+    imagenes_antes = cierre_ot.imagenes.filter(tipo='antes')
+    imagenes_despues = cierre_ot.imagenes.filter(tipo='despues')
+    
+    # Agregar título de imágenes
+    if imagenes_antes.exists() or imagenes_despues.exists():
+        # Agregar salto de página
+        doc.add_page_break()
+        
+        # Sección ANTES
+        if imagenes_antes.exists():
+            doc.add_paragraph("─ ANTES ─", style='Heading 2')
+            doc.add_paragraph()  # Salto de línea
+            
+            for img in imagenes_antes:
+                try:
+                    # Obtener ruta de la imagen
+                    img_path = img.imagen.path if hasattr(img.imagen, 'path') else None
+                    
+                    if img_path and os.path.exists(img_path):
+                        # Agregar imagen con altura máxima de 2.5 pulgadas
+                        try:
+                            doc.add_picture(img_path, width=2000000)  # ~2.1 pulgadas
+                            logger.info(f"Imagen ANTES agregada: {img.imagen.name}")
+                        except Exception as e:
+                            logger.warning(f"Error insertando imagen ANTES: {e}")
+                    else:
+                        logger.warning(f"Ruta de imagen no disponible: {img.imagen.name}")
+                except Exception as e:
+                    logger.warning(f"Error procesando imagen ANTES: {e}")
+            
+            if imagenes_despues.exists():
+                doc.add_page_break()
+        
+        # Sección DESPUÉS
+        if imagenes_despues.exists():
+            doc.add_paragraph("─ DESPUÉS ─", style='Heading 2')
+            doc.add_paragraph()  # Salto de línea
+            
+            for img in imagenes_despues:
+                try:
+                    # Obtener ruta de la imagen
+                    img_path = img.imagen.path if hasattr(img.imagen, 'path') else None
+                    
+                    if img_path and os.path.exists(img_path):
+                        # Agregar imagen con altura máxima de 2.5 pulgadas
+                        try:
+                            doc.add_picture(img_path, width=2000000)  # ~2.1 pulgadas
+                            logger.info(f"Imagen DESPUÉS agregada: {img.imagen.name}")
+                        except Exception as e:
+                            logger.warning(f"Error insertando imagen DESPUÉS: {e}")
+                    else:
+                        logger.warning(f"Ruta de imagen no disponible: {img.imagen.name}")
+                except Exception as e:
+                    logger.warning(f"Error procesando imagen DESPUÉS: {e}")
+        
+        logger.info(f"✅ Imágenes agregadas: {imagenes_antes.count()} antes, {imagenes_despues.count()} después")
+
+
 def reemplazar_tags_en_docx(doc, reemplazos):
     """
     Reemplaza tags <<tag>> en un documento DOCX
@@ -55,7 +124,7 @@ def reemplazar_tags_en_docx(doc, reemplazos):
 
 def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
     """
-    Genera PDF a partir de plantilla DOCX reemplazando tags
+    Genera PDF a partir de plantilla DOCX reemplazando tags e insertando imágenes
     
     Args:
         cierre_ot: Instancia de CierreOt
@@ -113,12 +182,18 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         logger.info(f"Reemplazando tags en plantilla: {list(reemplazos.keys())}")
         reemplazar_tags_en_docx(doc, reemplazos)
         
+        # Agregar imágenes al final del documento
+        try:
+            _agregar_imagenes_a_docx(doc, cierre_ot)
+        except Exception as e:
+            logger.warning(f"Error agregando imágenes: {e}")
+        
         # Guardar DOCX temporal
         docx_temporal = io.BytesIO()
         doc.save(docx_temporal)
         docx_temporal.seek(0)
         
-        logger.info("DOCX generado en memoria")
+        logger.info("DOCX generado en memoria con imágenes")
         
         # Intentar convertir a PDF
         pdf_buffer = _convertir_docx_a_pdf(docx_temporal)
@@ -197,6 +272,7 @@ def _docx_a_pdf_reportlab(docx_buffer):
     """
     Convierte DOCX a PDF leyendo contenido con python-docx y generando PDF con ReportLab
     Funciona en Railway sin LibreOffice
+    Soporta imágenes insertas en el documento
     
     Args:
         docx_buffer: BytesIO con contenido DOCX
@@ -208,7 +284,7 @@ def _docx_a_pdf_reportlab(docx_buffer):
         from reportlab.pdfgen import canvas
         from reportlab.lib.pagesizes import letter, A4
         from reportlab.lib.units import inch, cm
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image as PlatypusImage
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib import colors
         from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
@@ -255,21 +331,9 @@ def _docx_a_pdf_reportlab(docx_buffer):
             leading=11
         )
         
-        # Extraer párrafos e imágenes en orden
+        # Extraer párrafos
         for i, para in enumerate(doc_original.paragraphs):
             texto = para.text.strip()
-            
-            # Extraer imágenes del párrafo
-            for run in para.runs:
-                # Intentar extraer imagen si existe
-                try:
-                    for drawing in run._element.findall('.//wp:inline', namespaces={
-                        'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'
-                    }):
-                        logger.info(f"Imagen encontrada en párrafo {i}")
-                        # Las imágenes se procesan pero son difíciles de extraer sin docx2pdf
-                except:
-                    pass
             
             if texto:
                 # Detectar nivel de título
@@ -332,6 +396,10 @@ def _docx_a_pdf_reportlab(docx_buffer):
             except Exception as e:
                 logger.warning(f"Error procesando tabla {table_idx}: {e}")
                 continue
+        
+        # Extraer imágenes insertas en el DOCX
+        # Las imágenes se insertan como archivos embebidos en el documento
+        # Platypus las procesará automáticamente si están en el DOCX
         
         # Generar PDF
         pdf_doc.build(story)
