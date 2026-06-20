@@ -472,7 +472,7 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
 def _convertir_docx_a_pdf(docx_buffer, cierre_ot=None):
     """
     Convierte BytesIO DOCX a BytesIO PDF
-    Intenta: 1) docx2pdf + LibreOffice, 2) ReportLab fallback
+    Intenta: 1) docx2pdf + LibreOffice (solo Windows), 2) ReportLab fallback
     
     Args:
         docx_buffer: BytesIO con contenido DOCX
@@ -482,7 +482,15 @@ def _convertir_docx_a_pdf(docx_buffer, cierre_ot=None):
         BytesIO con PDF o None si falla
     """
     try:
-        # Opción 1: Intentar con docx2pdf + LibreOffice (mejor calidad preservando diseño)
+        import platform
+        
+        # En Linux/Railway, saltar docx2pdf (requiere Microsoft Word)
+        # Ir directamente a ReportLab
+        if platform.system() == 'Linux':
+            logger.info("🐧 Detectado Linux (Railway) - usando ReportLab directamente (docx2pdf requiere Word)")
+            return _docx_a_pdf_reportlab(docx_buffer, cierre_ot)
+        
+        # Opción 1: Intentar con docx2pdf + LibreOffice en Windows
         logger.info("📄 Intentando conversión DOCX→PDF con docx2pdf + LibreOffice")
         try:
             from docx2pdf import convert
@@ -547,6 +555,18 @@ def _docx_a_pdf_reportlab(docx_buffer, cierre_ot=None):
         # Cargar DOCX desde buffer
         docx_buffer.seek(0)
         doc_original = Document(docx_buffer)
+        
+        # Detectar si "Confirmación de trabajo recibido" ya existe en el DOCX
+        # Para evitar duplicación
+        confirmacion_ya_existe = False
+        imagenes_ya_existen = False
+        for para in doc_original.paragraphs:
+            if "Confirmación de trabajo recibido" in para.text:
+                confirmacion_ya_existe = True
+                logger.info("ℹ️ 'Confirmación de trabajo recibido' ya existe en DOCX, no se agregará de nuevo")
+            if "ANTES" in para.text or "DESPUÉS" in para.text:
+                imagenes_ya_existen = True
+                logger.info("ℹ️ Secciones de imágenes ya existen en DOCX, no se agregarán de nuevo")
         
         # Crear PDF con Platypus
         pdf_buffer = io.BytesIO()
@@ -650,9 +670,122 @@ def _docx_a_pdf_reportlab(docx_buffer, cierre_ot=None):
                 logger.warning(f"⚠️ Error procesando tabla {table_idx}: {e}")
                 continue
         
-        # NOTA: Las firmas e imágenes ya fueron agregadas al DOCX en generar_pdf_desde_plantilla()
-        # ReportLab solo lee el contenido existente - NO agrega duplicados
-        logger.info("✅ Contenido del DOCX extraído completamente (incluyendo firmas e imágenes)")
+        # Agregar firmas si cierre_ot está disponible Y NO YA EXISTE EN DOCX
+        if cierre_ot and not confirmacion_ya_existe:
+            try:
+                story.append(PageBreak())
+                story.append(Paragraph("<b>Confirmación de trabajo recibido:</b>", heading_style))
+                story.append(Spacer(1, 0.2*inch))
+                
+                # Tabla de firmas
+                firma_data = [
+                    ['Realizador por:', 'Recibido por:']
+                ]
+                
+                # Obtener imágenes de firmas
+                firma_tec_img = None
+                firma_rec_img = None
+                
+                if cierre_ot.firma_digital:
+                    tmp_path, _ = _obtener_imagen_temporal(cierre_ot.firma_digital)
+                    if tmp_path and os.path.exists(tmp_path):
+                        try:
+                            firma_tec_img = PlatypusImage(tmp_path, width=2*inch, height=1*inch)
+                        except:
+                            pass
+                
+                if cierre_ot.firma_receptor:
+                    tmp_path, _ = _obtener_imagen_temporal(cierre_ot.firma_receptor)
+                    if tmp_path and os.path.exists(tmp_path):
+                        try:
+                            firma_rec_img = PlatypusImage(tmp_path, width=2*inch, height=1*inch)
+                        except:
+                            pass
+                
+                firma_data.append([
+                    firma_tec_img or '[Sin firma]',
+                    firma_rec_img or '[Sin firma]'
+                ])
+                
+                firma_data.append([
+                    f"Doc: {cierre_ot.documento_tecnico or 'N/A'}",
+                    f"Doc: {cierre_ot.documento_receptor or 'N/A'}"
+                ])
+                
+                firma_table = Table(firma_data, colWidths=[3.75*inch, 3.75*inch])
+                firma_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F2937')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D1D5DB')),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 9),
+                    ('FONTSIZE', (0, 1), (-1, 1), 8),
+                    ('TOPPADDING', (0, 0), (-1, 0), 8),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                    ('TOPPADDING', (0, 1), (-1, 1), 10),
+                    ('BOTTOMPADDING', (0, 1), (-1, 1), 10),
+                ]))
+                story.append(firma_table)
+                logger.info("✅ Firmas agregadas al PDF con ReportLab")
+            except Exception as e:
+                logger.warning(f"⚠️ Error agregando firmas: {e}")
+        
+        # Agregar imágenes ANTES y DESPUÉS si cierre_ot está disponible Y NO YA EXISTEN EN DOCX
+        if cierre_ot and not imagenes_ya_existen:
+            try:
+                imagenes_antes = cierre_ot.imagenes.filter(tipo='antes')
+                imagenes_despues = cierre_ot.imagenes.filter(tipo='despues')
+                
+                if imagenes_antes.exists() or imagenes_despues.exists():
+                    story.append(PageBreak())
+                
+                # Sección ANTES
+                if imagenes_antes.exists():
+                    story.append(Paragraph("<b>─ ANTES ─</b>", heading_style))
+                    story.append(Spacer(1, 0.1*inch))
+                    
+                    for img in imagenes_antes:
+                        try:
+                            img_path, es_temp = _obtener_imagen_temporal(img.imagen)
+                            if img_path and os.path.exists(img_path):
+                                try:
+                                    img_platypus = PlatypusImage(img_path, width=4*inch, height=3*inch)
+                                    story.append(img_platypus)
+                                    story.append(Spacer(1, 0.1*inch))
+                                    logger.info(f"✅ Imagen ANTES agregada al PDF")
+                                except Exception as e:
+                                    logger.warning(f"Error insertando imagen ANTES: {e}")
+                        except Exception as e:
+                            logger.warning(f"Error procesando imagen ANTES: {e}")
+                
+                # Separador
+                if imagenes_antes.exists() and imagenes_despues.exists():
+                    story.append(Spacer(1, 0.2*inch))
+                
+                # Sección DESPUÉS
+                if imagenes_despues.exists():
+                    story.append(Paragraph("<b>─ DESPUÉS ─</b>", heading_style))
+                    story.append(Spacer(1, 0.1*inch))
+                    
+                    for img in imagenes_despues:
+                        try:
+                            img_path, es_temp = _obtener_imagen_temporal(img.imagen)
+                            if img_path and os.path.exists(img_path):
+                                try:
+                                    img_platypus = PlatypusImage(img_path, width=4*inch, height=3*inch)
+                                    story.append(img_platypus)
+                                    story.append(Spacer(1, 0.1*inch))
+                                    logger.info(f"✅ Imagen DESPUÉS agregada al PDF")
+                                except Exception as e:
+                                    logger.warning(f"Error insertando imagen DESPUÉS: {e}")
+                        except Exception as e:
+                            logger.warning(f"Error procesando imagen DESPUÉS: {e}")
+                
+                logger.info("✅ Imágenes agregadas al PDF con ReportLab")
+            except Exception as e:
+                logger.warning(f"⚠️ Error agregando imágenes: {e}")
         
         # Generar PDF
         pdf_doc.build(story)
