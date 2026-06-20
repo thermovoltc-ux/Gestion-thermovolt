@@ -318,18 +318,17 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-# Email Configuration - Usando Mailgun API (funciona en Railway sin problemas SMTP)
-EMAIL_BACKEND = 'anymail.backends.mailgun.EmailBackend'
+# Email Configuration - Usando Brevo API (100% gratis, 300 emails/día)
+EMAIL_BACKEND = 'anymail.backends.brevo.EmailBackend'
 ANYMAIL = {
-    'MAILGUN_API_KEY': os.environ.get('MAILGUN_API_KEY'),
-    'MAILGUN_SENDER_DOMAIN': os.environ.get('MAILGUN_SENDER_DOMAIN', 'sandbox.mailgun.org'),  # Reemplazar con dominio real
+    'BREVO_API_KEY': os.environ.get('BREVO_API_KEY'),
 }
 
 # Email addresses
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@thermovolt.com')
 EMAIL_ADICIONAL = os.environ.get('EMAIL_ADICIONAL', 'thermovoltc@gmail.com')
 
-# Legacy SendGrid config (por si se necesita en el futuro)
+# Legacy config (for reference only)
 SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
 SENDGRID_FROM_EMAIL = os.environ.get('SENDGRID_FROM_EMAIL', 'thermovoltc@gmail.com')
 
