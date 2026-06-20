@@ -25,7 +25,19 @@ echo "Instalando LibreOffice..."
 if [ "$SKIP_SYSTEM_PACKAGES" = "true" ]; then
   echo "SKIP_SYSTEM_PACKAGES=true -> Omitiendo instalación de LibreOffice"
 else
-  apt-get install -y libreoffice || apt-get install -y libreoffice-core libreoffice-writer libreoffice-calc || true
+  # Opción 1: Instalar suite completa
+  if apt-get install -y libreoffice 2>/dev/null; then
+    echo "✓ LibreOffice suite completa instalada"
+  # Opción 2: Instalar solo los componentes necesarios
+  elif apt-get install -y libreoffice-core libreoffice-writer libreoffice-calc 2>/dev/null; then
+    echo "✓ LibreOffice (componentes necesarios) instalado"
+  # Opción 3: Intenta con paquetes individuales
+  else
+    echo "⚠ Intentando instalar dependencias individuales..."
+    apt-get install -y libreoffice-common || true
+    apt-get install -y ure || true
+    apt-get install -y libkrb5-3 || true
+  fi
 fi
 
 # Verify LibreOffice
@@ -37,7 +49,8 @@ elif command -v libreoffice >/dev/null 2>&1; then
   LIBREOFFICE_CMD="libreoffice"
   echo "✓ LibreOffice disponible"
 else
-  echo "⚠ Advertencia: LibreOffice no se pudo instalar correctamente"
+  echo "❌ Advertencia CRÍTICA: LibreOffice no está disponible - el fallback a ReportLab se usará automáticamente"
+  echo "❌ Por favor instala: apt-get install -y libreoffice"
 fi
 
 # Configure LibreOffice to work in headless mode
@@ -48,9 +61,17 @@ if [ -n "$LIBREOFFICE_CMD" ]; then
   
   # Intentar inicializar LibreOffice sin interfaz para crear configuración
   # Esto puede ayudar a evitar problemas en la primera ejecución
+  echo "Preconfiguración de LibreOffice (timeout 30s)..."
   timeout 30 $LIBREOFFICE_CMD --headless --norestore --invisible --convert-to pdf /dev/null 2>&1 || true
   
-  echo "✓ LibreOffice preconfigurado"
+  # Verificar que LibreOffice ahora responde
+  if timeout 5 $LIBREOFFICE_CMD --headless --version >/dev/null 2>&1; then
+    echo "✓ LibreOffice preconfigurado y respondiendo"
+  else
+    echo "⚠ LibreOffice instalado pero podría tener problemas en headless mode"
+  fi
+else
+  echo "⚠ LibreOffice no disponible - PDF fallback activo"
 fi
 
 echo "✓ STARTUP: dependencias instaladas y configuradas"

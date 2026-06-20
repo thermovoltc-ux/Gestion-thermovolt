@@ -1133,24 +1133,28 @@ def generar_pdf_desde_plantilla(cierre_ot, template_path, firma_tec=None, firma_
         if os.path.exists(temp_pdf.name):
             pdf_size = os.path.getsize(temp_pdf.name)
             logger.info("PDF generado exitosamente, tamaño: %d bytes", pdf_size)
+            # CRÍTICO: Si el PDF está vacío (0 bytes), usar ReportLab
             if pdf_size == 0:
-                logger.error("PDF generado pero está vacío - usando ReportLab")
-                raise RuntimeError("PDF generado está vacío")
+                logger.error("❌ PDF generado pero está vacío (0 bytes) - libreroffice falló silenciosamente. Usando ReportLab como fallback")
+                raise RuntimeError("PDF generado está vacío (0 bytes) - LibreOffice probablemente falló en conversión")
             if pdf_size > 20 * 1024 * 1024:  # 20MB límite
                 logger.warning("PDF muy grande (%d bytes) - usando ReportLab", pdf_size)
                 raise RuntimeError("PDF demasiado grande")
             with open(temp_pdf.name, 'rb') as f:
                 buffer = BytesIO(f.read())
         else:
-            logger.error("PDF no se generó, archivo no existe: %s", temp_pdf.name)
+            logger.error("❌ PDF no se generó, archivo no existe: %s", temp_pdf.name)
             raise RuntimeError("PDF no se generó")
-        logger.info("=== PDF DESDE PLANTILLA COMPLETADO EXITOSAMENTE ===")
+        logger.info("✓ PDF DESDE PLANTILLA COMPLETADO EXITOSAMENTE")
     except Exception as e:
-        logger.warning("Error al convertir DOCX a PDF: %s - usando ReportLab", e)
+        logger.warning("⚠️  Error al convertir DOCX a PDF: %s - usando ReportLab como fallback", e)
         os.unlink(temp_docx.name)
         if os.path.exists(temp_pdf.name):
-            os.unlink(temp_pdf.name)
-        logger.info("=== USANDO REPORTLAB COMO FALLBACK ===")
+            try:
+                os.unlink(temp_pdf.name)
+            except Exception as cleanup_error:
+                logger.warning("Error limpiando archivo PDF temporal: %s", cleanup_error)
+        logger.info("=== GENERANDO PDF FALLBACK CON REPORTLAB ===")
         buffer, _, _ = generar_pdf_reportlab(cierre_ot)
         return buffer, firma_tec_agregada, firma_rec_agregada
     
@@ -1516,11 +1520,17 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
 
     try:
         if hasattr(settings, 'SENDGRID_API_KEY') and settings.SENDGRID_API_KEY:
+            # ✓ Validar API key existe
+            api_key = settings.SENDGRID_API_KEY
+            api_key_preview = f"{api_key[:10]}...{api_key[-5:]}" if len(api_key) > 15 else "***"
+            logger.info("✓ SendGrid API Key configurada: %s (longitud: %d)", api_key_preview, len(api_key))
+            
             pdf_content = pdf_buffer.getvalue()
             pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
             pdf_size_mb = len(pdf_content) / (1024 * 1024)
+            logger.info("📎 PDF adjunto - Tamaño: %.2f MB", pdf_size_mb)
             if pdf_size_mb > 25:
-                logger.warning("PDF muy grande (%.2f MB) - podría fallar en SendGrid", pdf_size_mb)
+                logger.warning("⚠️  PDF muy grande (%.2f MB) - podría fallar en SendGrid", pdf_size_mb)
 
             personalization = {
                 "to": [{"email": email} for email in recipient_list],
@@ -1546,7 +1556,13 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
                 "Content-Type": "application/json"
             }
 
-            logger.info("Enviando email via SendGrid API from=%s to=%s bcc=%s size=%.2fMB", from_email, recipient_list, bcc_list, pdf_size_mb)
+            logger.info("📧 ENVIANDO VIA SENDGRID API:")
+            logger.info("   - From: %s", from_email)
+            logger.info("   - To: %s", recipient_list)
+            logger.info("   - BCC: %s", bcc_list if bcc_list else "Ninguno")
+            logger.info("   - Asunto: %s", subject)
+            logger.info("   - Tamaño PDF: %.2f MB", pdf_size_mb)
+            
             response = requests.post(
                 "https://api.sendgrid.com/v3/mail/send",
                 json=payload,
@@ -1554,10 +1570,23 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
                 timeout=30
             )
 
+            logger.info("📨 Respuesta SendGrid - Status Code: %d", response.status_code)
             if response.status_code in (200, 202):
-                logger.info("Email enviado exitosamente via SendGrid API")
+                logger.info("✅ Email enviado exitosamente via SendGrid API")
                 return True
-            logger.error("SendGrid API error %s: %s", response.status_code, response.text)
+            
+            # ❌ Diagnóstico de error
+            logger.error("❌ SendGrid API error %d: %s", response.status_code, response.text)
+            
+            # Detalles específicos para error 401
+            if response.status_code == 401:
+                logger.error("🔐 ERROR DE AUTENTICACIÓN (401):")
+                logger.error("   - Probable causa 1: API Key inválida o expirada")
+                logger.error("   - Probable causa 2: Email 'from' no verificado en SendGrid")
+                logger.error("   - Probable causa 3: Problema con el servidor de SendGrid")
+                logger.error("   - SOLUCIÓN: Verifica que SENDGRID_API_KEY sea correcto en Railway")
+                logger.error("   - Email From: %s", from_email)
+            
             return False
 
         email = EmailMessage(subject, message, from_email, recipient_list, bcc=bcc_list)
