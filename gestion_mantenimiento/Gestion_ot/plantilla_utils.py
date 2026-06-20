@@ -105,11 +105,21 @@ def _insertar_firma_en_docx(doc, cierre_ot):
     try:
         doc.add_page_break()
         heading = doc.add_paragraph("Confirmación de trabajo recibido:")
-        heading.style = 'Heading 2'
+        # Solo asignar estilo si existe
+        try:
+            heading.style = 'Heading 2'
+        except:
+            heading.runs[0].bold = True
         
         # Crear tabla de firmas (3 filas: encabezados, firmas, documentos)
         tabla_firmas = doc.add_table(rows=3, cols=2)
-        tabla_firmas.style = 'Light Grid Accent 1'
+        
+        # Intentar asignar estilo de tabla, pero sin fallar si no existe
+        try:
+            tabla_firmas.style = 'Light Grid Accent 1'
+        except KeyError:
+            # Si el estilo no existe, simplemente no asignamos
+            logger.info("⚠️ Estilo 'Light Grid Accent 1' no disponible en plantilla, usando tabla sin estilo")
         
         # Fila 1: Encabezados
         tabla_firmas.rows[0].cells[0].text = "Realizador por:"
@@ -209,7 +219,10 @@ def _agregar_imagenes_a_docx(doc, cierre_ot):
         # Sección ANTES
         if imagenes_antes.exists():
             heading = doc.add_paragraph("─ ANTES ─")
-            heading.style = 'Heading 2'
+            try:
+                heading.style = 'Heading 2'
+            except:
+                heading.runs[0].bold = True
             heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
             
             for img in imagenes_antes:
@@ -244,7 +257,10 @@ def _agregar_imagenes_a_docx(doc, cierre_ot):
         # Sección DESPUÉS
         if imagenes_despues.exists():
             heading = doc.add_paragraph("─ DESPUÉS ─")
-            heading.style = 'Heading 2'
+            try:
+                heading.style = 'Heading 2'
+            except:
+                heading.runs[0].bold = True
             heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
             
             for img in imagenes_despues:
