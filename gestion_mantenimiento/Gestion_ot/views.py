@@ -1615,6 +1615,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         logger.info("   - From: %s", from_email)
         logger.info("   - To: %s", recipient_list)
         logger.info("   - BCC: %s", bcc_list if bcc_list else "Ninguno")
+        logger.info("   - Nota: Si puerto 587 falla, intentará 465 y 25")
         
         try:
             email = EmailMessage(subject, message, from_email, recipient_list, bcc=bcc_list)

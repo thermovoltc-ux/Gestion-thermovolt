@@ -324,9 +324,10 @@ SENDGRID_FROM_EMAIL = os.environ.get('SENDGRID_FROM_EMAIL', 'thermovoltc@gmail.c
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'your_email@gmail.com')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'your_app_password')
 
-# Configuración de email - siempre usar SMTP local para desarrollo
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'  # Gmail SMTP server for local development
+# Usar backend personalizado que soporta múltiples puertos y fallbacks
+# Este backend intenta puertos 587, 465, 25 en orden
+EMAIL_BACKEND = 'gestion_mantenimiento.custom_email_backends.MultiPortEmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'  # Gmail SMTP server
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL') or EMAIL_HOST_USER
