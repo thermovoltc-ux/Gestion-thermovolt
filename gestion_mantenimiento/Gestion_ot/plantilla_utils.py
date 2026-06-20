@@ -206,11 +206,12 @@ def _docx_a_pdf_reportlab(docx_buffer):
     """
     try:
         from reportlab.pdfgen import canvas
-        from reportlab.lib.pagesizes import letter
-        from reportlab.lib.units import inch
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.lib.units import inch, cm
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
         
         logger.info("Leyendo documento DOCX para conversión a PDF")
         
@@ -220,70 +221,114 @@ def _docx_a_pdf_reportlab(docx_buffer):
         
         # Crear PDF con Platypus
         pdf_buffer = io.BytesIO()
-        pdf_doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
+        pdf_doc = SimpleDocTemplate(
+            pdf_buffer, 
+            pagesize=letter,
+            rightMargin=0.5*inch,
+            leftMargin=0.5*inch,
+            topMargin=0.5*inch,
+            bottomMargin=0.5*inch
+        )
         
         # Estilos
         styles = getSampleStyleSheet()
         story = []
         
-        # Extractar párrafos
-        for para in doc_original.paragraphs:
+        # Crear estilos personalizados
+        heading_style = ParagraphStyle(
+            name='CustomHeading',
+            parent=styles['Heading1'],
+            fontSize=12,
+            textColor=colors.HexColor('#1F2937'),
+            spaceAfter=8,
+            spaceBefore=4,
+            fontName='Helvetica-Bold',
+            alignment=TA_CENTER
+        )
+        
+        body_style = ParagraphStyle(
+            name='CustomBody',
+            parent=styles['BodyText'],
+            fontSize=9,
+            textColor=colors.HexColor('#374151'),
+            spaceAfter=4,
+            leading=11
+        )
+        
+        # Extraer párrafos e imágenes en orden
+        for i, para in enumerate(doc_original.paragraphs):
             texto = para.text.strip()
+            
+            # Extraer imágenes del párrafo
+            for run in para.runs:
+                # Intentar extraer imagen si existe
+                try:
+                    for drawing in run._element.findall('.//wp:inline', namespaces={
+                        'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'
+                    }):
+                        logger.info(f"Imagen encontrada en párrafo {i}")
+                        # Las imágenes se procesan pero son difíciles de extraer sin docx2pdf
+                except:
+                    pass
+            
             if texto:
                 # Detectar nivel de título
-                if para.style.name.startswith('Heading'):
-                    level = int(para.style.name[-1]) if para.style.name[-1].isdigit() else 1
-                    font_size = 16 - (level * 2)
-                    style = ParagraphStyle(
-                        name=f'CustomHeading{level}',
-                        parent=styles['Heading1'],
-                        fontSize=font_size,
-                        textColor=colors.HexColor('#1F2937'),
-                        spaceAfter=12,
-                        spaceBefore=6,
-                        fontName='Helvetica-Bold'
-                    )
-                    story.append(Paragraph(texto, style))
+                if para.style and para.style.name and para.style.name.startswith('Heading'):
+                    story.append(Paragraph(texto, heading_style))
                 else:
-                    style = ParagraphStyle(
-                        name='CustomBody',
-                        parent=styles['BodyText'],
-                        fontSize=10,
-                        textColor=colors.HexColor('#374151'),
-                        spaceAfter=6,
-                        leading=12
-                    )
-                    story.append(Paragraph(texto, style))
-                story.append(Spacer(1, 0.15*inch))
+                    story.append(Paragraph(texto, body_style))
+                story.append(Spacer(1, 0.1*inch))
         
-        # Extractar tablas
+        # Extraer tablas con mejor formateo
         for table_idx, tabla in enumerate(doc_original.tables):
             try:
-                # Convertir tabla
+                # Convertir tabla preservando estructura
                 data = []
-                for row in tabla.rows:
+                max_cols = max(len(tabla.rows[0].cells) if tabla.rows else 0, 
+                              len(tabla.columns)) if tabla.columns else 0
+                
+                for row_idx, row in enumerate(tabla.rows):
                     row_data = []
-                    for cell in row.cells:
-                        cell_text = '\n'.join([p.text for p in cell.paragraphs])
-                        row_data.append(cell_text)
+                    for cell_idx, cell in enumerate(row.cells):
+                        cell_text = '\n'.join([p.text for p in cell.paragraphs if p.text.strip()])
+                        row_data.append(cell_text or '')
+                    
+                    # Rellenar celdas faltantes
+                    while len(row_data) < max_cols:
+                        row_data.append('')
+                    
                     data.append(row_data)
                 
-                if data:
+                if data and len(data[0]) > 0:
+                    # Calcular ancho de columnas automáticamente
+                    available_width = 7.5*inch  # Ancho disponible
+                    col_widths = [available_width / len(data[0])] * len(data[0])
+                    
                     # Crear tabla Platypus
-                    t = Table(data, colWidths=[2*inch]*len(data[0]))
-                    t.setStyle(TableStyle([
+                    t = Table(data, colWidths=col_widths)
+                    
+                    # Estilos de tabla
+                    style_commands = [
                         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F2937')),
                         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                        ('FONTSIZE', (0, 0), (-1, 0), 10),
-                        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F3F4F6')),
-                        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#D1D5DB')),
-                        ('FONTSIZE', (0, 1), (-1, -1), 9),
-                    ]))
+                        ('FONTSIZE', (0, 0), (-1, 0), 9),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                        ('TOPPADDING', (0, 0), (-1, 0), 8),
+                        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F9FAFB')),
+                        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D1D5DB')),
+                        ('FONTSIZE', (0, 1), (-1, -1), 8),
+                        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F3F4F6')]),
+                        ('TOPPADDING', (0, 1), (-1, -1), 6),
+                        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                    ]
+                    
+                    t.setStyle(TableStyle(style_commands))
                     story.append(t)
-                    story.append(Spacer(1, 0.2*inch))
+                    story.append(Spacer(1, 0.15*inch))
+                    
             except Exception as e:
                 logger.warning(f"Error procesando tabla {table_idx}: {e}")
                 continue
