@@ -494,7 +494,7 @@ def _convertir_docx_a_pdf(docx_buffer, cierre_ot=None):
             
             # Convertir a PDF
             tmp_pdf_path = tmp_docx_path.replace('.docx', '.pdf')
-            convert(tmp_docx_path, tmp_pdf_path, timeout=60)
+            convert(tmp_docx_path, tmp_pdf_path)
             
             # Leer PDF
             with open(tmp_pdf_path, 'rb') as f:
