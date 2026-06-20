@@ -10,7 +10,9 @@ import io
 import logging
 import requests
 import tempfile
+import base64
 from datetime import datetime
+from PIL import Image as PILImage
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
@@ -27,12 +29,41 @@ logger = logging.getLogger(__name__)
 
 def _obtener_imagen_temporal(file_field_o_url):
     """
-    Obtiene ruta temporal de una imagen desde FileField, URL o data URL
+    Obtiene ruta temporal de una imagen desde FileField, URL, data URL o base64
     """
     if not file_field_o_url:
         return None, False
     
     try:
+        # Manejar data URLs (data:image/png;base64,...)
+        if isinstance(file_field_o_url, str) and file_field_o_url.startswith('data:image'):
+            try:
+                # Extraer la parte base64
+                if ',' in file_field_o_url:
+                    header, encoded = file_field_o_url.split(',', 1)
+                else:
+                    encoded = file_field_o_url
+                
+                # Decodificar
+                image_data = base64.b64decode(encoded)
+                
+                # Crear imagen temporal
+                img = PILImage.open(io.BytesIO(image_data))
+                
+                # Convertir a RGB si es necesario
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Guardar en archivo temporal
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
+                    img.save(tmp.name, format='PNG')
+                    logger.info(f"✅ Data URL decodificada y guardada en: {tmp.name}")
+                    return tmp.name, True
+            except Exception as e:
+                logger.error(f"❌ Error procesando data URL: {e}")
+                return None, False
+        
+        # Manejar URLs HTTP
         if isinstance(file_field_o_url, str) and file_field_o_url.startswith('http'):
             response = requests.get(file_field_o_url, timeout=15)
             response.raise_for_status()
@@ -41,11 +72,13 @@ def _obtener_imagen_temporal(file_field_o_url):
                 tmp.write(response.content)
                 return tmp.name, True
         
+        # Manejar FileField con atributo url
         elif hasattr(file_field_o_url, 'url'):
             url = file_field_o_url.url
             if url and url.startswith('http'):
                 return _obtener_imagen_temporal(url)
         
+        # Manejar FileField con atributo path
         if hasattr(file_field_o_url, 'path'):
             local_path = file_field_o_url.path
             if local_path and os.path.exists(local_path):
