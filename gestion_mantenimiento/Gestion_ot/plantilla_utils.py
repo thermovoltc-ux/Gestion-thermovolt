@@ -347,14 +347,15 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         firma_data = [
             ['Realizador por:', 'Recibido por:'],
             [cierre_ot.nombre_tecnico or 'N/A', cierre_ot.nombre_receptor or 'N/A'],
-            [f"Doc: {cierre_ot.documento_tecnico or 'N/A'}", f"Doc: {cierre_ot.documento_receptor or 'N/A'}"]
+            [f"CC: {cierre_ot.documento_tecnico or 'N/A'}", f"CC: {cierre_ot.documento_receptor or 'N/A'}"]
         ]
         
         tabla_firmas = Table(firma_data, colWidths=[3.75*inch, 3.75*inch])
         tabla_firmas.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F2937')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),  # Encabezado centrado
+            ('ALIGN', (0, 1), (-1, -1), 'LEFT'),   # Nombres y documentos a la izquierda
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 8),
