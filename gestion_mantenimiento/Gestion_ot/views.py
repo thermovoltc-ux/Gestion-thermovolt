@@ -1458,16 +1458,17 @@ def guardar_copia_pdf_envio(pdf_buffer, cierre_ot):
 
 
 def enviar_pdf_por_email(pdf_buffer, cierre_ot):
-    """Envía el PDF por email usando SendGrid cuando está disponible."""
+    """Envía el PDF por email usando Mailgun API (funciona en Railway sin restricciones SMTP)."""
     subject = f"Informe de Mantenimiento OT-{cierre_ot.orden_trabajo.solicitud.consecutivo}"
     message = "Adjunto se encuentra el informe de mantenimiento."
-    from_email = getattr(settings, 'SENDGRID_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL)
-    # Build recipient list: include technician + client PDV-specific addresses (configurable)
+    from_email = settings.DEFAULT_FROM_EMAIL
+    
+    # Build recipient list
     recipient_list = []
     if cierre_ot.correo_tecnico:
         recipient_list.append(cierre_ot.correo_tecnico)
 
-    # Try to resolve a client/PDV email from settings.CLIENT_EMAIL_MAP using Solicitud.PDV
+    # Try to resolve client/PDV email
     pdv_name = None
     try:
         solicitud = cierre_ot.orden_trabajo.solicitud
@@ -1485,7 +1486,6 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
 
     if pdv_name and client_map:
         key = pdv_name.strip().lower()
-        # exact key match
         email_val = client_map.get(key)
         if email_val:
             if isinstance(email_val, str):
@@ -1493,7 +1493,6 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
             else:
                 client_emails = list(email_val)
         else:
-            # try contains-match over keys
             for k, v in client_map.items():
                 try:
                     if k and k.lower() in key:
@@ -1505,7 +1504,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
                 except Exception:
                     continue
 
-    # fallback to solicitud.email_solicitante
+    # Fallback to solicitud.email_solicitante
     if not client_emails:
         try:
             sol = cierre_ot.orden_trabajo.solicitud
@@ -1517,9 +1516,8 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     for e in client_emails:
         if e and e not in recipient_list:
             recipient_list.append(e)
+    
     bcc_list = []
-
-    # Add monitoring/copy address as BCC, and allow comma-separated values
     copy_address = getattr(settings, 'EMAIL_ADICIONAL', None)
     if copy_address:
         if isinstance(copy_address, str):
@@ -1537,112 +1535,21 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     guardar_copia_pdf_envio(pdf_buffer, cierre_ot)
 
     try:
-        if hasattr(settings, 'SENDGRID_API_KEY') and settings.SENDGRID_API_KEY:
-            # ✓ Validar API key existe
-            api_key = settings.SENDGRID_API_KEY
-            api_key_preview = f"{api_key[:10]}...{api_key[-5:]}" if len(api_key) > 15 else "***"
-            logger.info("✓ SendGrid API Key configurada: %s (longitud: %d)", api_key_preview, len(api_key))
-            
-            pdf_content = pdf_buffer.getvalue()
-            pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
-            pdf_size_mb = len(pdf_content) / (1024 * 1024)
-            logger.info("📎 PDF adjunto - Tamaño: %.2f MB", pdf_size_mb)
-            if pdf_size_mb > 25:
-                logger.warning("⚠️  PDF muy grande (%.2f MB) - podría fallar en SendGrid", pdf_size_mb)
-
-            personalization = {
-                "to": [{"email": email} for email in recipient_list],
-                "subject": subject
-            }
-            if bcc_list:
-                personalization["bcc"] = [{"email": email} for email in bcc_list]
-
-            payload = {
-                "personalizations": [personalization],
-                "from": {"email": from_email},
-                "content": [{"type": "text/plain", "value": message}],
-                "attachments": [{
-                    "content": pdf_base64,
-                    "type": "application/pdf",
-                    "filename": "informe_mantenimiento.pdf",
-                    "disposition": "attachment"
-                }]
-            }
-
-            headers = {
-                "Authorization": f"Bearer {settings.SENDGRID_API_KEY}",
-                "Content-Type": "application/json"
-            }
-
-            logger.info("📧 INTENTANDO ENVIO VIA SENDGRID API:")
-            logger.info("   - From: %s", from_email)
-            logger.info("   - To: %s", recipient_list)
-            logger.info("   - BCC: %s", bcc_list if bcc_list else "Ninguno")
-            logger.info("   - Asunto: %s", subject)
-            logger.info("   - Tamaño PDF: %.2f MB", pdf_size_mb)
-            
-            response = requests.post(
-                "https://api.sendgrid.com/v3/mail/send",
-                json=payload,
-                headers=headers,
-                timeout=30
-            )
-
-            logger.info("📨 Respuesta SendGrid - Status Code: %d", response.status_code)
-            if response.status_code in (200, 202):
-                logger.info("✅ Email enviado EXITOSAMENTE via SendGrid API")
-                return True
-            
-            # ❌ SendGrid falló - intentar fallback SMTP
-            logger.warning("⚠️  SendGrid API error %d: %s", response.status_code, response.text)
-            
-            # Detalles específicos para error 401
-            if response.status_code == 401:
-                logger.warning("🔐 ERROR 401 SendGrid - Intentando fallback a SMTP")
-                if "Maximum credits exceeded" in response.text:
-                    logger.warning("   → Causa: Plan de SendGrid sin créditos (plan gratuito agotado)")
-                else:
-                    logger.warning("   → Causa: Posible API Key inválida o email 'from' no verificado")
-            
-            logger.info("🔄 Intentando enviar por SMTP como fallback...")
-
-        # Fallback: Intentar enviar por SMTP (Django EmailBackend)
-        logger.info("📬 ENVIANDO VIA SMTP:")
-        logger.info("   - Backend: %s", settings.EMAIL_BACKEND)
-        logger.info("   - Host: %s", settings.EMAIL_HOST)
-        logger.info("   - Port: %s", settings.EMAIL_PORT)
-        logger.info("   - Use TLS: %s", getattr(settings, 'EMAIL_USE_TLS', 'No configurado'))
+        logger.info("📬 Enviando email via Mailgun:")
         logger.info("   - From: %s", from_email)
         logger.info("   - To: %s", recipient_list)
         logger.info("   - BCC: %s", bcc_list if bcc_list else "Ninguno")
-        logger.info("   - Nota: Si puerto 587 falla, intentará 465 y 25")
+        logger.info("   - Subject: %s", subject)
         
-        try:
-            email = EmailMessage(subject, message, from_email, recipient_list, bcc=bcc_list)
-            email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
-            logger.info("   📧 EmailMessage creado, intentando enviar...")
-            email.send(fail_silently=False)
-            logger.info("✅ Email enviado EXITOSAMENTE via SMTP")
-            return True
-        except smtplib.SMTPAuthenticationError as e:
-            logger.error("❌ ERROR AUTENTICACION SMTP: %s", str(e))
-            logger.error("   - Verifica que EMAIL_HOST_PASSWORD es correcto")
-            logger.error("   - Debe ser sin espacios: cobusxzmypxyyzoo")
-            logger.error("   - Verifica que 2FA está activado en Google")
-            return False
-        except smtplib.SMTPException as e:
-            logger.error("❌ ERROR SMTP: %s", str(e))
-            return False
-        except Exception as e:
-            logger.error("❌ Error enviando email por SMTP: %s", e)
-            logger.error("   - Tipo de error: %s", type(e).__name__)
-            import traceback
-            logger.error("   - Traceback: %s", traceback.format_exc())
-            return False
-    
+        email = EmailMessage(subject, message, from_email, recipient_list, bcc=bcc_list)
+        email.attach('informe_mantenimiento.pdf', pdf_buffer.getvalue(), 'application/pdf')
+        email.send(fail_silently=False)
+        
+        logger.info("✅ Email enviado EXITOSAMENTE via Mailgun")
+        return True
+        
     except Exception as e:
-        logger.error("❌ Error crítico en envio de email: %s", e)
-        logger.error("   - Tipo de error: %s", type(e).__name__)
-        import traceback
-        logger.error("   - Traceback: %s", traceback.format_exc())
+        logger.error("❌ Error enviando email: %s", str(e))
+        logger.error("   - Tipo: %s", type(e).__name__)
         return False
+

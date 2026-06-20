@@ -1,93 +1,56 @@
 """
-Custom Django email backend with fallbacks for production environments
+Custom Django email backends - Legacy support (now using Mailgun)
+Kept for reference and potential fallback use
 """
 
 import os
 import logging
 from django.core.mail.backends.smtp import EmailBackend as BaseEmailBackend
 from django.core.mail.backends.console import EmailBackend as ConsoleBackend
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 
 class MultiPortEmailBackend(BaseEmailBackend):
     """
-    SMTP backend que intenta múltiples puertos y hosts como fallback
-    Útil para entornos con restricciones de red como Railway
+    Legacy SMTP backend with multi-port fallback - DEPRECATED
+    
+    Now using Mailgun via django-anymail.
+    This backend is kept for reference only.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ports_to_try = [587, 465, 25]  # Intentar estos puertos en orden
+        self.ports_to_try = [587, 465, 25]
         self.connection = None
 
     def open(self):
-        """
-        Intenta abrir conexión SMTP con múltiples puertos como fallback
-        """
+        """Attempt SMTP connection with port fallback (minimal logging)"""
         if self.connection is not None:
             return False
 
         for port in self.ports_to_try:
             try:
-                logger.info(f"📡 Intentando conexión SMTP en puerto {port}...")
                 self.port = port
-                
-                # Para puerto 465, usar SSL en lugar de TLS
-                if port == 465:
-                    self.use_ssl = True
-                    self.use_tls = False
-                    logger.info(f"   - Usando SSL para puerto {port}")
-                else:
-                    self.use_ssl = False
-                    self.use_tls = True
-                    logger.info(f"   - Usando TLS para puerto {port}")
+                self.use_ssl = (port == 465)
+                self.use_tls = (port != 465)
                 
                 super().open()
-                logger.info(f"✅ Conexión SMTP establecida en puerto {port}")
+                logger.warning(f"SMTP connected on port {port}")
                 return True
             except Exception as e:
-                logger.warning(f"⚠️  Puerto {port} falló: {type(e).__name__}: {str(e)}")
-                self.connection = None
+                logger.debug(f"Port {port} failed: {str(e)}")
                 continue
 
-        # Si todos los puertos fallan, registrar error
-        logger.error("❌ No se pudo conectar a SMTP en ningún puerto (587, 465, 25)")
-        logger.error("   Railway podría tener restricciones de red saliente")
+        logger.error(f"Failed SMTP connection on all ports: {self.ports_to_try}")
         return False
 
-    def send_messages(self, email_messages):
-        """
-        Envía mensajes, con fallback a Console si SMTP falla
-        """
-        if not email_messages:
-            return 0
-
-        msg_count = 0
+    def close(self):
+        """Close SMTP connection"""
         try:
-            if not self.open():
-                logger.error("❌ No se pudo abrir conexión SMTP")
-                logger.info("💾 Intentando guardar emails localmente como fallback...")
-                # Fallback: Usar ConsoleBackend para guardar en stdout/logs
-                console_backend = ConsoleBackend()
-                msg_count = console_backend.send_messages(email_messages)
-                logger.warning(f"⚠️  {msg_count} emails guardados en logs como fallback")
-                return msg_count
-
-            for message in email_messages:
-                sent = self._send(message)
-                if sent:
-                    msg_count += 1
-        except Exception as e:
-            logger.error(f"❌ Error enviando emails: {e}")
-            if not self.fail_silently:
-                raise
-        finally:
-            if self.connection is not None:
-                self.close()
-
-        return msg_count
+            super().close()
+        except Exception:
+            pass
 
 
 class LocalFileEmailBackend:
@@ -107,6 +70,7 @@ class LocalFileEmailBackend:
 
     def send_messages(self, email_messages):
         msg_count = 0
+        from django.conf import settings
         email_dir = os.path.join(settings.MEDIA_ROOT, 'email_queue')
         os.makedirs(email_dir, exist_ok=True)
 
@@ -124,7 +88,7 @@ class LocalFileEmailBackend:
                     f.write(f"Date: {datetime.datetime.now()}\n\n")
                     f.write(message.body)
 
-                logger.info(f"📄 Email guardado localmente: {filepath}")
+                logger.info(f"Email guardado localmente: {filepath}")
                 msg_count += 1
             except Exception as e:
                 logger.error(f"Error guardando email: {e}")
@@ -132,3 +96,4 @@ class LocalFileEmailBackend:
                     raise
 
         return msg_count
+

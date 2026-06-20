@@ -318,24 +318,20 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-# Email Configuration
+# Email Configuration - Usando Mailgun API (funciona en Railway sin problemas SMTP)
+EMAIL_BACKEND = 'anymail.backends.mailgun.EmailBackend'
+ANYMAIL = {
+    'MAILGUN_API_KEY': os.environ.get('MAILGUN_API_KEY'),
+    'MAILGUN_SENDER_DOMAIN': os.environ.get('MAILGUN_SENDER_DOMAIN', 'sandbox.mailgun.org'),  # Reemplazar con dominio real
+}
+
+# Email addresses
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@thermovolt.com')
+EMAIL_ADICIONAL = os.environ.get('EMAIL_ADICIONAL', 'thermovoltc@gmail.com')
+
+# Legacy SendGrid config (por si se necesita en el futuro)
 SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
 SENDGRID_FROM_EMAIL = os.environ.get('SENDGRID_FROM_EMAIL', 'thermovoltc@gmail.com')
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'your_email@gmail.com')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'your_app_password')
-
-# Usar backend personalizado que soporta múltiples puertos y fallbacks
-# Este backend intenta puertos 587, 465, 25 en orden
-EMAIL_BACKEND = 'gestion_mantenimiento.custom_email_backends.MultiPortEmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'  # Gmail SMTP server
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL') or EMAIL_HOST_USER
-
-# SendGrid se usa directamente en las vistas, no por SMTP
-
-# Additional email for BCC copies; usar thermovoltc@gmail.com si no está configurado
-EMAIL_ADICIONAL = os.environ.get('EMAIL_ADICIONAL', 'thermovoltc@gmail.com')
 
 # Mapeo opcional PDV/Cliente -> emails de recepción de informes.
 # Se puede definir aquí como diccionario Python o via variable de entorno JSON
