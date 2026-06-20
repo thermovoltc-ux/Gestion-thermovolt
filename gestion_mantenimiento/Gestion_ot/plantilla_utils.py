@@ -358,7 +358,7 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.white),  # Líneas BLANCAS
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ]))
@@ -403,11 +403,13 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
             ]
             tabla_imgs = Table([img_cells], colWidths=[3.75*inch, 3.75*inch])
             tabla_imgs.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),  # Centrado horizontal
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),  # Centrado vertical
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.white),  # Líneas BLANCAS para efecto flotante
                 ('TOPPADDING', (0, 0), (-1, -1), 3),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 0),
                 ('ROWHEIGHTS', (0, 0), (-1, 0), 1.5*inch),
             ]))
             story.append(tabla_imgs)
