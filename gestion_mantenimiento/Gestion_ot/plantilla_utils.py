@@ -83,81 +83,60 @@ def reemplazar_tags_en_docx(doc, reemplazos):
 
 def _insertar_firma_en_docx(doc, cierre_ot):
     """
-    Inserta las firmas DEBAJO de los documentos en la sección "Confirmación de trabajo recibido"
-    Las imágenes de firma van directamente debajo del texto "Documento de identidad: XXX"
+    Inserta las firmas DENTRO de la tabla de firmas en el DOCX
+    Las imágenes van en nuevas filas debajo de los documentos
     """
     if not cierre_ot.firma_digital and not cierre_ot.firma_receptor:
         logger.info("⚠️ No hay firmas para agregar")
         return
     
     try:
-        # Buscar el párrafo "Confirmación de trabajo recibido:"
-        confirmacion_encontrada = False
-        para_confirmacion_idx = None
-        
-        for idx, para in enumerate(doc.paragraphs):
-            if "Confirmación de trabajo recibido" in para.text:
-                confirmacion_encontrada = True
-                para_confirmacion_idx = idx
-                logger.info(f"✅ Encontrado 'Confirmación de trabajo recibido' en párrafo {idx}")
-                break
-        
-        if not confirmacion_encontrada:
-            logger.warning("⚠️ No se encontró 'Confirmación de trabajo recibido' en documento")
-            return
-        
-        # Buscar la tabla de firmas (suele ser la última tabla o después de "Confirmación")
-        tabla_encontrada = False
-        tabla_idx = None
+        # Buscar la tabla de firmas
+        tabla_firmas_idx = None
         
         for idx, tabla in enumerate(doc.tables):
-            # Buscar tabla que contenga "Realiz" o "Recibido"
+            # Buscar tabla que contenga "Documento de identidad"
             for row in tabla.rows:
                 for cell in row.cells:
-                    texto_celda = '\n'.join([p.text for p in cell.paragraphs])
-                    if ('Realiz' in texto_celda or 'Recibido' in texto_celda) and 'Documento' in texto_celda:
-                        tabla_encontrada = True
-                        tabla_idx = idx
-                        logger.info(f"✅ Encontrada tabla de firmas (tabla {idx})")
+                    if "Documento de identidad" in '\n'.join([p.text for p in cell.paragraphs]):
+                        tabla_firmas_idx = idx
+                        logger.info(f"✅ Encontrada tabla de firmas en tabla {idx}")
                         break
-                if tabla_encontrada:
+                if tabla_firmas_idx is not None:
                     break
         
-        if not tabla_encontrada:
+        if tabla_firmas_idx is None:
             logger.warning("⚠️ No se encontró tabla de firmas")
             return
         
-        # Agregar firmas debajo de la tabla
-        # Insertamos párrafos después de la tabla con las imágenes
-        tabla = doc.tables[tabla_idx]
+        tabla_firmas = doc.tables[tabla_firmas_idx]
         
-        # Agregar espacio
-        p_espacio = doc.add_paragraph()
-        p_espacio.text = ""
+        # Agregar fila para las firmas (imágenes)
+        row_firmas = tabla_firmas.add_row()
         
-        # Agregar firma técnico si existe
+        # Celda izquierda: Firma técnico
         if cierre_ot.firma_digital:
             tmp_path, es_temp = _obtener_imagen_temporal(cierre_ot.firma_digital)
             if tmp_path and os.path.exists(tmp_path):
                 try:
-                    p_firma_tec = doc.add_paragraph()
-                    p_firma_tec.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
-                    run = p_firma_tec.add_run()
-                    run.add_picture(tmp_path, width=Inches(1.5))
-                    logger.info("✅ Firma técnico agregada")
+                    p_img_tec = row_firmas.cells[0].paragraphs[0]
+                    p_img_tec.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                    run = p_img_tec.add_run()
+                    run.add_picture(tmp_path, width=Inches(1.2))
+                    logger.info("✅ Firma técnico agregada a la tabla")
                 except Exception as e:
                     logger.warning(f"Error agregando firma técnico: {e}")
         
-        # Agregar firma receptor si existe
+        # Celda derecha: Firma receptor
         if cierre_ot.firma_receptor:
             tmp_path, es_temp = _obtener_imagen_temporal(cierre_ot.firma_receptor)
             if tmp_path and os.path.exists(tmp_path):
                 try:
-                    p_firma_rec = doc.add_paragraph()
-                    p_firma_rec.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
-                    run = p_firma_rec.add_run()
-                    run.add_picture(tmp_path, width=Inches(1.5))
-                    logger.info("✅ Firma receptor agregada")
+                    p_img_rec = row_firmas.cells[1].paragraphs[0]
+                    p_img_rec.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                    run = p_img_rec.add_run()
+                    run.add_picture(tmp_path, width=Inches(1.2))
+                    logger.info("✅ Firma receptor agregada a la tabla")
                 except Exception as e:
                     logger.warning(f"Error agregando firma receptor: {e}")
     
