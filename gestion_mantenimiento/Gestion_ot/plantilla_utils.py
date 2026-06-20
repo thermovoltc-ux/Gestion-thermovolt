@@ -141,19 +141,35 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         
         # ==================== ENCABEZADO ====================
         
-        # Logo
+        # Logo + Servicio Nº en la misma línea (logo izq, servicio der)
+        logo_cell = None
         logo_path = _obtener_logo()
         if logo_path:
             try:
-                logo = PlatypusImage(logo_path, width=2.2*inch, height=0.8*inch)
-                story.append(logo)
+                logo_cell = PlatypusImage(logo_path, width=2.2*inch, height=0.8*inch)
                 logger.info("✅ Logo agregado al PDF")
             except Exception as e:
                 logger.warning(f"Error agregando logo: {e}")
         
-        # Servicio N°
-        p_servicio = Paragraph(f"<b>Servicio Nº {numero_ot}</b>", title_style)
-        story.append(p_servicio)
+        servicio_style = ParagraphStyle(
+            name='ServicioStyle',
+            parent=styles['Heading1'],
+            fontSize=14,
+            textColor=colors.HexColor('#1F2937'),
+            alignment=TA_RIGHT,
+            fontName='Helvetica-Bold'
+        )
+        p_servicio = Paragraph(f"<b>Servicio Nº {numero_ot}</b>", servicio_style)
+        
+        encabezado_data = [[logo_cell or Paragraph('', body_style), p_servicio]]
+        tabla_encabezado = Table(encabezado_data, colWidths=[3.5*inch, 3.5*inch])
+        tabla_encabezado.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BORDERS', (0, 0), (-1, -1), 0, colors.white),
+        ]))
+        story.append(tabla_encabezado)
         story.append(Spacer(1, 0.2*inch))
         
         # ==================== TABLA 1: EQUIPO, CLIENTE, FECHA ====================
@@ -209,16 +225,50 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         
         # ==================== DESCRIPCIÓN ====================
         
-        story.append(Paragraph("DESCRIPCIÓN DEL TRABAJO REALIZADO", heading_style))
         desc_texto = cierre_ot.descripcion_falla or 'N/A'
-        story.append(Paragraph(desc_texto, body_style))
+        tabla_desc_data = [
+            ['DESCRIPCIÓN DEL TRABAJO REALIZADO'],
+            [desc_texto]
+        ]
+        tabla_desc = Table(tabla_desc_data, colWidths=[7.5*inch])
+        tabla_desc.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F2937')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (0, 0), 'MIDDLE'),
+            ('VALIGN', (0, 1), (-1, -1), 'TOP'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(tabla_desc)
         story.append(Spacer(1, 0.1*inch))
         
         # ==================== OBSERVACIONES ====================
         
-        story.append(Paragraph("OBSERVACIONES", heading_style))
         obs_texto = cierre_ot.observaciones or 'N/A'
-        story.append(Paragraph(obs_texto, body_style))
+        tabla_obs_data = [
+            ['OBSERVACIONES'],
+            [obs_texto]
+        ]
+        tabla_obs = Table(tabla_obs_data, colWidths=[7.5*inch])
+        tabla_obs.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F2937')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (0, 0), 'MIDDLE'),
+            ('VALIGN', (0, 1), (-1, -1), 'TOP'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(tabla_obs)
         story.append(Spacer(1, 0.15*inch))
         
         # ==================== CONFIRMACIÓN DE TRABAJO ====================
