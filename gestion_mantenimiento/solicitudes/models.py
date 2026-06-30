@@ -34,6 +34,10 @@ class Solicitud(models.Model):
         if self.ubicacion:
             self.PDV = self.ubicacion.nombre
             self.co = self.ubicacion.codigo
+
+        if self._state.adding and not self.consecutivo:
+            ultimo_consecutivo = Solicitud.objects.aggregate(models.Max('consecutivo'))['consecutivo__max'] or 0
+            self.consecutivo = ultimo_consecutivo + 1
         
         super(Solicitud, self).save(*args, **kwargs)
 

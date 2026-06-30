@@ -22,6 +22,7 @@ from gestion_mantenimiento.users.forms import CustomAuthenticationForm
 from django.core.mail import send_mail
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import models
 
 # Configurar el logger
 logger = logging.getLogger(__name__)
@@ -34,8 +35,8 @@ def crear_solicitud(request):
         if form.is_valid():
             nueva_solicitud = form.save(commit=False)
 
-            ultima_solicitud = Solicitud.objects.count()
-            nueva_solicitud.consecutivo = ultima_solicitud + 1
+            ultimo_consecutivo = Solicitud.objects.aggregate(models.Max('consecutivo'))['consecutivo__max'] or 0
+            nueva_solicitud.consecutivo = ultimo_consecutivo + 1
 
             estado_solicitado, _ = Estado.objects.get_or_create(nombre='solicitado')
             nueva_solicitud.estado = estado_solicitado
