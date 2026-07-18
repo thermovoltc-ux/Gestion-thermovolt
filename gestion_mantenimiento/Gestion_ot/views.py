@@ -1105,12 +1105,12 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     # Usar PDV como nombre del cliente
     cliente_nombre = solicitud.PDV if solicitud.PDV else "N/A"
     
-    fecha_str = cierre_ot.fecha_inicio_actividad.strftime('%d/%m/%Y') if cierre_ot.fecha_inicio_actividad else datetime.now().strftime('%d/%m/%Y')
+    fecha_str = cierre_ot.fecha_inicio_actividad.strftime('%d/%m/%Y') if cierre_ot.fecha_inicio_actividad else datetime.datetime.now().strftime('%d/%m/%Y')
     
     subject = f"Informe de Mantenimiento OT-{consecutivo}"
     
     # Nombre del PDF: OT - 115 - 20/6/2026 8:51:39
-    fecha_obj = cierre_ot.fecha_inicio_actividad or datetime.now()
+    fecha_obj = cierre_ot.fecha_inicio_actividad or datetime.datetime.now()
     fecha_hora_str = fecha_obj.strftime('%d/%m/%Y %H:%M:%S')
     pdf_filename = f"OT - {consecutivo} - {fecha_hora_str}.pdf"
     

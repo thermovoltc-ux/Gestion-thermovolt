@@ -83,11 +83,27 @@ def _obtener_imagen_temporal(file_field_o_url):
                     img = img.convert('RGB')
                     logger.info(f"Convertido a RGB desde {img.mode}")
                 
-                # Guardar en archivo temporal
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
-                    img.save(tmp.name, format='PNG', quality=95)
-                    logger.info(f"✅ Data URL procesada y guardada en: {tmp.name}")
-                    return tmp.name, True
+                # Reducir resolución si es muy grande y guardar en JPEG para reducir tamaño
+                max_width = 1600
+                if img.width > max_width:
+                    ratio = max_width / float(img.width)
+                    new_height = int(img.height * ratio)
+                    try:
+                        img = img.resize((max_width, new_height), PILImage.LANCZOS)
+                        logger.info(f"Imagen redimensionada a: {img.size}")
+                    except Exception:
+                        logger.warning("No se pudo redimensionar la imagen, se guardará tal cual")
+
+                # Guardar como JPEG comprimido
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp:
+                    try:
+                        img.save(tmp.name, format='JPEG', quality=70, optimize=True)
+                        logger.info(f"✅ Data URL procesada y guardada en: {tmp.name}")
+                        return tmp.name, True
+                    except Exception as e:
+                        logger.warning(f"Fallo al guardar como JPEG: {e}, intentando PNG")
+                        img.save(tmp.name, format='PNG')
+                        return tmp.name, True
             except Exception as e:
                 logger.error(f"❌ Error procesando data URL: {e}", exc_info=True)
                 return None, False
