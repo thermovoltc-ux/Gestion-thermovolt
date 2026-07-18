@@ -1242,13 +1242,22 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         
         # Agregar versión HTML
         email.attach_alternative(html_content, "text/html")
-        
-        # Adjuntar PDF con nombre mejorado
-        email.attach(pdf_filename, pdf_buffer.getvalue(), 'application/pdf')
-        
+
+        # Adjuntar PDF solo si el tamaño es razonable para Brevo; si no, enviamos el correo sin adjunto.
+        pdf_bytes = pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else bytes(pdf_buffer)
+        attachment_size_mb = len(pdf_bytes) / (1024 * 1024)
         logger.info(f"📬 Enviando email via Brevo")
         logger.info(f"   - Destinatarios: {recipient_list}")
-        logger.info(f"   - Archivo: {pdf_filename}")
+        logger.info(f"   - Archivo: {pdf_filename} ({attachment_size_mb:.2f} MB)")
+
+        if len(pdf_bytes) <= 4 * 1024 * 1024:
+            email.attach(pdf_filename, pdf_bytes, 'application/pdf')
+            logger.info("📎 PDF adjuntado al email")
+        else:
+            logger.warning(
+                "⚠️ El PDF supera el umbral seguro para Brevo (%s MB). Se enviará el correo sin adjunto.",
+                round(attachment_size_mb, 2),
+            )
         
         email.send(fail_silently=False)
         
