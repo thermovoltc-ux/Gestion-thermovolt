@@ -449,6 +449,9 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
                 alignment=TA_CENTER,
                 fontName='Helvetica-Bold'
             )
+
+            # Limitar a las primeras 4 imágenes para evitar PDFs enormes en email.
+            max_fotos_por_tipo = 4
             
             # ANTES
             if imagenes_antes:
@@ -456,14 +459,15 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
                 story.append(Spacer(1, 0.15*inch))
                 
                 # Agrupar imágenes de a 2 por fila
-                for i in range(0, len(imagenes_antes), 2):
+                fotos_antes = imagenes_antes[:max_fotos_por_tipo]
+                for i in range(0, len(fotos_antes), 2):
                     fila_imgs = []
                     for j in range(2):
-                        if i + j < len(imagenes_antes):
+                        if i + j < len(fotos_antes):
                             try:
-                                img_path, _ = _obtener_imagen_temporal(imagenes_antes[i + j].imagen)
+                                img_path, _ = _obtener_imagen_temporal(fotos_antes[i + j].imagen)
                                 if img_path and os.path.exists(img_path):
-                                    img_obj = PlatypusImage(img_path, width=3.3*inch, height=2.5*inch)
+                                    img_obj = PlatypusImage(img_path, width=2.7*inch, height=2.0*inch)
                                     fila_imgs.append(img_obj)
                                     logger.info("✅ Imagen ANTES agregada")
                                 else:
@@ -475,7 +479,7 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
                             fila_imgs.append(Paragraph('', body_style))
                     
                     if fila_imgs:
-                        tabla_imgs_antes = Table([fila_imgs], colWidths=[3.5*inch, 3.5*inch])
+                        tabla_imgs_antes = Table([fila_imgs], colWidths=[3.2*inch, 3.2*inch])
                         tabla_imgs_antes.setStyle(TableStyle([
                             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -490,14 +494,15 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
                 story.append(Spacer(1, 0.15*inch))
                 
                 # Agrupar imágenes de a 2 por fila
-                for i in range(0, len(imagenes_despues), 2):
+                fotos_despues = imagenes_despues[:max_fotos_por_tipo]
+                for i in range(0, len(fotos_despues), 2):
                     fila_imgs = []
                     for j in range(2):
-                        if i + j < len(imagenes_despues):
+                        if i + j < len(fotos_despues):
                             try:
-                                img_path, _ = _obtener_imagen_temporal(imagenes_despues[i + j].imagen)
+                                img_path, _ = _obtener_imagen_temporal(fotos_despues[i + j].imagen)
                                 if img_path and os.path.exists(img_path):
-                                    img_obj = PlatypusImage(img_path, width=3.3*inch, height=2.5*inch)
+                                    img_obj = PlatypusImage(img_path, width=2.7*inch, height=2.0*inch)
                                     fila_imgs.append(img_obj)
                                     logger.info("✅ Imagen DESPUÉS agregada")
                                 else:
@@ -509,7 +514,7 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
                             fila_imgs.append(Paragraph('', body_style))
                     
                     if fila_imgs:
-                        tabla_imgs_despues = Table([fila_imgs], colWidths=[3.5*inch, 3.5*inch])
+                        tabla_imgs_despues = Table([fila_imgs], colWidths=[3.2*inch, 3.2*inch])
                         tabla_imgs_despues.setStyle(TableStyle([
                             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
