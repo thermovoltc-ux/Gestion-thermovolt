@@ -91,20 +91,63 @@ def hoja_vida_equipo(request, equipo_id):
     story.append(title)
     story.append(Spacer(1, 12))
 
-    # Datos básicos del equipo
-    equipo_data = [
-        ['Nombre', equipo.nombre or ''],
-        ['Código', equipo.codigo or ''],
-        ['Ubicación', equipo.ubicacion.nombre if equipo.ubicacion else ''],
-        ['Descripción', equipo.descripcion or ''],
+    # Datos del equipo — organizados en dos columnas + espacio para foto
+    attrs = [
+        ('Nombre', equipo.nombre or ''),
+        ('Código', equipo.codigo or ''),
+        ('Ubicación', equipo.ubicacion.nombre if equipo.ubicacion else ''),
+        ('Descripción', equipo.descripcion or ''),
+        ('Fabricante', equipo.fabricante or ''),
+        ('Modelo', equipo.modelo or ''),
+        ('Serie', equipo.serie or ''),
+        ('Prioridad', equipo.prioridad or ''),
+        ('Fecha adquisición', equipo.fecha_adquisicion.strftime('%d/%m/%Y') if equipo.fecha_adquisicion else ''),
+        ('Horas de uso', str(equipo.horas_uso) if equipo.horas_uso is not None else ''),
+        ('Valor compra', f"{equipo.valor_compra:.2f}" if equipo.valor_compra is not None else ''),
+        ('Valor actual', f"{equipo.valor_actual:.2f}" if equipo.valor_actual is not None else ''),
     ]
-    table = Table(equipo_data, colWidths=[120, 360])
-    table.setStyle(TableStyle([
-        ('GRID', (0,0), (-1,-1), 0.5, colors.black),
+
+    # Construir filas con dos pares de atributo por fila (4 columnas: label,val,label,val)
+    attr_rows = []
+    for i in range(0, len(attrs), 2):
+        left = attrs[i]
+        right = attrs[i+1] if i+1 < len(attrs) else ('', '')
+        attr_rows.append([left[0], left[1], right[0], right[1]])
+
+    attrs_table = Table(attr_rows, colWidths=[80, 170, 80, 170])
+    attrs_table.setStyle(TableStyle([
+        ('GRID', (0,0), (-1,-1), 0.4, colors.black),
         ('BACKGROUND', (0,0), (0,-1), colors.HexColor('#f3f4f6')),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('ALIGN', (1,0), (1,-1), 'LEFT'),
+        ('ALIGN', (3,0), (3,-1), 'LEFT'),
     ]))
-    story.append(table)
+
+    # Foto: intentar insertar la imagen si existe, sino dejar marco vacío
+    photo_width = 120
+    photo_height = 120
+    photo_flowable = None
+    try:
+        if equipo.imagen and hasattr(equipo.imagen, 'path'):
+            from reportlab.platypus import Image as RLImage
+            img_path = equipo.imagen.path
+            photo_flowable = RLImage(img_path, width=photo_width, height=photo_height)
+    except Exception:
+        photo_flowable = None
+
+    if not photo_flowable:
+        # marco vacío para foto
+        placeholder = Table([[ ' ' ]], colWidths=[photo_width], rowHeights=[photo_height])
+        placeholder.setStyle(TableStyle([
+            ('BOX', (0,0), (-1,-1), 0.5, colors.black),
+        ]))
+        photo_flowable = placeholder
+
+    main_table = Table([[attrs_table, photo_flowable]], colWidths=[420, photo_width])
+    main_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+    ]))
+    story.append(main_table)
     story.append(Spacer(1, 12))
 
     # Intervenciones (OTs)
@@ -114,18 +157,28 @@ def hoja_vida_equipo(request, equipo_id):
     data = [['Nº OT', 'Fecha', 'Responsable', 'Tipo / Estado', 'Observación']]
     for ot in ots:
         fecha = ot.fecha_actividad.strftime('%d/%m/%Y') if ot.fecha_actividad else ''
-        responsable = ot.tecnico_asignado or (ot.solicitud.solicitado_por if hasattr(ot, 'solicitud') else '')
-        estado = ot.estado.nombre if ot.estado else ''
+        # Responsable: preferir nombre_tecnico del cierre, luego tecnico_asignado
+        responsable = ''
+        tipo_txt = ''
+        estado_txt = ot.estado.nombre if ot.estado else ''
         observacion = ''
-        # Intentar extraer observación desde cierre si existe
         try:
             cierre = ot.cierreot
+            responsable = cierre.nombre_tecnico or ''
+            tipo_txt = cierre.tipo_mantenimiento or (cierre.tipo_intervencion if hasattr(cierre, 'tipo_intervencion') else '')
             observacion = cierre.observaciones or ''
         except Exception:
-            observacion = ''
-        data.append([f"OT-{ot.solicitud.consecutivo}", fecha, responsable, estado, observacion])
+            cierre = None
+        if not responsable:
+            responsable = ot.tecnico_asignado or ''
 
-    ot_table = Table(data, colWidths=[70, 80, 120, 100, 110])
+        # Construir celda Tipo / Estado con dos líneas
+        from reportlab.platypus import Paragraph
+        tipo_estado = Paragraph(f"<b>{tipo_txt}</b><br/>{estado_txt}", styles['BodyText'])
+
+        data.append([f"OT-{ot.solicitud.consecutivo}", fecha, responsable, tipo_estado, observacion])
+
+    ot_table = Table(data, colWidths=[70, 80, 120, 140, 130])
     ot_table.setStyle(TableStyle([
         ('GRID', (0,0), (-1,-1), 0.5, colors.black),
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#111827')),
