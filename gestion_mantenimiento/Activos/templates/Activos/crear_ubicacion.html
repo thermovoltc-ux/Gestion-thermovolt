@@ -1,14 +1,14 @@
 {% extends "solicitudes/indexpadre.html" %}
 
-{% block title %}Crear Ubicación{% endblock %}
+{% block title %}{{ page_title|default:'Crear Ubicación' }}{% endblock %}
 
 {% block content %}
-  <h2>Crear Nueva Ubicación</h2>
+  <h2>{{ page_title|default:'Crear Nueva Ubicación' }}</h2>
   <p>Si esta ubicación es una sub-ubicación dentro de otra, elige la ubicación padre. De lo contrario, deja el campo vacío para crear una ubicación raíz.</p>
-  <form id="form-ubicacion" method="post" action="{% url 'crear_ubicacion' %}" enctype="multipart/form-data">
+  <form id="form-ubicacion" method="post" action="{{ action_url|default:request.path }}" enctype="multipart/form-data">
     {% csrf_token %}
     {{ form.as_p }}
-    <button type="submit" class="btn btn-success">Crear Ubicación</button>
+    <button type="submit" class="btn btn-success">{{ submit_text|default:'Crear Ubicación' }}</button>
     <a href="{% url 'lista_activos' %}" class="btn btn-danger">Cancelar</a>
   </form>
 {% endblock %}

@@ -1,6 +1,7 @@
 import os
 from urllib.request import urlopen
 from django.shortcuts import render, redirect
+from django.urls import reverse
 from .forms import UbicacionForm, EquipoForm
 from .models import Ubicacion, Equipo
 from django.http import FileResponse, Http404
@@ -20,7 +21,34 @@ def crear_ubicacion(request):
             return redirect('lista_activos')
     else:
         form = UbicacionForm()
-    return render(request, 'Activos/crear_ubicacion.html', {'form': form})
+    context = {
+        'form': form,
+        'page_title': 'Crear Ubicación',
+        'submit_text': 'Crear Ubicación',
+        'action_url': reverse('crear_ubicacion'),
+    }
+    return render(request, 'Activos/crear_ubicacion.html', context)
+
+def editar_ubicacion(request, ubicacion_id):
+    ubicacion = Ubicacion.objects.filter(id=ubicacion_id).first()
+    if not ubicacion:
+        raise Http404('Ubicación no encontrada')
+
+    if request.method == 'POST':
+        form = UbicacionForm(request.POST, request.FILES, instance=ubicacion)
+        if form.is_valid():
+            form.save()
+            return redirect('lista_activos')
+    else:
+        form = UbicacionForm(instance=ubicacion)
+
+    context = {
+        'form': form,
+        'page_title': 'Editar Ubicación',
+        'submit_text': 'Actualizar Ubicación',
+        'action_url': reverse('editar_ubicacion', args=[ubicacion.id]),
+    }
+    return render(request, 'Activos/crear_ubicacion.html', context)
 
 def crear_equipo(request):
     if request.method == 'POST':
@@ -30,7 +58,34 @@ def crear_equipo(request):
             return redirect('lista_activos')
     else:
         form = EquipoForm()
-    return render(request, 'Activos/crear_equipo.html', {'form': form})
+    context = {
+        'form': form,
+        'page_title': 'Crear Equipo',
+        'submit_text': 'Guardar',
+        'action_url': reverse('crear_equipo'),
+    }
+    return render(request, 'Activos/crear_equipo.html', context)
+
+def editar_equipo(request, equipo_id):
+    equipo = Equipo.objects.filter(id=equipo_id).first()
+    if not equipo:
+        raise Http404('Equipo no encontrado')
+
+    if request.method == 'POST':
+        form = EquipoForm(request.POST, request.FILES, instance=equipo)
+        if form.is_valid():
+            form.save()
+            return redirect('lista_activos')
+    else:
+        form = EquipoForm(instance=equipo)
+
+    context = {
+        'form': form,
+        'page_title': 'Editar Equipo',
+        'submit_text': 'Actualizar',
+        'action_url': reverse('editar_equipo', args=[equipo.id]),
+    }
+    return render(request, 'Activos/crear_equipo.html', context)
 
 def crear_equipo_dinamico(request):
     """Crea un equipo hijo dinámicamente desde el árbol"""

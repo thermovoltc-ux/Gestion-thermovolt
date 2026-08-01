@@ -1,17 +1,17 @@
 {% extends "solicitudes/indexpadre.html" %}
 
 {% block title %}
-Crear Equipo
+{{ page_title|default:'Crear Equipo' }}
 {% endblock %}
 
 {% block content %}
 <div class="container-crear_equipo">
-    <h1>Crear Equipo</h1>
+    <h1>{{ page_title|default:'Crear Equipo' }}</h1>
     <p>Selecciona la ubicación donde se encuentra este equipo y, si corresponde, el equipo padre dentro del cual depende.</p>
-    <form id="form-equipo" method="post" action="{% url 'crear_equipo' %}" enctype="multipart/form-data">
+    <form id="form-equipo" method="post" action="{{ action_url|default:request.path }}" enctype="multipart/form-data">
         {% csrf_token %}
         {{ form.as_p }}
-        <button type="submit" class="btn btn-primary">Guardar</button>
+        <button type="submit" class="btn btn-primary">{{ submit_text|default:'Guardar' }}</button>
         <a href="{% url 'lista_activos' %}" class="btn btn-danger">Cancelar</a>
     </form>
 </div>

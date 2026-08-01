@@ -1084,6 +1084,9 @@ Lista de Activos - Gestión de Activos y Equipos
                     ${tipo === 'equipo' ? `<button class="btn-action btn-action-secondary" onclick="window.open('/Activos/hoja_vida/${id}/', '_blank')">
                         <ion-icon name="document-text-outline"></ion-icon> Hoja de vida
                     </button>` : ''}
+                    <button class="btn-action btn-action-secondary" onclick="abrirEditarNodo('${tipo}', ${id})">
+                        <ion-icon name="pencil-outline"></ion-icon> Editar
+                    </button>
                     <button class="btn-action btn-action-secondary" onclick="verHistorial(${id}, '${tipo}')">
                         <ion-icon name="history-outline"></ion-icon> Historial OT
                     </button>
@@ -1288,6 +1291,14 @@ Lista de Activos - Gestión de Activos y Equipos
         }
 
         modal.classList.add('open');
+    }
+
+    function abrirEditarNodo(tipo, id) {
+        if (tipo === 'equipo') {
+            window.location.href = `/Activos/editar_equipo/${id}/`;
+        } else if (tipo === 'ubicacion') {
+            window.location.href = `/Activos/editar_ubicacion/${id}/`;
+        }
     }
 
     function verHistorial(id, tipo) {
