@@ -173,7 +173,6 @@ def hoja_vida_equipo(request, equipo_id):
             responsable = ot.tecnico_asignado or ''
 
         # Construir celda Tipo / Estado con dos líneas
-        from reportlab.platypus import Paragraph
         tipo_estado = Paragraph(f"<b>{tipo_txt}</b><br/>{estado_txt}", styles['BodyText'])
 
         data.append([f"OT-{ot.solicitud.consecutivo}", fecha, responsable, tipo_estado, observacion])
