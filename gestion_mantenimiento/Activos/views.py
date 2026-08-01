@@ -126,15 +126,19 @@ def hoja_vida_equipo(request, equipo_id):
     # Calcular altura de tabla para que la imagen acompañe todo el bloque de información
     _, attrs_height = attrs_table.wrap(360, 0)
 
-    # Foto: intentar insertar la imagen si existe, sino dejar marco vacío
-    photo_width = 150
+    # Ajustamos el ancho de la caja antes de crear la imagen para que la imagen llene el área
+    photo_col_width = 170
+    photo_width = photo_col_width - 10
     photo_height = attrs_height
     photo_flowable = None
     try:
         if equipo.imagen and hasattr(equipo.imagen, 'path'):
             from reportlab.platypus import Image as RLImage
             img_path = equipo.imagen.path
-            photo_flowable = RLImage(img_path, width=photo_width, height=photo_height)
+            photo_flowable = RLImage(img_path)
+            photo_flowable.drawWidth = photo_width
+            photo_flowable.drawHeight = photo_height - 10
+            photo_flowable.hAlign = 'CENTER'
     except Exception:
         photo_flowable = None
 
@@ -148,7 +152,6 @@ def hoja_vida_equipo(request, equipo_id):
         photo_flowable = placeholder
 
     # Ajustar la foto para que quede centrada en un recuadro a la derecha
-    photo_col_width = 170
     photo_box = Table([[photo_flowable]], colWidths=[photo_col_width], rowHeights=[photo_height])
     photo_box.setStyle(TableStyle([
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
