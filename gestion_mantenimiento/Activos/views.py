@@ -88,6 +88,7 @@ def hoja_vida_equipo(request, equipo_id):
     label_style = ParagraphStyle('Label', parent=styles['BodyText'], fontName='Helvetica-Bold', fontSize=9, leading=12)
     value_style = ParagraphStyle('Value', parent=styles['BodyText'], fontSize=9, leading=12)
     type_state_style = ParagraphStyle('TypeState', parent=styles['BodyText'], fontSize=9, leading=11)
+    header_style = ParagraphStyle('Header', parent=styles['BodyText'], fontName='Helvetica-Bold', fontSize=9, leading=11, textColor=colors.whitesmoke)
     story = []
 
     title = Paragraph(f"Hoja de vida - {equipo.nombre}", styles['Title'])
@@ -96,21 +97,18 @@ def hoja_vida_equipo(request, equipo_id):
 
     # Datos del equipo — organizados en dos columnas + espacio para foto
     attrs = [
-        ('Nombre', equipo.nombre or ''),
         ('Código', equipo.codigo or ''),
-        ('Ubicación', equipo.ubicacion.nombre if equipo.ubicacion else ''),
-        ('Descripción', equipo.descripcion or ''),
-        ('Fabricante', equipo.fabricante or ''),
         ('Modelo', equipo.modelo or ''),
-        ('Serie', equipo.serie or ''),
-        ('Prioridad', equipo.prioridad or ''),
-        ('Fecha adquisición', equipo.fecha_adquisicion.strftime('%d/%m/%Y') if equipo.fecha_adquisicion else ''),
+        ('Nombre', equipo.nombre or ''),
         ('Horas de uso', str(equipo.horas_uso) if equipo.horas_uso is not None else ''),
+        ('Ubicación', equipo.ubicacion.nombre if equipo.ubicacion else ''),
+        ('Prioridad', equipo.prioridad or ''),
+        ('Fabricante', equipo.fabricante or ''),
         ('Valor compra', f"{equipo.valor_compra:.2f}" if equipo.valor_compra is not None else ''),
+        ('Serie', equipo.serie or ''),
         ('Valor actual', f"{equipo.valor_actual:.2f}" if equipo.valor_actual is not None else ''),
     ]
 
-    # Construir filas con dos pares de atributo por fila (4 columnas: label,val,label,val)
     attr_rows = []
     for i in range(0, len(attrs), 2):
         left = attrs[i]
@@ -122,17 +120,17 @@ def hoja_vida_equipo(request, equipo_id):
             Paragraph(right[1], value_style),
         ])
 
-    attrs_table = Table(attr_rows, colWidths=[90, 160, 90, 160])
+    attrs_table = Table(attr_rows, colWidths=[70, 105, 70, 105])
     attrs_table.setStyle(TableStyle([
         ('GRID', (0,0), (-1,-1), 0.4, colors.black),
         ('BACKGROUND', (0,0), (-1,-1), colors.white),
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ('ALIGN', (1,0), (1,-1), 'LEFT'),
         ('ALIGN', (3,0), (3,-1), 'LEFT'),
-        ('LEFTPADDING', (0,0), (-1,-1), 6),
-        ('RIGHTPADDING', (0,0), (-1,-1), 6),
-        ('TOPPADDING', (0,0), (-1,-1), 5),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ('LEFTPADDING', (0,0), (-1,-1), 8),
+        ('RIGHTPADDING', (0,0), (-1,-1), 8),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
     ]))
 
     # Foto: intentar insertar la imagen si existe, sino dejar marco vacío
@@ -155,9 +153,15 @@ def hoja_vida_equipo(request, equipo_id):
         ]))
         photo_flowable = placeholder
 
-    # Ajustar la foto para que no se superponga con la tabla de especificaciones
+    # Ajustar la foto para que quede centrada en un recuadro a la derecha
     photo_col_width = 160
-    main_table = Table([[attrs_table, photo_flowable]], colWidths=[420, photo_col_width])
+    photo_box = Table([[photo_flowable]], colWidths=[photo_col_width], rowHeights=[photo_height])
+    photo_box.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOX', (0,0), (-1,-1), 0.5, colors.black),
+    ]))
+    main_table = Table([[attrs_table, photo_box]], colWidths=[380, photo_col_width])
     main_table.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ('LEFTPADDING', (0,0), (-1,-1), 0),
@@ -205,12 +209,16 @@ def hoja_vida_equipo(request, equipo_id):
             Paragraph(observacion, value_style),
         ])
 
-    ot_table = Table(data, colWidths=[70, 80, 120, 140, 130])
+    ot_table = Table(data, colWidths=[70, 70, 110, 130, 120])
     ot_table.setStyle(TableStyle([
         ('GRID', (0,0), (-1,-1), 0.5, colors.black),
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#111827')),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (-1,-1), 4),
+        ('RIGHTPADDING', (0,0), (-1,-1), 4),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
     ]))
     story.append(ot_table)
 
