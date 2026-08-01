@@ -82,9 +82,9 @@ def _obtener_imagen_temporal(file_field_o_url):
                 elif img.mode != 'RGB':
                     img = img.convert('RGB')
                     logger.info(f"Convertido a RGB desde {img.mode}")
-                
-                # Reducir resolución si es muy grande y guardar en JPEG para reducir tamaño
-                max_width = 1200
+
+                # Reducir resolución solo si es muy grande y guardar en JPEG con calidad alta
+                max_width = 2400
                 if img.width > max_width:
                     ratio = max_width / float(img.width)
                     new_height = max(1, int(img.height * ratio))
@@ -94,11 +94,15 @@ def _obtener_imagen_temporal(file_field_o_url):
                     except Exception:
                         logger.warning("No se pudo redimensionar la imagen, se guardará tal cual")
 
-                # Guardar como JPEG comprimido y más ligero
+                # Guardar como JPEG de alta calidad
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp:
                     try:
-                        img.save(tmp.name, format='JPEG', quality=60, optimize=True)
-                        logger.info(f"✅ Data URL procesada y guardada en: {tmp.name}")
+                        img.save(tmp.name, format='JPEG', quality=90, optimize=True)
+                        try:
+                            new_size = os.path.getsize(tmp.name)
+                            logger.info(f"✅ Data URL procesada y guardada en: {tmp.name} ({new_size} bytes)")
+                        except Exception:
+                            logger.info(f"✅ Data URL procesada y guardada en: {tmp.name}")
                         return tmp.name, True
                     except Exception as e:
                         logger.warning(f"Fallo al guardar como JPEG: {e}, intentando PNG")

@@ -10,6 +10,7 @@ urlpatterns = [
     path('listar_ot/', views.listar_ot, name='listar_ot'),
     path('cierre_ot/<int:ot_id>/', views.cierre_ot, name='cierre_ot'),
     path('detalles_solicitud/<int:consecutivo>/', views.detalles_solicitud, name='detalles_solicitud'),
+    path('descargar_informe/<str:filename>/', views.descargar_informe_pdf, name='descargar_informe_pdf'),
     
     # Rutas para planes de mantenimiento
     path('planes/', vista_planes.lista_planes_mantenimiento, name='lista_planes'),

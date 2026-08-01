@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 import json
@@ -1097,19 +1097,51 @@ def guardar_copia_pdf_envio(pdf_buffer, cierre_ot):
         return None
 
 
+def _build_download_url(filename):
+    """Genera una URL pública para descargar un informe guardado localmente."""
+    if not filename:
+        return None
+    host = os.environ.get('PUBLIC_HOST') or (settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000')
+    scheme = 'https' if not settings.DEBUG else 'http'
+    return f"{scheme}://{host.rstrip('/')}{reverse('descargar_informe_pdf', args=[filename])}"
+
+
+def _build_media_url(relative_url):
+    """Devuelve una URL absoluta válida para un recurso dentro de MEDIA_URL."""
+    if not relative_url:
+        return None
+
+    relative_url = relative_url.replace('\\', '/')
+    if relative_url.startswith('http://') or relative_url.startswith('https://'):
+        return relative_url
+
+    media_url = settings.MEDIA_URL or '/media/'
+    if media_url.startswith('http://') or media_url.startswith('https://'):
+        return urljoin(media_url, relative_url.lstrip('/'))
+
+    host = os.environ.get('PUBLIC_HOST') or (settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000')
+    scheme = 'https' if not settings.DEBUG else 'http'
+    if media_url.startswith('/'):
+        return f"{scheme}://{host.rstrip('/')}{media_url.rstrip('/')}/{relative_url.lstrip('/')}"
+    return f"{scheme}://{host.rstrip('/')}/{media_url.rstrip('/')}/{relative_url.lstrip('/')}"
+
+
 def guardar_pdf_en_media(pdf_buffer, cierre_ot):
-    """Guarda el PDF en el almacenamiento configurado (MEDIA o Cloudinary) y devuelve la URL pública si es posible."""
+    """Guarda el PDF en el almacenamiento configurado y devuelve la URL pública si es posible."""
     timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
     filename = f"informe_ot_{cierre_ot.orden_trabajo.solicitud.consecutivo}_{timestamp}.pdf"
     relative_path = os.path.join('email_copies', 'informes', filename)
 
+    pdf_bytes = pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else bytes(pdf_buffer)
+
     try:
         # Usar default_storage para respetar configuración de Cloudinary/FS
-        content = ContentFile(pdf_buffer.getvalue())
+        content = ContentFile(pdf_bytes)
         saved_name = default_storage.save(relative_path, content)
         url = default_storage.url(saved_name)
-        logger.info("PDF guardado en storage: %s -> URL: %s", saved_name, url)
-        return url
+        public_url = _build_media_url(url)
+        logger.info("PDF guardado en storage: %s -> URL: %s", saved_name, public_url)
+        return public_url
     except Exception as exc:
         logger.warning("No se pudo guardar el PDF en storage: %s", exc)
 
@@ -1119,20 +1151,34 @@ def guardar_pdf_en_media(pdf_buffer, cierre_ot):
         os.makedirs(local_dir, exist_ok=True)
         local_path = os.path.join(local_dir, filename)
         with open(local_path, 'wb') as local_file:
-            local_file.write(pdf_buffer.getvalue())
+            local_file.write(pdf_bytes)
 
-        media_path = '/'.join([settings.MEDIA_URL.rstrip('/'), 'email_copies', 'informes', filename])
-        if not media_path.startswith('http'):
-            host = settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000'
-            scheme = 'https' if not settings.DEBUG else 'http'
-            media_path = f"{scheme}://{host.rstrip('/')}{media_path if media_path.startswith('/') else '/' + media_path}"
-
-        logger.info("PDF guardado localmente en MEDIA_ROOT: %s -> URL: %s", local_path, media_path)
-        return media_path
+        public_url = _build_download_url(filename)
+        logger.info("PDF guardado localmente en MEDIA_ROOT: %s -> URL de descarga: %s", local_path, public_url)
+        return public_url
     except Exception as exc2:
         logger.warning("No se pudo guardar el PDF localmente en MEDIA_ROOT: %s", exc2)
 
+    logger.error("No fue posible generar una URL pública para el PDF.")
     return None
+
+
+def descargar_informe_pdf(request, filename):
+    """Sirve un informe PDF guardado localmente en MEDIA_ROOT/email_copies/informes."""
+    if not filename or '..' in filename or filename.startswith('/'):
+        raise Http404("Nombre de archivo inválido")
+
+    allowed_dir = os.path.normpath(os.path.join(settings.MEDIA_ROOT, 'email_copies', 'informes'))
+    file_path = os.path.normpath(os.path.join(allowed_dir, filename))
+    if not file_path.startswith(allowed_dir):
+        raise Http404("Ruta de archivo inválida")
+    if not os.path.exists(file_path):
+        raise Http404("Archivo no encontrado")
+    try:
+        return FileResponse(open(file_path, 'rb'), content_type='application/pdf', filename=filename)
+    except Exception as exc:
+        logger.error("Error abriendo el archivo PDF para descarga: %s", exc)
+        raise Http404("No se pudo abrir el archivo")
 
 
 def enviar_pdf_por_email(pdf_buffer, cierre_ot):
