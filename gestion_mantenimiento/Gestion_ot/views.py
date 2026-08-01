@@ -42,6 +42,8 @@ import shutil
 import subprocess
 from PIL import Image as PILImage
 import threading
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 
 try:
     import pythoncom
@@ -1094,6 +1096,23 @@ def guardar_copia_pdf_envio(pdf_buffer, cierre_ot):
         return None
 
 
+def guardar_pdf_en_media(pdf_buffer, cierre_ot):
+    """Guarda el PDF en el almacenamiento configurado (MEDIA o Cloudinary) y devuelve la URL pública si es posible."""
+    try:
+        timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"informe_ot_{cierre_ot.orden_trabajo.solicitud.consecutivo}_{timestamp}.pdf"
+        relative_path = os.path.join('email_copies', 'informes', filename)
+        # Usar default_storage para respetar configuración de Cloudinary/FS
+        content = ContentFile(pdf_buffer.getvalue())
+        saved_name = default_storage.save(relative_path, content)
+        url = default_storage.url(saved_name)
+        logger.info("PDF guardado en storage: %s -> URL: %s", saved_name, url)
+        return url
+    except Exception as exc:
+        logger.warning("No se pudo guardar el PDF en storage: %s", exc)
+        return None
+
+
 def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     """Envía el PDF por email usando Brevo API con formato HTML presentable."""
     from django.core.mail import EmailMultiAlternatives
@@ -1243,21 +1262,41 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         # Agregar versión HTML
         email.attach_alternative(html_content, "text/html")
 
-        # Adjuntar PDF solo si el tamaño es razonable para Brevo; si no, enviamos el correo sin adjunto.
+        # Adjuntar PDF solo si el tamaño es razonable para Brevo; si no, guardar en MEDIA y enviar enlace.
         pdf_bytes = pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else bytes(pdf_buffer)
         attachment_size_mb = len(pdf_bytes) / (1024 * 1024)
         logger.info(f"📬 Enviando email via Brevo")
         logger.info(f"   - Destinatarios: {recipient_list}")
         logger.info(f"   - Archivo: {pdf_filename} ({attachment_size_mb:.2f} MB)")
 
+        # Umbral seguro para adjuntar (4 MB). Si supera, guardamos en MEDIA y compartimos enlace.
         if len(pdf_bytes) <= 4 * 1024 * 1024:
             email.attach(pdf_filename, pdf_bytes, 'application/pdf')
             logger.info("📎 PDF adjuntado al email")
         else:
             logger.warning(
-                "⚠️ El PDF supera el umbral seguro para Brevo (%s MB). Se enviará el correo sin adjunto.",
+                "⚠️ El PDF supera el umbral seguro para Brevo (%s MB). Guardando en MEDIA y enviando enlace en el cuerpo del correo.",
                 round(attachment_size_mb, 2),
             )
+            # Guardar copia en storage y obtener URL pública (puede ser absoluta si Cloudinary está activo)
+            pdf_url = guardar_pdf_en_media(pdf_buffer, cierre_ot)
+            # También dejar una copia local para auditoría
+            try:
+                guardar_copia_pdf_envio(pdf_buffer, cierre_ot)
+            except Exception:
+                pass
+
+            if pdf_url:
+                # Si la URL es relativa (p. ej. '/media/...'), construir URL absoluta
+                if pdf_url.startswith('/'):
+                    scheme = 'https' if not settings.DEBUG else 'http'
+                    host = (settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS and settings.ALLOWED_HOSTS[0] else 'localhost:8000')
+                    pdf_url = f"{scheme}://{host.rstrip('/')}{pdf_url}"
+
+                # Añadir bloque HTML con enlace de descarga
+                download_block = f"<p>El informe completo está disponible para descarga aquí: <a href=\"{pdf_url}\">Descargar informe (PDF)</a></p>"
+                html_content = html_content.replace('</div>\n                <!-- Footer -->', f"</div>\n                {download_block}\n                <!-- Footer -->")
+                text_content += f"\n\nInforme disponible: {pdf_url}\n"
         
         email.send(fail_silently=False)
         
