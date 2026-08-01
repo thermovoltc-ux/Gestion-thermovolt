@@ -1,6 +1,6 @@
 {# filepath: Activos/templates/Activos/ubicacion_node.html #}
 <div class="tree-item">
-    <div class="tree-node" onclick="seleccionarNodo(event, 'ubicacion', {{ ubicacion.id }}, '{{ ubicacion.nombre }}', '{{ ubicacion.codigo }}', '{{ ubicacion.descripcion }}', '{% if ubicacion.imagen %}{{ ubicacion.imagen.url|escapejs }}{% endif %}')">
+    <div class="tree-node" onclick="seleccionarNodo(event, 'ubicacion', {{ ubicacion.id }}, '{{ ubicacion.nombre|escapejs }}', '{{ ubicacion.codigo|escapejs }}', '{{ ubicacion.descripcion|escapejs }}', null, {% if ubicacion.imagen %}'{{ ubicacion.imagen.url|escapejs }}'{% else %}''{% endif %}, '', '', '', '', '', '', '', '', '{{ ubicacion.direccion|default_if_none:''|escapejs }}', '{{ ubicacion.pais|default_if_none:''|escapejs }}', '{{ ubicacion.ciudad|default_if_none:''|escapejs }}')">
         <span class="toggle-icon" id="toggle-icon-ubicacion-{{ ubicacion.id }}" {% if ubicacion.children.exists or ubicacion.equipos.exists %}onclick="toggleChildren('ubicacion-{{ ubicacion.id }}'); event.stopPropagation();" {% endif %}>
             {% if ubicacion.children.exists or ubicacion.equipos.exists %}
                 <ion-icon name="add-outline"></ion-icon>
@@ -37,7 +37,7 @@
             {% endfor %}
             {% for equipo in ubicacion.equipos.all %}
                 <li class="tree-sub-item">
-                    <div class="tree-node" onclick="seleccionarNodo(event, 'equipo', {{ equipo.id }}, '{{ equipo.nombre }}', '{{ equipo.codigo }}', '{{ equipo.descripcion }}', {{ ubicacion.id }}, '{% if equipo.imagen %}{{ equipo.imagen.url|escapejs }}{% endif %}', null)">
+                    <div class="tree-node" onclick="seleccionarNodo(event, 'equipo', {{ equipo.id }}, '{{ equipo.nombre|escapejs }}', '{{ equipo.codigo|escapejs }}', '{{ equipo.descripcion|escapejs }}', {{ ubicacion.id }}, '{% if equipo.imagen %}{{ equipo.imagen.url|escapejs }}{% endif %}', '{{ equipo.fabricante|default_if_none:''|escapejs }}', '{{ equipo.modelo|default_if_none:''|escapejs }}', '{{ equipo.serie|default_if_none:''|escapejs }}', '{{ equipo.prioridad|default_if_none:''|escapejs }}', '{{ equipo.fecha_adquisicion|date:"Y-m-d"|default_if_none:'' }}', '{{ equipo.horas_uso|default_if_none:'' }}', '{{ equipo.valor_compra|default_if_none:'' }}', '{{ equipo.valor_actual|default_if_none:'' }}', '', '', '')">
                         <span class="toggle-icon" id="toggle-icon-equipo-{{ equipo.id }}" {% if equipo.children.exists %}onclick="toggleChildren('equipo-{{ equipo.id }}'); event.stopPropagation();" {% endif %}>
                             {% if equipo.children.exists %}
                                 <ion-icon name="add-outline"></ion-icon>

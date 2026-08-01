@@ -1,7 +1,7 @@
 {# filepath: Activos/templates/Activos/equipo_node.html #}
 {% for child_equipo in equipo.children.all %}
     <li class="tree-sub-item">
-        <div class="tree-node" onclick="seleccionarNodo(event, 'equipo', {{ child_equipo.id }}, '{{ child_equipo.nombre }}', '{{ child_equipo.codigo }}', '{{ child_equipo.descripcion }}', null, null, '{% if child_equipo.imagen %}{{ child_equipo.imagen.url|escapejs }}{% endif %}')">
+        <div class="tree-node" onclick="seleccionarNodo(event, 'equipo', {{ child_equipo.id }}, '{{ child_equipo.nombre|escapejs }}', '{{ child_equipo.codigo|escapejs }}', '{{ child_equipo.descripcion|escapejs }}', {% if child_equipo.ubicacion %}{{ child_equipo.ubicacion.id }}{% else %}null{% endif %}, '{% if child_equipo.imagen %}{{ child_equipo.imagen.url|escapejs }}{% endif %}', '{{ child_equipo.fabricante|default_if_none:''|escapejs }}', '{{ child_equipo.modelo|default_if_none:''|escapejs }}', '{{ child_equipo.serie|default_if_none:''|escapejs }}', '{{ child_equipo.prioridad|default_if_none:''|escapejs }}', '{{ child_equipo.fecha_adquisicion|date:"Y-m-d"|default_if_none:'' }}', '{{ child_equipo.horas_uso|default_if_none:'' }}', '{{ child_equipo.valor_compra|default_if_none:'' }}', '{{ child_equipo.valor_actual|default_if_none:'' }}', '', '', '')">
             <span class="toggle-icon" id="toggle-icon-equipo-{{ child_equipo.id }}" {% if child_equipo.children.exists %}onclick="toggleChildren('equipo-{{ child_equipo.id }}'); event.stopPropagation();" {% endif %}>
                 {% if child_equipo.children.exists %}
                     <ion-icon name="add-outline"></ion-icon>
@@ -19,7 +19,7 @@
                 {% endif %}
             </div>
             <div class="tree-node-actions">
-                <button class="tree-node-action-btn" onclick="abrirModalCrearHijo('equipo', {{ child_equipo.id }}); event.stopPropagation();" title="Agregar subequipo">
+                <button class="tree-node-action-btn" onclick="abrirModalCrearHijo({{ child_equipo.id }}, 'equipo', '{{ child_equipo.nombre|escapejs }}'); event.stopPropagation();" title="Agregar subequipo">
                     <ion-icon name="add-circle-outline"></ion-icon>
                 </button>
                 <button class="tree-node-action-btn" onclick="abrirModalCrearPlan({{ child_equipo.id }}, '{{ child_equipo.nombre }}'); event.stopPropagation();" title="Plan mantenimiento">
