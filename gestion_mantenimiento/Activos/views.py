@@ -100,11 +100,11 @@ def hoja_vida_equipo(request, equipo_id):
     attr_rows = [
         [Paragraph('INFORMACIÓN BÁSICA', header_style), '', '', ''],
         [Paragraph('Código', label_style), Paragraph(equipo.codigo or '', value_style), Paragraph('Modelo', label_style), Paragraph(equipo.modelo or '', value_style)],
-        [Paragraph('Nombre', label_style), Paragraph(equipo.nombre or '', value_style), Paragraph('Horas de uso', label_style), Paragraph(str(equipo.horas_uso) if equipo.horas_uso is not None else '', value_style)],
+        [Paragraph('Nombre', label_style), Paragraph(equipo.nombre or '', value_style), Paragraph('H. de uso', label_style), Paragraph(str(equipo.horas_uso) if equipo.horas_uso is not None else '', value_style)],
         [Paragraph('Ubicación', label_style), Paragraph(equipo.ubicacion.nombre if equipo.ubicacion else '', value_style), Paragraph('Prioridad', label_style), Paragraph(equipo.prioridad or '', value_style)],
         [Paragraph('Fabricante', label_style), Paragraph(equipo.fabricante or '', value_style), Paragraph('Val. compra', label_style), Paragraph(f"{equipo.valor_compra:.2f}" if equipo.valor_compra is not None else '', value_style)],
         [Paragraph('Serie', label_style), Paragraph(equipo.serie or '', value_style), Paragraph('Valor actual', label_style), Paragraph(f"{equipo.valor_actual:.2f}" if equipo.valor_actual is not None else '', value_style)],
-        [Paragraph('Fecha de adq.', label_style), Paragraph(equipo.fecha_adquisicion.strftime('%d/%m/%Y') if equipo.fecha_adquisicion else '', value_style), '', ''],
+        [Paragraph('F. de Adq.', label_style), Paragraph(equipo.fecha_adquisicion.strftime('%d/%m/%Y') if equipo.fecha_adquisicion else '', value_style), '', ''],
         [Paragraph('Descripción', label_style), Paragraph(description_text, value_style), '', ''],
     ]
 
@@ -123,9 +123,12 @@ def hoja_vida_equipo(request, equipo_id):
         ('BOTTOMPADDING', (0,0), (-1,-1), 4),
     ]))
 
+    # Calcular altura de tabla para que la imagen acompañe todo el bloque de información
+    _, attrs_height = attrs_table.wrap(360, 0)
+
     # Foto: intentar insertar la imagen si existe, sino dejar marco vacío
     photo_width = 150
-    photo_height = 260
+    photo_height = max(attrs_height, 260)
     photo_flowable = None
     try:
         if equipo.imagen and hasattr(equipo.imagen, 'path'):
