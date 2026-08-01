@@ -1081,6 +1081,9 @@ Lista de Activos - Gestión de Activos y Equipos
                     <button class="btn-action btn-action-primary" onclick="abrirModalCrearPlan(${id}, '${nombre}')">
                         <ion-icon name="calendar-outline"></ion-icon> Plan Mantenimiento
                     </button>
+                    ${tipo === 'equipo' ? `<button class="btn-action btn-action-secondary" onclick="window.open('/Activos/hoja_vida/${id}/', '_blank')">
+                        <ion-icon name="document-text-outline"></ion-icon> Hoja de vida
+                    </button>` : ''}
                     <button class="btn-action btn-action-secondary" onclick="verHistorial(${id}, '${tipo}')">
                         <ion-icon name="history-outline"></ion-icon> Historial OT
                     </button>
