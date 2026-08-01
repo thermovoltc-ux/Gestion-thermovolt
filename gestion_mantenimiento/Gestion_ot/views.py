@@ -1097,18 +1097,35 @@ def guardar_copia_pdf_envio(pdf_buffer, cierre_ot):
         return None
 
 
+def _is_local_host(hostname):
+    """Devuelve True si el hostname es localhost/127.0.0.1."""
+    if not hostname:
+        return False
+    normalized = hostname.lower().strip()
+    return normalized in ('127.0.0.1', 'localhost')
+
+
 def _build_download_url(filename):
     """Genera una URL pública para descargar un informe guardado localmente."""
     if not filename:
         return None
     safe_filename = quote(filename)
-    raw_host = os.environ.get('PUBLIC_HOST') or (settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000')
-    host = raw_host.strip()
-    if host.startswith('http://') or host.startswith('https://'):
-        host = urlparse(host).netloc or host
-    if host in ('127.0.0.1', 'localhost'):
-        host = f"{host}:8000"
-    scheme = 'http' if host.startswith(('127.0.0.1', 'localhost')) else ('https' if not settings.DEBUG else 'http')
+    public_host = os.environ.get('PUBLIC_HOST')
+    if public_host:
+        host = public_host.strip()
+        if host.startswith('http://') or host.startswith('https://'):
+            host = urlparse(host).netloc or host
+        if _is_local_host(host):
+            logger.warning("PUBLIC_HOST configurado como localhost/127.0.0.1; no se generará enlace de descarga público.")
+            return None
+    else:
+        allowed_hosts = [h for h in settings.ALLOWED_HOSTS if not _is_local_host(h)]
+        if not allowed_hosts:
+            logger.warning("No hay PUBLIC_HOST ni ALLOWED_HOSTS públicos válidos; no se generará enlace de descarga público.")
+            return None
+        host = allowed_hosts[0].strip()
+
+    scheme = 'https' if not settings.DEBUG else 'http'
     url = f"{scheme}://{host.rstrip('/')}{reverse('descargar_informe_pdf', args=[safe_filename])}"
     logger.info("URL de descarga generada: %s (host=%s scheme=%s)", url, host, scheme)
     return url
