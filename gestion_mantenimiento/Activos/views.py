@@ -1,7 +1,9 @@
+import os
 from django.shortcuts import render, redirect
 from .forms import UbicacionForm, EquipoForm
 from .models import Ubicacion, Equipo
 from django.http import FileResponse, Http404
+from django.core.files.storage import default_storage
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -132,13 +134,22 @@ def hoja_vida_equipo(request, equipo_id):
     photo_height = attrs_height
     photo_flowable = None
     try:
-        if equipo.imagen and hasattr(equipo.imagen, 'path'):
+        if equipo.imagen:
             from reportlab.platypus import Image as RLImage
-            img_path = equipo.imagen.path
-            photo_flowable = RLImage(img_path)
-            photo_flowable.drawWidth = photo_width
-            photo_flowable.drawHeight = photo_height - 10
-            photo_flowable.hAlign = 'CENTER'
+            image_source = None
+            if hasattr(equipo.imagen, 'path'):
+                path = equipo.imagen.path
+                if path and os.path.exists(path):
+                    image_source = path
+            if image_source is None and hasattr(equipo.imagen, 'name'):
+                try:
+                    image_file = default_storage.open(equipo.imagen.name, 'rb')
+                    image_source = image_file
+                except Exception:
+                    image_source = None
+            if image_source is not None:
+                photo_flowable = RLImage(image_source, width=photo_width, height=photo_height - 10)
+                photo_flowable.hAlign = 'CENTER'
     except Exception:
         photo_flowable = None
 
