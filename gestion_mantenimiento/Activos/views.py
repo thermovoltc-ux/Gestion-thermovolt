@@ -128,7 +128,7 @@ def hoja_vida_equipo(request, equipo_id):
 
     # Foto: intentar insertar la imagen si existe, sino dejar marco vacío
     photo_width = 150
-    photo_height = max(attrs_height, 260)
+    photo_height = attrs_height
     photo_flowable = None
     try:
         if equipo.imagen and hasattr(equipo.imagen, 'path'):
