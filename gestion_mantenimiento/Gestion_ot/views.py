@@ -1099,10 +1099,11 @@ def guardar_copia_pdf_envio(pdf_buffer, cierre_ot):
 
 def guardar_pdf_en_media(pdf_buffer, cierre_ot):
     """Guarda el PDF en el almacenamiento configurado (MEDIA o Cloudinary) y devuelve la URL pública si es posible."""
+    timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"informe_ot_{cierre_ot.orden_trabajo.solicitud.consecutivo}_{timestamp}.pdf"
+    relative_path = os.path.join('email_copies', 'informes', filename)
+
     try:
-        timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"informe_ot_{cierre_ot.orden_trabajo.solicitud.consecutivo}_{timestamp}.pdf"
-        relative_path = os.path.join('email_copies', 'informes', filename)
         # Usar default_storage para respetar configuración de Cloudinary/FS
         content = ContentFile(pdf_buffer.getvalue())
         saved_name = default_storage.save(relative_path, content)
@@ -1111,7 +1112,27 @@ def guardar_pdf_en_media(pdf_buffer, cierre_ot):
         return url
     except Exception as exc:
         logger.warning("No se pudo guardar el PDF en storage: %s", exc)
-        return None
+
+    try:
+        # Fallback local directo en MEDIA_ROOT cuando el storage principal rechaza archivos grandes.
+        local_dir = os.path.join(settings.MEDIA_ROOT, 'email_copies', 'informes')
+        os.makedirs(local_dir, exist_ok=True)
+        local_path = os.path.join(local_dir, filename)
+        with open(local_path, 'wb') as local_file:
+            local_file.write(pdf_buffer.getvalue())
+
+        media_path = '/'.join([settings.MEDIA_URL.rstrip('/'), 'email_copies', 'informes', filename])
+        if not media_path.startswith('http'):
+            host = settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000'
+            scheme = 'https' if not settings.DEBUG else 'http'
+            media_path = f"{scheme}://{host.rstrip('/')}{media_path if media_path.startswith('/') else '/' + media_path}"
+
+        logger.info("PDF guardado localmente en MEDIA_ROOT: %s -> URL: %s", local_path, media_path)
+        return media_path
+    except Exception as exc2:
+        logger.warning("No se pudo guardar el PDF localmente en MEDIA_ROOT: %s", exc2)
+
+    return None
 
 
 def enviar_pdf_por_email(pdf_buffer, cierre_ot):
@@ -1252,17 +1273,6 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         # Crear email con versión texto y HTML
         text_content = f"Cordial saludo,\n\nAdjunto se encuentra el informe de los trabajos realizados en {cliente_nombre}.\n\nOT-{consecutivo}\nEquipo: {equipo_nombre}\nCliente: {cliente_nombre}\nFecha: {fecha_str}\n\nThermovolt Servicios"
         
-        email = EmailMultiAlternatives(
-            subject=subject,
-            body=text_content,
-            from_email=from_email,
-            to=recipient_list,
-            bcc=bcc_list
-        )
-        
-        # Agregar versión HTML
-        email.attach_alternative(html_content, "text/html")
-
         # Adjuntar PDF solo si el tamaño es razonable para Brevo; si no, guardar en MEDIA y enviar enlace.
         pdf_bytes = pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else bytes(pdf_buffer)
         attachment_size_mb = len(pdf_bytes) / (1024 * 1024)
@@ -1272,6 +1282,13 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
 
         # Umbral seguro para adjuntar (4 MB). Si supera, guardamos en MEDIA y compartimos enlace.
         if len(pdf_bytes) <= 4 * 1024 * 1024:
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=text_content,
+                from_email=from_email,
+                to=recipient_list,
+                bcc=bcc_list
+            )
             email.attach(pdf_filename, pdf_bytes, 'application/pdf')
             logger.info("📎 PDF adjuntado al email")
         else:
@@ -1288,12 +1305,20 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
             pdf_url = guardar_pdf_en_media(pdf_buffer, cierre_ot)
             if not pdf_url:
                 # Fallback a Google Drive si el storage actual falla
-                try:
-                    folder_id = os.environ.get('GOOGLE_DRIVE_FOLDER_ID')
-                    pdf_url = subir_pdf_a_drive(pdf_bytes, pdf_filename, folder_id=folder_id)
-                    logger.info("PDF subido a Google Drive: %s", pdf_url)
-                except Exception as drive_exc:
-                    logger.warning("No se pudo subir el PDF a Google Drive: %s", drive_exc)
+                drive_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
+                drive_json_path = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON_PATH') or os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+                if not drive_json and not drive_json_path:
+                    logger.warning('No se configuró ninguna credencial de Drive (GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_SERVICE_ACCOUNT_JSON_PATH / GOOGLE_APPLICATION_CREDENTIALS).')
+                else:
+                    try:
+                        folder_id = os.environ.get('GOOGLE_DRIVE_FOLDER_ID', '').strip()
+                        if not folder_id:
+                            logger.warning('GOOGLE_DRIVE_FOLDER_ID no está configurado o está vacío.')
+                        else:
+                            pdf_url = subir_pdf_a_drive(pdf_bytes, pdf_filename, folder_id=folder_id)
+                            logger.info("PDF subido a Google Drive: %s", pdf_url)
+                    except Exception as drive_exc:
+                        logger.warning("No se pudo subir el PDF a Google Drive: %s", drive_exc)
 
             if pdf_url:
                 if pdf_url.startswith('/'):
@@ -1306,7 +1331,17 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
                 text_content += f"\n\nInforme disponible: {pdf_url}\n"
             else:
                 logger.warning("No se pudo obtener una URL de PDF; se enviará el correo sin adjunto ni enlace.")
-        
+            
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=text_content,
+                from_email=from_email,
+                to=recipient_list,
+                bcc=bcc_list
+            )
+
+        # Agregar versión HTML con el contenido final, incluyendo posible enlace.
+        email.attach_alternative(html_content, "text/html")
         email.send(fail_silently=False)
         
         logger.info("✅ Email enviado EXITOSAMENTE via Brevo")
