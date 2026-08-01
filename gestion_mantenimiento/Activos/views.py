@@ -5,7 +5,7 @@ from django.http import FileResponse, Http404
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo
 
@@ -85,6 +85,9 @@ def hoja_vida_equipo(request, equipo_id):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
     styles = getSampleStyleSheet()
+    label_style = ParagraphStyle('Label', parent=styles['BodyText'], fontName='Helvetica-Bold', fontSize=9, leading=12)
+    value_style = ParagraphStyle('Value', parent=styles['BodyText'], fontSize=9, leading=12)
+    type_state_style = ParagraphStyle('TypeState', parent=styles['BodyText'], fontSize=9, leading=11)
     story = []
 
     title = Paragraph(f"Hoja de vida - {equipo.nombre}", styles['Title'])
@@ -112,15 +115,24 @@ def hoja_vida_equipo(request, equipo_id):
     for i in range(0, len(attrs), 2):
         left = attrs[i]
         right = attrs[i+1] if i+1 < len(attrs) else ('', '')
-        attr_rows.append([left[0], left[1], right[0], right[1]])
+        attr_rows.append([
+            Paragraph(left[0], label_style),
+            Paragraph(left[1], value_style),
+            Paragraph(right[0], label_style),
+            Paragraph(right[1], value_style),
+        ])
 
-    attrs_table = Table(attr_rows, colWidths=[80, 170, 80, 170])
+    attrs_table = Table(attr_rows, colWidths=[90, 160, 90, 160])
     attrs_table.setStyle(TableStyle([
         ('GRID', (0,0), (-1,-1), 0.4, colors.black),
-        ('BACKGROUND', (0,0), (0,-1), colors.HexColor('#f3f4f6')),
+        ('BACKGROUND', (0,0), (-1,-1), colors.white),
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ('ALIGN', (1,0), (1,-1), 'LEFT'),
         ('ALIGN', (3,0), (3,-1), 'LEFT'),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
     ]))
 
     # Foto: intentar insertar la imagen si existe, sino dejar marco vacío
@@ -143,9 +155,15 @@ def hoja_vida_equipo(request, equipo_id):
         ]))
         photo_flowable = placeholder
 
-    main_table = Table([[attrs_table, photo_flowable]], colWidths=[420, photo_width])
+    # Ajustar la foto para que no se superponga con la tabla de especificaciones
+    photo_col_width = 160
+    main_table = Table([[attrs_table, photo_flowable]], colWidths=[420, photo_col_width])
     main_table.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+        ('TOPPADDING', (0,0), (-1,-1), 0),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
     ]))
     story.append(main_table)
     story.append(Spacer(1, 12))
@@ -154,10 +172,15 @@ def hoja_vida_equipo(request, equipo_id):
     story.append(Paragraph('<b>Intervenciones / Historial de OT</b>', styles['Heading2']))
     story.append(Spacer(1, 8))
 
-    data = [['Nº OT', 'Fecha', 'Responsable', 'Tipo / Estado', 'Observación']]
+    data = [[
+        Paragraph('Nº OT', label_style),
+        Paragraph('Fecha', label_style),
+        Paragraph('Responsable', label_style),
+        Paragraph('Tipo / Estado', label_style),
+        Paragraph('Observación', label_style),
+    ]]
     for ot in ots:
         fecha = ot.fecha_actividad.strftime('%d/%m/%Y') if ot.fecha_actividad else ''
-        # Responsable: preferir nombre_tecnico del cierre, luego tecnico_asignado
         responsable = ''
         tipo_txt = ''
         estado_txt = ot.estado.nombre if ot.estado else ''
@@ -172,10 +195,15 @@ def hoja_vida_equipo(request, equipo_id):
         if not responsable:
             responsable = ot.tecnico_asignado or ''
 
-        # Construir celda Tipo / Estado con dos líneas
-        tipo_estado = Paragraph(f"<b>{tipo_txt}</b><br/>{estado_txt}", styles['BodyText'])
+        tipo_estado = Paragraph(f"<b>{tipo_txt}</b><br/>{estado_txt}", type_state_style)
 
-        data.append([f"OT-{ot.solicitud.consecutivo}", fecha, responsable, tipo_estado, observacion])
+        data.append([
+            Paragraph(f"OT-{ot.solicitud.consecutivo}", value_style),
+            Paragraph(fecha, value_style),
+            Paragraph(responsable, value_style),
+            tipo_estado,
+            Paragraph(observacion, value_style),
+        ])
 
     ot_table = Table(data, colWidths=[70, 80, 120, 140, 130])
     ot_table.setStyle(TableStyle([
