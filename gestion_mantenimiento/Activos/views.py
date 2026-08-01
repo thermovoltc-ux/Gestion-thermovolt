@@ -142,7 +142,8 @@ def hoja_vida_equipo(request, equipo_id):
         # marco vacío para foto
         placeholder = Table([[ ' ' ]], colWidths=[photo_width], rowHeights=[photo_height])
         placeholder.setStyle(TableStyle([
-            ('BOX', (0,0), (-1,-1), 0.5, colors.black),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ]))
         photo_flowable = placeholder
 
