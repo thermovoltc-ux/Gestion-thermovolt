@@ -44,6 +44,7 @@ from PIL import Image as PILImage
 import threading
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from .drive_utils import subir_pdf_a_drive
 
 try:
     import pythoncom
@@ -1278,25 +1279,33 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
                 "⚠️ El PDF supera el umbral seguro para Brevo (%s MB). Guardando en MEDIA y enviando enlace en el cuerpo del correo.",
                 round(attachment_size_mb, 2),
             )
-            # Guardar copia en storage y obtener URL pública (puede ser absoluta si Cloudinary está activo)
-            pdf_url = guardar_pdf_en_media(pdf_buffer, cierre_ot)
-            # También dejar una copia local para auditoría
+            # Guardar copia local de auditoría
             try:
                 guardar_copia_pdf_envio(pdf_buffer, cierre_ot)
             except Exception:
                 pass
 
+            pdf_url = guardar_pdf_en_media(pdf_buffer, cierre_ot)
+            if not pdf_url:
+                # Fallback a Google Drive si el storage actual falla
+                try:
+                    folder_id = os.environ.get('GOOGLE_DRIVE_FOLDER_ID')
+                    pdf_url = subir_pdf_a_drive(pdf_bytes, pdf_filename, folder_id=folder_id)
+                    logger.info("PDF subido a Google Drive: %s", pdf_url)
+                except Exception as drive_exc:
+                    logger.warning("No se pudo subir el PDF a Google Drive: %s", drive_exc)
+
             if pdf_url:
-                # Si la URL es relativa (p. ej. '/media/...'), construir URL absoluta
                 if pdf_url.startswith('/'):
                     scheme = 'https' if not settings.DEBUG else 'http'
                     host = (settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS and settings.ALLOWED_HOSTS[0] else 'localhost:8000')
                     pdf_url = f"{scheme}://{host.rstrip('/')}{pdf_url}"
 
-                # Añadir bloque HTML con enlace de descarga
                 download_block = f"<p>El informe completo está disponible para descarga aquí: <a href=\"{pdf_url}\">Descargar informe (PDF)</a></p>"
                 html_content = html_content.replace('</div>\n                <!-- Footer -->', f"</div>\n                {download_block}\n                <!-- Footer -->")
                 text_content += f"\n\nInforme disponible: {pdf_url}\n"
+            else:
+                logger.warning("No se pudo obtener una URL de PDF; se enviará el correo sin adjunto ni enlace.")
         
         email.send(fail_silently=False)
         
