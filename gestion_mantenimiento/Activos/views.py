@@ -95,38 +95,27 @@ def hoja_vida_equipo(request, equipo_id):
     story.append(title)
     story.append(Spacer(1, 12))
 
-    # Datos del equipo — organizados en dos columnas + espacio para foto
-    attrs = [
-        ('Código', equipo.codigo or ''),
-        ('Modelo', equipo.modelo or ''),
-        ('Nombre', equipo.nombre or ''),
-        ('Horas de uso', str(equipo.horas_uso) if equipo.horas_uso is not None else ''),
-        ('Ubicación', equipo.ubicacion.nombre if equipo.ubicacion else ''),
-        ('Prioridad', equipo.prioridad or ''),
-        ('Fabricante', equipo.fabricante or ''),
-        ('Valor compra', f"{equipo.valor_compra:.2f}" if equipo.valor_compra is not None else ''),
-        ('Serie', equipo.serie or ''),
-        ('Valor actual', f"{equipo.valor_actual:.2f}" if equipo.valor_actual is not None else ''),
+    # Datos del equipo — diseño de tres columnas con foto a la derecha
+    description_text = equipo.descripcion or ''
+    attr_rows = [
+        [Paragraph('INFORMACIÓN BÁSICA', header_style), '', '', ''],
+        [Paragraph('Código', label_style), Paragraph(equipo.codigo or '', value_style), Paragraph('Modelo', label_style), Paragraph(equipo.modelo or '', value_style)],
+        [Paragraph('Nombre', label_style), Paragraph(equipo.nombre or '', value_style), Paragraph('Horas de uso', label_style), Paragraph(str(equipo.horas_uso) if equipo.horas_uso is not None else '', value_style)],
+        [Paragraph('Ubicación', label_style), Paragraph(equipo.ubicacion.nombre if equipo.ubicacion else '', value_style), Paragraph('Prioridad', label_style), Paragraph(equipo.prioridad or '', value_style)],
+        [Paragraph('Fabricante', label_style), Paragraph(equipo.fabricante or '', value_style), Paragraph('Valor compra', label_style), Paragraph(f"{equipo.valor_compra:.2f}" if equipo.valor_compra is not None else '', value_style)],
+        [Paragraph('Serie', label_style), Paragraph(equipo.serie or '', value_style), Paragraph('Valor actual', label_style), Paragraph(f"{equipo.valor_actual:.2f}" if equipo.valor_actual is not None else '', value_style)],
+        [Paragraph('Fecha de adquisición', label_style), Paragraph(equipo.fecha_adquisicion.strftime('%d/%m/%Y') if equipo.fecha_adquisicion else '', value_style), '', ''],
+        [Paragraph('Descripción', label_style), Paragraph(description_text, value_style), '', ''],
     ]
 
-    attr_rows = []
-    for i in range(0, len(attrs), 2):
-        left = attrs[i]
-        right = attrs[i+1] if i+1 < len(attrs) else ('', '')
-        attr_rows.append([
-            Paragraph(left[0], label_style),
-            Paragraph(left[1], value_style),
-            Paragraph(right[0], label_style),
-            Paragraph(right[1], value_style),
-        ])
-
-    attrs_table = Table(attr_rows, colWidths=[70, 105, 70, 105])
+    attrs_table = Table(attr_rows, colWidths=[70, 120, 70, 120])
     attrs_table.setStyle(TableStyle([
         ('GRID', (0,0), (-1,-1), 0.4, colors.black),
-        ('BACKGROUND', (0,0), (-1,-1), colors.white),
+        ('BACKGROUND', (0,0), (3,0), colors.HexColor('#f8fafc')),
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('ALIGN', (1,0), (1,-1), 'LEFT'),
-        ('ALIGN', (3,0), (3,-1), 'LEFT'),
+        ('ALIGN', (1,1), (-1,-1), 'LEFT'),
+        ('SPAN', (0,0), (3,0)),
+        ('SPAN', (1,7), (3,7)),
         ('LEFTPADDING', (0,0), (-1,-1), 8),
         ('RIGHTPADDING', (0,0), (-1,-1), 8),
         ('TOPPADDING', (0,0), (-1,-1), 4),
@@ -177,11 +166,11 @@ def hoja_vida_equipo(request, equipo_id):
     story.append(Spacer(1, 8))
 
     data = [[
-        Paragraph('Nº OT', label_style),
-        Paragraph('Fecha', label_style),
-        Paragraph('Responsable', label_style),
-        Paragraph('Tipo / Estado', label_style),
-        Paragraph('Observación', label_style),
+        Paragraph('Nº OT', header_style),
+        Paragraph('Fecha', header_style),
+        Paragraph('Responsable', header_style),
+        Paragraph('Tipo / Estado', header_style),
+        Paragraph('Observación', header_style),
     ]]
     for ot in ots:
         fecha = ot.fecha_actividad.strftime('%d/%m/%Y') if ot.fecha_actividad else ''
