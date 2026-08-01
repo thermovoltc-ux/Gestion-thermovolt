@@ -153,7 +153,9 @@ def hoja_vida_equipo(request, equipo_id):
     photo_box.setStyle(TableStyle([
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOX', (0,0), (-1,-1), 0.5, colors.black),
+        ('LINEABOVE', (0,0), (-1,0), 0.5, colors.black),
+        ('LINERIGHT', (0,0), (-1,-1), 0.5, colors.black),
+        ('LINEBELOW', (0,-1), (-1,-1), 0.5, colors.black),
     ]))
     main_table = Table([[attrs_table, photo_box]], colWidths=[360, photo_col_width])
     main_table.setStyle(TableStyle([
