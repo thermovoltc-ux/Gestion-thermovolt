@@ -102,16 +102,17 @@ def hoja_vida_equipo(request, equipo_id):
         [Paragraph('Código', label_style), Paragraph(equipo.codigo or '', value_style), Paragraph('Modelo', label_style), Paragraph(equipo.modelo or '', value_style)],
         [Paragraph('Nombre', label_style), Paragraph(equipo.nombre or '', value_style), Paragraph('Horas de uso', label_style), Paragraph(str(equipo.horas_uso) if equipo.horas_uso is not None else '', value_style)],
         [Paragraph('Ubicación', label_style), Paragraph(equipo.ubicacion.nombre if equipo.ubicacion else '', value_style), Paragraph('Prioridad', label_style), Paragraph(equipo.prioridad or '', value_style)],
-        [Paragraph('Fabricante', label_style), Paragraph(equipo.fabricante or '', value_style), Paragraph('Valor compra', label_style), Paragraph(f"{equipo.valor_compra:.2f}" if equipo.valor_compra is not None else '', value_style)],
+        [Paragraph('Fabricante', label_style), Paragraph(equipo.fabricante or '', value_style), Paragraph('Val. compra', label_style), Paragraph(f"{equipo.valor_compra:.2f}" if equipo.valor_compra is not None else '', value_style)],
         [Paragraph('Serie', label_style), Paragraph(equipo.serie or '', value_style), Paragraph('Valor actual', label_style), Paragraph(f"{equipo.valor_actual:.2f}" if equipo.valor_actual is not None else '', value_style)],
-        [Paragraph('Fecha de adquisición', label_style), Paragraph(equipo.fecha_adquisicion.strftime('%d/%m/%Y') if equipo.fecha_adquisicion else '', value_style), '', ''],
+        [Paragraph('Fecha de adq.', label_style), Paragraph(equipo.fecha_adquisicion.strftime('%d/%m/%Y') if equipo.fecha_adquisicion else '', value_style), '', ''],
         [Paragraph('Descripción', label_style), Paragraph(description_text, value_style), '', ''],
     ]
 
     attrs_table = Table(attr_rows, colWidths=[70, 120, 70, 120])
     attrs_table.setStyle(TableStyle([
         ('GRID', (0,0), (-1,-1), 0.4, colors.black),
-        ('BACKGROUND', (0,0), (3,0), colors.HexColor('#f8fafc')),
+        ('BACKGROUND', (0,0), (3,0), colors.HexColor('#111827')),
+        ('TEXTCOLOR', (0,0), (3,0), colors.whitesmoke),
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ('ALIGN', (1,1), (-1,-1), 'LEFT'),
         ('SPAN', (0,0), (3,0)),
@@ -123,8 +124,8 @@ def hoja_vida_equipo(request, equipo_id):
     ]))
 
     # Foto: intentar insertar la imagen si existe, sino dejar marco vacío
-    photo_width = 120
-    photo_height = 120
+    photo_width = 150
+    photo_height = 260
     photo_flowable = None
     try:
         if equipo.imagen and hasattr(equipo.imagen, 'path'):
@@ -143,14 +144,14 @@ def hoja_vida_equipo(request, equipo_id):
         photo_flowable = placeholder
 
     # Ajustar la foto para que quede centrada en un recuadro a la derecha
-    photo_col_width = 160
+    photo_col_width = 170
     photo_box = Table([[photo_flowable]], colWidths=[photo_col_width], rowHeights=[photo_height])
     photo_box.setStyle(TableStyle([
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('BOX', (0,0), (-1,-1), 0.5, colors.black),
     ]))
-    main_table = Table([[attrs_table, photo_box]], colWidths=[380, photo_col_width])
+    main_table = Table([[attrs_table, photo_box]], colWidths=[360, photo_col_width])
     main_table.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ('LEFTPADDING', (0,0), (-1,-1), 0),
