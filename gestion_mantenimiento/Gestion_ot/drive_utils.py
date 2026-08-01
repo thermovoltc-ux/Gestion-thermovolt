@@ -1,13 +1,14 @@
 import os
 import json
 from io import BytesIO
+from typing import Optional
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
 
-def subir_pdf_a_drive(pdf_bytes: bytes, filename: str, folder_id: str | None = None) -> str:
+def subir_pdf_a_drive(pdf_bytes: bytes, filename: str, folder_id: Optional[str] = None) -> str:
     """Sube un PDF a Google Drive usando una cuenta de servicio y devuelve un enlace público."""
     service_account_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
     if not service_account_json:
