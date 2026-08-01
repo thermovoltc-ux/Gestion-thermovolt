@@ -10,7 +10,7 @@ import datetime
 from dateutil.parser import isoparse
 import re
 import requests
-from urllib.parse import urljoin, quote
+from urllib.parse import urljoin, quote, urlparse
 import os
 from django.contrib import messages
 import os
@@ -1102,9 +1102,16 @@ def _build_download_url(filename):
     if not filename:
         return None
     safe_filename = quote(filename)
-    host = os.environ.get('PUBLIC_HOST') or (settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000')
-    scheme = 'https' if not settings.DEBUG else 'http'
-    return f"{scheme}://{host.rstrip('/')}{reverse('descargar_informe_pdf', args=[safe_filename])}"
+    raw_host = os.environ.get('PUBLIC_HOST') or (settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000')
+    host = raw_host.strip()
+    if host.startswith('http://') or host.startswith('https://'):
+        host = urlparse(host).netloc or host
+    if host in ('127.0.0.1', 'localhost'):
+        host = f"{host}:8000"
+    scheme = 'http' if host.startswith(('127.0.0.1', 'localhost')) else ('https' if not settings.DEBUG else 'http')
+    url = f"{scheme}://{host.rstrip('/')}{reverse('descargar_informe_pdf', args=[safe_filename])}"
+    logger.info("URL de descarga generada: %s (host=%s scheme=%s)", url, host, scheme)
+    return url
 
 
 def _build_media_url(relative_url):
