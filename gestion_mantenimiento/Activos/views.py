@@ -164,6 +164,7 @@ def hoja_vida_equipo(request, equipo_id):
         ('RIGHTPADDING', (0,0), (-1,-1), 0),
         ('TOPPADDING', (0,0), (-1,-1), 0),
         ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ('LINEAFTER', (1,0), (1,0), 0.5, colors.black),
     ]))
     story.append(main_table)
     story.append(Spacer(1, 12))
