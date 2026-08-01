@@ -1,4 +1,5 @@
 import os
+from urllib.request import urlopen
 from django.shortcuts import render, redirect
 from .forms import UbicacionForm, EquipoForm
 from .models import Ubicacion, Equipo
@@ -144,7 +145,16 @@ def hoja_vida_equipo(request, equipo_id):
             if image_source is None and hasattr(equipo.imagen, 'name'):
                 try:
                     image_file = default_storage.open(equipo.imagen.name, 'rb')
+                    image_file.seek(0)
                     image_source = image_file
+                except Exception:
+                    image_source = None
+            if image_source is None and hasattr(equipo.imagen, 'url'):
+                try:
+                    response = urlopen(equipo.imagen.url)
+                    image_bytes = BytesIO(response.read())
+                    image_bytes.seek(0)
+                    image_source = image_bytes
                 except Exception:
                     image_source = None
             if image_source is not None:
