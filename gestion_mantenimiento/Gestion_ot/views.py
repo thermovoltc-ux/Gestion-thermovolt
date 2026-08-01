@@ -10,7 +10,7 @@ import datetime
 from dateutil.parser import isoparse
 import re
 import requests
-from urllib.parse import urljoin
+from urllib.parse import urljoin, quote
 import os
 from django.contrib import messages
 import os
@@ -1101,9 +1101,10 @@ def _build_download_url(filename):
     """Genera una URL pública para descargar un informe guardado localmente."""
     if not filename:
         return None
+    safe_filename = quote(filename)
     host = os.environ.get('PUBLIC_HOST') or (settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000')
     scheme = 'https' if not settings.DEBUG else 'http'
-    return f"{scheme}://{host.rstrip('/')}{reverse('descargar_informe_pdf', args=[filename])}"
+    return f"{scheme}://{host.rstrip('/')}{reverse('descargar_informe_pdf', args=[safe_filename])}"
 
 
 def _build_media_url(relative_url):
@@ -1372,9 +1373,13 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
                     host = (settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS and settings.ALLOWED_HOSTS[0] else 'localhost:8000')
                     pdf_url = f"{scheme}://{host.rstrip('/')}{pdf_url}"
 
-                download_block = f"<p>El informe completo está disponible para descarga aquí: <a href=\"{pdf_url}\">Descargar informe (PDF)</a></p>"
-                html_content = html_content.replace('</div>\n                <!-- Footer -->', f"</div>\n                {download_block}\n                <!-- Footer -->")
+                download_block = f"<div style=\"background:#f5f5f5;padding:15px;border:1px solid #d1d5db;border-radius:6px;margin:20px 0;\"><p>El informe completo está disponible para descarga aquí: <a href=\"{pdf_url}\">Descargar informe (PDF)</a></p></div>"
+                if '</body>' in html_content:
+                    html_content = html_content.replace('</body>', f"{download_block}</body>")
+                else:
+                    html_content += download_block
                 text_content += f"\n\nInforme disponible: {pdf_url}\n"
+                logger.info("Link de descarga del informe agregado al email: %s", pdf_url)
             else:
                 logger.warning("No se pudo obtener una URL de PDF; se enviará el correo sin adjunto ni enlace.")
             
