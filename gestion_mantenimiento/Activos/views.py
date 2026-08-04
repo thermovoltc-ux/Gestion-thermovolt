@@ -239,6 +239,7 @@ def _build_hoja_vida_pdf_bytes(equipo, request=None):
     photo_col_width = 190
     photo_width = 112
     photo_height = 146
+    main_row_height = max(attrs_height, photo_height)
     photo_flowable = None
     try:
         image_bytes = _resolve_equipo_image_bytes(equipo, request=request)
@@ -257,22 +258,22 @@ def _build_hoja_vida_pdf_bytes(equipo, request=None):
         ]))
         photo_flowable = placeholder
 
-    photo_box = Table([[photo_flowable]], colWidths=[photo_col_width], rowHeights=[photo_height])
+    photo_box = Table([[photo_flowable]], colWidths=[photo_col_width], rowHeights=[main_row_height])
     photo_box.setStyle(TableStyle([
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('LINEABOVE', (0,0), (-1,0), 0.5, colors.black),
         ('LINERIGHT', (0,0), (-1,-1), 0.5, colors.black),
         ('LINEBELOW', (0,-1), (-1,-1), 0.5, colors.black),
-        ('LEFTPADDING', (0,0), (-1,-1), 4),
-        ('RIGHTPADDING', (0,0), (-1,-1), 4),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+        ('TOPPADDING', (0,0), (-1,-1), 0),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
     ]))
     main_table = Table(
         [[attrs_table, photo_box]],
         colWidths=[360, photo_col_width],
-        rowHeights=[max(attrs_height, photo_height)],
+        rowHeights=[main_row_height],
     )
     main_table.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
