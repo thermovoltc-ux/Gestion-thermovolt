@@ -238,7 +238,7 @@ def _build_hoja_vida_pdf_bytes(equipo, request=None):
     _, attrs_height = attrs_table.wrap(360, 0)
     photo_col_width = 190
     photo_width = 112
-    photo_height = 150
+    photo_height = 146
     photo_flowable = None
     try:
         image_bytes = _resolve_equipo_image_bytes(equipo, request=request)
@@ -269,7 +269,11 @@ def _build_hoja_vida_pdf_bytes(equipo, request=None):
         ('TOPPADDING', (0,0), (-1,-1), 4),
         ('BOTTOMPADDING', (0,0), (-1,-1), 4),
     ]))
-    main_table = Table([[attrs_table, photo_box]], colWidths=[360, photo_col_width])
+    main_table = Table(
+        [[attrs_table, photo_box]],
+        colWidths=[360, photo_col_width],
+        rowHeights=[max(attrs_height, photo_height)],
+    )
     main_table.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ('LEFTPADDING', (0,0), (-1,-1), 0),
