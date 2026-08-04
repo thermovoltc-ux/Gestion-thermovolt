@@ -14,7 +14,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
-from reportlab.lib.utils import ImageReader
+from reportlab.platypus import Image as RLImage
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo
 
 def crear_ubicacion(request):
@@ -226,11 +226,7 @@ def _build_hoja_vida_pdf_bytes(equipo, request=None):
     try:
         image_bytes = _resolve_equipo_image_bytes(equipo, request=request)
         if image_bytes:
-            image_reader = ImageReader(BytesIO(image_bytes))
-            photo_flowable = Paragraph('', styles['BodyText'])
-            photo_flowable = None
-            from reportlab.platypus import Image as RLImage
-            photo_flowable = RLImage(image_reader, width=photo_width, height=photo_height - 10)
+            photo_flowable = RLImage(BytesIO(image_bytes), width=photo_width, height=photo_height - 10)
             photo_flowable.hAlign = 'CENTER'
     except Exception:
         photo_flowable = None
