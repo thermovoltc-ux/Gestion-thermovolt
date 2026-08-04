@@ -15,7 +15,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.platypus import Image as RLImage
-from PIL import Image as PILImage
+from PIL import Image as PILImage, ImageOps
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo
 
 def crear_ubicacion(request):
@@ -175,20 +175,23 @@ def _resolve_equipo_image_bytes(equipo, request=None):
     return None
 
 
-def _fit_image_dimensions(image_bytes, max_width, max_height):
-    """Escala una imagen para que entre en el recuadro del PDF sin deformarla."""
+def _fit_image_for_box(image_bytes, box_width, box_height):
+    """Genera una versión de la imagen ya adaptada al recuadro del PDF, preservando proporción."""
     try:
         with PILImage.open(BytesIO(image_bytes)) as image:
-            source_width, source_height = image.size
-            if source_width <= 0 or source_height <= 0:
-                return max_width, max_height
+            image = image.convert('RGB')
+            resized = ImageOps.contain(image, (box_width, box_height))
+            canvas = PILImage.new('RGB', (box_width, box_height), (255, 255, 255))
+            x = max(0, (box_width - resized.width) // 2)
+            y = max(0, (box_height - resized.height) // 2)
+            canvas.paste(resized, (x, y))
 
-            ratio = min(max_width / source_width, max_height / source_height)
-            final_width = max(1, int(source_width * ratio))
-            final_height = max(1, int(source_height * ratio))
-            return final_width, final_height
+            normalized = BytesIO()
+            canvas.save(normalized, format='JPEG', quality=92)
+            normalized.seek(0)
+            return normalized.getvalue()
     except Exception:
-        return max_width, max_height
+        return image_bytes
 
 
 def _build_hoja_vida_pdf_bytes(equipo, request=None):
@@ -243,8 +246,8 @@ def _build_hoja_vida_pdf_bytes(equipo, request=None):
     try:
         image_bytes = _resolve_equipo_image_bytes(equipo, request=request)
         if image_bytes:
-            fitted_width, fitted_height = _fit_image_dimensions(image_bytes, photo_width, photo_height - 20)
-            photo_flowable = RLImage(BytesIO(image_bytes), width=fitted_width, height=fitted_height)
+            normalized_image_bytes = _fit_image_for_box(image_bytes, photo_width, photo_height - 20)
+            photo_flowable = RLImage(BytesIO(normalized_image_bytes), width=photo_width, height=photo_height - 20)
             photo_flowable.hAlign = 'CENTER'
     except Exception:
         photo_flowable = None
