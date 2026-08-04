@@ -236,14 +236,14 @@ def _build_hoja_vida_pdf_bytes(equipo, request=None):
     ]))
 
     _, attrs_height = attrs_table.wrap(360, 0)
-    photo_col_width = 185
-    photo_width = 118
-    photo_height = 175
+    photo_col_width = 190
+    photo_width = 112
+    photo_height = 150
     photo_flowable = None
     try:
         image_bytes = _resolve_equipo_image_bytes(equipo, request=request)
         if image_bytes:
-            fitted_width, fitted_height = _fit_image_dimensions(image_bytes, photo_width, photo_height - 12)
+            fitted_width, fitted_height = _fit_image_dimensions(image_bytes, photo_width, photo_height - 20)
             photo_flowable = RLImage(BytesIO(image_bytes), width=fitted_width, height=fitted_height)
             photo_flowable.hAlign = 'CENTER'
     except Exception:
