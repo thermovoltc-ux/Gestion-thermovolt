@@ -1,7 +1,10 @@
 import os
+import re
+import zipfile
 from urllib.request import urlopen
 from django.shortcuts import render, redirect
 from django.urls import reverse
+from django.utils.text import slugify
 from .forms import UbicacionForm, EquipoForm
 from .models import Ubicacion, Equipo
 from django.http import FileResponse, Http404
@@ -131,13 +134,8 @@ def lista_activos(request):
     return render(request, 'Activos/lista_activos.html', context)
 
 
-def hoja_vida_equipo(request, equipo_id):
-    """Genera y devuelve una Hoja de Vida (PDF) para un `Equipo` con su historial de OTs."""
-    equipo = Equipo.objects.filter(id=equipo_id).first()
-    if not equipo:
-        raise Http404("Equipo no encontrado")
-
-    # Obtener OTs relacionadas
+def _build_hoja_vida_pdf_bytes(equipo):
+    """Genera el PDF de hoja de vida para un equipo y devuelve un BytesIO listo para responder."""
     ots = OrdenTrabajo.objects.filter(solicitud__equipo=equipo).select_related('solicitud', 'estado').order_by('-solicitud__consecutivo')
 
     buffer = BytesIO()
@@ -153,7 +151,6 @@ def hoja_vida_equipo(request, equipo_id):
     story.append(title)
     story.append(Spacer(1, 12))
 
-    # Datos del equipo — diseño de tres columnas con foto a la derecha
     description_text = equipo.descripcion or ''
     attr_rows = [
         [Paragraph('INFORMACIÓN BÁSICA', header_style), '', '', ''],
@@ -181,10 +178,7 @@ def hoja_vida_equipo(request, equipo_id):
         ('BOTTOMPADDING', (0,0), (-1,-1), 4),
     ]))
 
-    # Calcular altura de tabla para que la imagen acompañe todo el bloque de información
     _, attrs_height = attrs_table.wrap(360, 0)
-
-    # Ajustamos el ancho de la caja antes de crear la imagen para que la imagen llene el área
     photo_col_width = 170
     photo_width = photo_col_width - 10
     photo_height = attrs_height
@@ -219,7 +213,6 @@ def hoja_vida_equipo(request, equipo_id):
         photo_flowable = None
 
     if not photo_flowable:
-        # marco vacío para foto
         placeholder = Table([[ ' ' ]], colWidths=[photo_width], rowHeights=[photo_height])
         placeholder.setStyle(TableStyle([
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
@@ -227,7 +220,6 @@ def hoja_vida_equipo(request, equipo_id):
         ]))
         photo_flowable = placeholder
 
-    # Ajustar la foto para que quede centrada en un recuadro a la derecha
     photo_box = Table([[photo_flowable]], colWidths=[photo_col_width], rowHeights=[photo_height])
     photo_box.setStyle(TableStyle([
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
@@ -248,7 +240,6 @@ def hoja_vida_equipo(request, equipo_id):
     story.append(main_table)
     story.append(Spacer(1, 12))
 
-    # Intervenciones (OTs)
     story.append(Paragraph('<b>Intervenciones / Historial de OT</b>', styles['Heading2']))
     story.append(Spacer(1, 8))
 
@@ -259,6 +250,7 @@ def hoja_vida_equipo(request, equipo_id):
         Paragraph('Tipo / Estado', header_style),
         Paragraph('Observación', header_style),
     ]]
+
     for ot in ots:
         fecha = ot.fecha_actividad.strftime('%d/%m/%Y') if ot.fecha_actividad else ''
         responsable = ''
@@ -300,6 +292,53 @@ def hoja_vida_equipo(request, equipo_id):
 
     doc.build(story)
     buffer.seek(0)
+    return buffer
 
+
+def hoja_vida_equipo(request, equipo_id):
+    """Genera y devuelve una Hoja de Vida (PDF) para un `Equipo` con su historial de OTs."""
+    equipo = Equipo.objects.filter(id=equipo_id).first()
+    if not equipo:
+        raise Http404("Equipo no encontrado")
+
+    buffer = _build_hoja_vida_pdf_bytes(equipo)
     filename = f"hoja_vida_{equipo.codigo or equipo.id}.pdf"
     return FileResponse(buffer, as_attachment=True, filename=filename)
+
+
+def _collect_ubicacion_descendants(ubicacion):
+    ids = []
+    stack = [ubicacion]
+    while stack:
+        current = stack.pop()
+        ids.append(current.id)
+        stack.extend(list(current.children.all()))
+    return ids
+
+
+def descargar_hojas_vida_ubicacion(request, ubicacion_id):
+    """Genera un ZIP con todas las hojas de vida de los equipos bajo una ubicación y sus sububicaciones."""
+    ubicacion = Ubicacion.objects.filter(id=ubicacion_id).first()
+    if not ubicacion:
+        raise Http404("Ubicación no encontrada")
+
+    ubicacion_ids = _collect_ubicacion_descendants(ubicacion)
+    equipos = Equipo.objects.filter(ubicacion_id__in=ubicacion_ids).select_related('ubicacion').order_by('ubicacion__nombre', 'nombre')
+    if not equipos.exists():
+        raise Http404("No hay equipos asociados a esta ubicación para exportar")
+
+    archive_buffer = BytesIO()
+    with zipfile.ZipFile(archive_buffer, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+        for equipo in equipos:
+            safe_name = f"{slugify(equipo.codigo or str(equipo.id))}_{slugify(equipo.nombre)}.pdf"
+            safe_name = re.sub(r'[-_]+', '-', safe_name)
+            pdf_buffer = _build_hoja_vida_pdf_bytes(equipo)
+            archive.writestr(safe_name, pdf_buffer.getvalue())
+
+    archive_buffer.seek(0)
+    return FileResponse(
+        archive_buffer,
+        as_attachment=True,
+        filename=f"{slugify(ubicacion.nombre)}_hojas_vida.zip",
+        content_type='application/zip',
+    )

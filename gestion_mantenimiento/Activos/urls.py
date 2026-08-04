@@ -11,5 +11,6 @@ urlpatterns = [
     path('crear_equipo_dinamico/', views.crear_equipo_dinamico, name='crear_equipo_dinamico'),
     path('lista_activos/', views.lista_activos, name='lista_activos'),
     path('hoja_vida/<int:equipo_id>/', views.hoja_vida_equipo, name='hoja_vida_equipo'),
+    path('zip_hojas_vida/<int:ubicacion_id>/', views.descargar_hojas_vida_ubicacion, name='descargar_hojas_vida_ubicacion'),
     # Otras rutas...
 ]

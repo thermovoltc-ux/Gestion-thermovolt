@@ -1084,6 +1084,9 @@ Lista de Activos - Gestión de Activos y Equipos
                     ${tipo === 'equipo' ? `<button class="btn-action btn-action-secondary" onclick="window.open('/Activos/hoja_vida/${id}/', '_blank')">
                         <ion-icon name="document-text-outline"></ion-icon> Hoja de vida
                     </button>` : ''}
+                    ${tipo === 'ubicacion' ? `<button class="btn-action btn-action-secondary" onclick="window.open('/Activos/zip_hojas_vida/${id}/', '_blank')">
+                        <ion-icon name="download-outline"></ion-icon> Descargar todas las HVs
+                    </button>` : ''}
                     <button class="btn-action btn-action-secondary" onclick="abrirEditarNodo('${tipo}', ${id})">
                         <ion-icon name="pencil-outline"></ion-icon> Editar
                     </button>
