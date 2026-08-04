@@ -15,6 +15,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.platypus import Image as RLImage
+from PIL import Image as PILImage
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo
 
 def crear_ubicacion(request):
@@ -174,6 +175,22 @@ def _resolve_equipo_image_bytes(equipo, request=None):
     return None
 
 
+def _fit_image_dimensions(image_bytes, max_width, max_height):
+    """Escala una imagen para que entre en el recuadro del PDF sin deformarla."""
+    try:
+        with PILImage.open(BytesIO(image_bytes)) as image:
+            source_width, source_height = image.size
+            if source_width <= 0 or source_height <= 0:
+                return max_width, max_height
+
+            ratio = min(max_width / source_width, max_height / source_height)
+            final_width = max(1, int(source_width * ratio))
+            final_height = max(1, int(source_height * ratio))
+            return final_width, final_height
+    except Exception:
+        return max_width, max_height
+
+
 def _build_hoja_vida_pdf_bytes(equipo, request=None):
     """Genera el PDF de hoja de vida para un equipo y devuelve un BytesIO listo para responder."""
     ots = OrdenTrabajo.objects.filter(solicitud__equipo=equipo).select_related('solicitud', 'estado').order_by('-solicitud__consecutivo')
@@ -219,14 +236,15 @@ def _build_hoja_vida_pdf_bytes(equipo, request=None):
     ]))
 
     _, attrs_height = attrs_table.wrap(360, 0)
-    photo_col_width = 170
-    photo_width = photo_col_width - 10
-    photo_height = attrs_height
+    photo_col_width = 210
+    photo_width = photo_col_width - 12
+    photo_height = max(attrs_height, 210)
     photo_flowable = None
     try:
         image_bytes = _resolve_equipo_image_bytes(equipo, request=request)
         if image_bytes:
-            photo_flowable = RLImage(BytesIO(image_bytes), width=photo_width, height=photo_height - 10)
+            fitted_width, fitted_height = _fit_image_dimensions(image_bytes, photo_width, photo_height - 18)
+            photo_flowable = RLImage(BytesIO(image_bytes), width=fitted_width, height=fitted_height)
             photo_flowable.hAlign = 'CENTER'
     except Exception:
         photo_flowable = None
@@ -246,6 +264,10 @@ def _build_hoja_vida_pdf_bytes(equipo, request=None):
         ('LINEABOVE', (0,0), (-1,0), 0.5, colors.black),
         ('LINERIGHT', (0,0), (-1,-1), 0.5, colors.black),
         ('LINEBELOW', (0,-1), (-1,-1), 0.5, colors.black),
+        ('LEFTPADDING', (0,0), (-1,-1), 4),
+        ('RIGHTPADDING', (0,0), (-1,-1), 4),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
     ]))
     main_table = Table([[attrs_table, photo_box]], colWidths=[360, photo_col_width])
     main_table.setStyle(TableStyle([
