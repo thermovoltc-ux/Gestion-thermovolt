@@ -14,6 +14,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
+from reportlab.lib.utils import ImageReader
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo
 
 def crear_ubicacion(request):
@@ -134,7 +135,46 @@ def lista_activos(request):
     return render(request, 'Activos/lista_activos.html', context)
 
 
-def _build_hoja_vida_pdf_bytes(equipo):
+def _resolve_equipo_image_bytes(equipo, request=None):
+    """Resuelve la imagen del equipo a bytes para el PDF, soportando almacenamiento local y remoto."""
+    if not equipo.imagen:
+        return None
+
+    try:
+        if hasattr(equipo.imagen, 'path') and equipo.imagen.path and os.path.exists(equipo.imagen.path):
+            with open(equipo.imagen.path, 'rb') as image_file:
+                return image_file.read()
+    except Exception:
+        pass
+
+    try:
+        image_name = getattr(equipo.imagen, 'name', None)
+        if image_name:
+            with default_storage.open(image_name, 'rb') as image_file:
+                return image_file.read()
+    except Exception:
+        pass
+
+    try:
+        image_url = getattr(equipo.imagen, 'url', None)
+        if image_url:
+            if image_url.startswith('http://') or image_url.startswith('https://'):
+                remote_url = image_url
+            elif request is not None:
+                remote_url = request.build_absolute_uri(image_url)
+            else:
+                remote_url = None
+
+            if remote_url:
+                with urlopen(remote_url) as response:
+                    return response.read()
+    except Exception:
+        pass
+
+    return None
+
+
+def _build_hoja_vida_pdf_bytes(equipo, request=None):
     """Genera el PDF de hoja de vida para un equipo y devuelve un BytesIO listo para responder."""
     ots = OrdenTrabajo.objects.filter(solicitud__equipo=equipo).select_related('solicitud', 'estado').order_by('-solicitud__consecutivo')
 
@@ -184,31 +224,14 @@ def _build_hoja_vida_pdf_bytes(equipo):
     photo_height = attrs_height
     photo_flowable = None
     try:
-        if equipo.imagen:
+        image_bytes = _resolve_equipo_image_bytes(equipo, request=request)
+        if image_bytes:
+            image_reader = ImageReader(BytesIO(image_bytes))
+            photo_flowable = Paragraph('', styles['BodyText'])
+            photo_flowable = None
             from reportlab.platypus import Image as RLImage
-            image_source = None
-            if hasattr(equipo.imagen, 'path'):
-                path = equipo.imagen.path
-                if path and os.path.exists(path):
-                    image_source = path
-            if image_source is None and hasattr(equipo.imagen, 'name'):
-                try:
-                    image_file = default_storage.open(equipo.imagen.name, 'rb')
-                    image_file.seek(0)
-                    image_source = image_file
-                except Exception:
-                    image_source = None
-            if image_source is None and hasattr(equipo.imagen, 'url'):
-                try:
-                    response = urlopen(equipo.imagen.url)
-                    image_bytes = BytesIO(response.read())
-                    image_bytes.seek(0)
-                    image_source = image_bytes
-                except Exception:
-                    image_source = None
-            if image_source is not None:
-                photo_flowable = RLImage(image_source, width=photo_width, height=photo_height - 10)
-                photo_flowable.hAlign = 'CENTER'
+            photo_flowable = RLImage(image_reader, width=photo_width, height=photo_height - 10)
+            photo_flowable.hAlign = 'CENTER'
     except Exception:
         photo_flowable = None
 
@@ -301,7 +324,7 @@ def hoja_vida_equipo(request, equipo_id):
     if not equipo:
         raise Http404("Equipo no encontrado")
 
-    buffer = _build_hoja_vida_pdf_bytes(equipo)
+    buffer = _build_hoja_vida_pdf_bytes(equipo, request=request)
     filename = f"hoja_vida_{equipo.codigo or equipo.id}.pdf"
     return FileResponse(buffer, as_attachment=True, filename=filename)
 
@@ -332,7 +355,7 @@ def descargar_hojas_vida_ubicacion(request, ubicacion_id):
         for equipo in equipos:
             safe_name = f"{slugify(equipo.codigo or str(equipo.id))}_{slugify(equipo.nombre)}.pdf"
             safe_name = re.sub(r'[-_]+', '-', safe_name)
-            pdf_buffer = _build_hoja_vida_pdf_bytes(equipo)
+            pdf_buffer = _build_hoja_vida_pdf_bytes(equipo, request=request)
             archive.writestr(safe_name, pdf_buffer.getvalue())
 
     archive_buffer.seek(0)
