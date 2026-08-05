@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, FileResponse, Http404
+from django.http import JsonResponse, FileResponse, Http404, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 import json
@@ -48,7 +48,7 @@ from PIL import Image as PILImage
 import threading
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-from .drive_utils import subir_pdf_a_drive, subir_pdf_privado_a_drive, descargar_archivo_privado_drive
+from .drive_utils import subir_pdf_a_drive, subir_pdf_privado_a_drive, descargar_archivo_privado_drive, iterar_archivo_privado_drive
 
 try:
     import pythoncom
@@ -1252,19 +1252,19 @@ def descargar_informe_token(request, token):
     if not record.download_enabled:
         raise Http404('Este enlace de descarga no está habilitado.')
 
-    temp_file = descargar_archivo_privado_drive(record.drive_file_id)
     try:
-        response = FileResponse(
-            temp_file,
-            as_attachment=True,
-            filename=record.nombre_archivo,
+        response = StreamingHttpResponse(
+            iterar_archivo_privado_drive(record.drive_file_id),
             content_type=record.mime_type or 'application/pdf',
         )
         response['Content-Type'] = record.mime_type or 'application/pdf'
         response['Content-Disposition'] = f'attachment; filename="{record.nombre_archivo}"'
+        response['X-Accel-Buffering'] = 'no'
+        if record.file_size_bytes:
+            response['Content-Length'] = str(record.file_size_bytes)
         return response
     except Exception as exc:
-        logger.error('Error devolviendo PDF privado desde Drive: %s', exc)
+        logger.error('Error devolviendo PDF privado desde Drive por streaming: %s', exc)
         raise Http404('No se pudo descargar el informe solicitado.')
 
 

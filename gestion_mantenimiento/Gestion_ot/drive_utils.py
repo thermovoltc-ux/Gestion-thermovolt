@@ -1,14 +1,17 @@
 import os
 import json
 import tempfile
+import requests
 from io import BytesIO
-from typing import Optional
+from typing import Optional, Iterator
 
 try:
+    from google.auth.transport.requests import Request as GoogleRequest
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 except ImportError:  # pragma: no cover - fallback seguro para entorno sin librerías de Drive
+    GoogleRequest = None
     service_account = None
     build = None
     MediaIoBaseUpload = None
@@ -37,7 +40,7 @@ def _get_drive_credentials_info():
     raise RuntimeError('La variable de entorno GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_SERVICE_ACCOUNT_JSON_PATH no está configurada.')
 
 
-def crear_drive_service():
+def _crear_drive_credentials():
     if service_account is None or build is None:
         raise RuntimeError('La librería de Google Drive no está instalada en este entorno. Instala google-api-python-client y google-auth para activar el flujo privado.')
 
@@ -46,7 +49,41 @@ def crear_drive_service():
         credentials_info,
         scopes=['https://www.googleapis.com/auth/drive']
     )
+    if GoogleRequest is not None and not credentials.token:
+        credentials.refresh(GoogleRequest())
+    return credentials
+
+
+def crear_drive_service():
+    credentials = _crear_drive_credentials()
     return build('drive', 'v3', credentials=credentials)
+
+
+def iterar_archivo_privado_drive(file_id: str, chunk_size: int = 1024 * 1024) -> Iterator[bytes]:
+    """Genera una descarga por chunks desde Google Drive sin materializar el PDF completo en memoria."""
+    credentials = _crear_drive_credentials()
+    drive_service = build('drive', 'v3', credentials=credentials)
+    drive_service.files().get(
+        fileId=file_id,
+        fields='id,name,mimeType,size',
+        supportsAllDrives=True,
+        supportsTeamDrives=True,
+    ).execute()
+
+    session = requests.Session()
+    session.headers.update({
+        'Authorization': f'Bearer {credentials.token}',
+    })
+    response = session.get(
+        f'https://www.googleapis.com/drive/v3/files/{file_id}?alt=media',
+        stream=True,
+        timeout=(5, 120),
+    )
+    response.raise_for_status()
+
+    for chunk in response.iter_content(chunk_size=chunk_size):
+        if chunk:
+            yield chunk
 
 
 def subir_pdf_privado_a_drive(pdf_bytes: bytes, filename: str, folder_id: Optional[str] = None) -> dict:
