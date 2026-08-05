@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from mptt.models import MPTTModel, TreeForeignKey
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
+import uuid
 
 # Modelo de Estado
 class Estado(models.Model):
@@ -109,6 +110,27 @@ class ImagenCierreOt(models.Model):
 
     def __str__(self):
         return f"Imagen {self.tipo} de {self.cierre_ot}"
+
+
+class InformeDriveArchivo(models.Model):
+    """Referencia privada de un PDF generado que se conserva en Google Drive."""
+    cierre_ot = models.OneToOneField(CierreOt, on_delete=models.CASCADE, related_name='informe_drive_archivo')
+    drive_file_id = models.CharField(max_length=255, unique=True, db_index=True)
+    nombre_archivo = models.CharField(max_length=255)
+    mime_type = models.CharField(max_length=120, default='application/pdf')
+    file_size_bytes = models.BigIntegerField(null=True, blank=True)
+    download_token = models.CharField(max_length=64, unique=True, db_index=True)
+    download_enabled = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.download_token:
+            self.download_token = uuid.uuid4().hex
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"InformeDriveArchivo {self.nombre_archivo} - {self.cierre_ot}"
 
 
 # ============================================================================

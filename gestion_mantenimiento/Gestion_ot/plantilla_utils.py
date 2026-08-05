@@ -454,8 +454,14 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
                 fontName='Helvetica-Bold'
             )
 
-            # Limitar a las primeras 4 imágenes para evitar PDFs enormes en email.
-            max_fotos_por_tipo = 4
+            # Limitar el número de fotos por tipo para evitar PDFs demasiado grandes,
+            # pero hacerlo configurable y no hardcodeado a 4.
+            try:
+                max_fotos_por_tipo = int(os.environ.get('INFORME_MAX_FOTOS_POR_TIPO', '8'))
+            except (TypeError, ValueError):
+                max_fotos_por_tipo = 8
+            if max_fotos_por_tipo < 1:
+                max_fotos_por_tipo = 8
             
             # ANTES
             if imagenes_antes:

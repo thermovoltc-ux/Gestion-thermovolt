@@ -15,7 +15,7 @@ import os
 from django.contrib import messages
 import os
 import smtplib
-from .models import OrdenTrabajo, Estado, GestionOt, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad
+from .models import OrdenTrabajo, Estado, GestionOt, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad, InformeDriveArchivo
 from .forms import GestionOtForm, OrdenTrabajoForm, CierreOtForm, ImagenCierreOtForm, ImagenAntesForm, ImagenDespuesForm, CierreOtActividadFormSet
 from gestion_mantenimiento.solicitudes.models import Solicitud
 import logging
@@ -24,7 +24,10 @@ from django.contrib.auth.decorators import login_required
 from django.urls import reverse
 from django.core.serializers.json import DjangoJSONEncoder
 from docx import Document
-from docx2pdf import convert
+try:
+    from docx2pdf import convert
+except ImportError:
+    convert = None
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
@@ -40,11 +43,12 @@ import os
 import base64
 import shutil
 import subprocess
+import uuid
 from PIL import Image as PILImage
 import threading
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-from .drive_utils import subir_pdf_a_drive
+from .drive_utils import subir_pdf_a_drive, subir_pdf_privado_a_drive, descargar_archivo_privado_drive
 
 try:
     import pythoncom
@@ -1151,16 +1155,71 @@ def _build_media_url(relative_url):
     return f"{scheme}://{host.rstrip('/')}/{media_url.rstrip('/')}/{relative_url.lstrip('/')}"
 
 
+def _build_private_download_url(token):
+    """Construye la URL interna de Django para un PDF privado asociado a un token."""
+    if not token:
+        return None
+    public_host = os.environ.get('PUBLIC_HOST')
+    if public_host:
+        host = public_host.strip()
+        if host.startswith('http://') or host.startswith('https://'):
+            host = urlparse(host).netloc or host
+        if _is_local_host(host):
+            logger.warning('PUBLIC_HOST configurado como localhost/127.0.0.1; no se generará enlace privado de descarga.')
+            return None
+    else:
+        allowed_hosts = [h for h in settings.ALLOWED_HOSTS if not _is_local_host(h)]
+        if not allowed_hosts:
+            logger.warning('No hay PUBLIC_HOST ni ALLOWED_HOSTS públicos válidos; no se generará enlace privado de descarga.')
+            return None
+        host = allowed_hosts[0].strip()
+
+    scheme = 'https' if not settings.DEBUG else 'http'
+    return f"{scheme}://{host.rstrip('/')}{reverse('descargar_informe_token', args=[token])}"
+
+
+def _crear_o_actualizar_informe_drive_archivo(cierre_ot, pdf_bytes, filename, pdf_mime_type='application/pdf'):
+    """Crea o actualiza el registro privado de un PDF en Drive asociado al cierre de OT."""
+    drive_folder_id = os.environ.get('GOOGLE_DRIVE_FOLDER_ID', '').strip()
+    if not drive_folder_id:
+        raise RuntimeError('GOOGLE_DRIVE_FOLDER_ID no está configurado.')
+
+    metadata = subir_pdf_privado_a_drive(pdf_bytes, filename, folder_id=drive_folder_id)
+    record, created = InformeDriveArchivo.objects.update_or_create(
+        cierre_ot=cierre_ot,
+        defaults={
+            'drive_file_id': metadata['drive_file_id'],
+            'nombre_archivo': metadata['nombre_archivo'],
+            'mime_type': metadata.get('mime_type') or pdf_mime_type,
+            'file_size_bytes': metadata.get('file_size_bytes') or len(pdf_bytes),
+            'download_enabled': True,
+        },
+    )
+    if created or not record.download_token:
+        record.download_token = uuid.uuid4().hex
+        record.save(update_fields=['download_token'])
+    return record
+
+
 def guardar_pdf_en_media(pdf_buffer, cierre_ot):
-    """Guarda el PDF en el almacenamiento configurado y devuelve la URL pública si es posible."""
+    """Compatibilidad: conserva el comportamiento anterior de guardar copia local y publicar una URL cuando el storage lo permite."""
     timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
     filename = f"informe_ot_{cierre_ot.orden_trabajo.solicitud.consecutivo}_{timestamp}.pdf"
     relative_path = os.path.join('email_copies', 'informes', filename)
 
     pdf_bytes = pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else bytes(pdf_buffer)
 
+    drive_folder_id = os.environ.get('GOOGLE_DRIVE_FOLDER_ID', '').strip()
+    drive_credentials = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON') or os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON_PATH') or os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+    if drive_folder_id and drive_credentials:
+        try:
+            public_url = subir_pdf_a_drive(pdf_bytes, filename, folder_id=drive_folder_id)
+            logger.info("PDF guardado en Google Drive: %s", public_url)
+            return public_url
+        except Exception as drive_exc:
+            logger.warning("No se pudo guardar el PDF en Google Drive: %s", drive_exc)
+
     try:
-        # Usar default_storage para respetar configuración de Cloudinary/FS
         content = ContentFile(pdf_bytes)
         saved_name = default_storage.save(relative_path, content)
         url = default_storage.url(saved_name)
@@ -1171,7 +1230,6 @@ def guardar_pdf_en_media(pdf_buffer, cierre_ot):
         logger.warning("No se pudo guardar el PDF en storage: %s", exc)
 
     try:
-        # Fallback local directo en MEDIA_ROOT cuando el storage principal rechaza archivos grandes.
         local_dir = os.path.join(settings.MEDIA_ROOT, 'email_copies', 'informes')
         os.makedirs(local_dir, exist_ok=True)
         local_path = os.path.join(local_dir, filename)
@@ -1186,6 +1244,28 @@ def guardar_pdf_en_media(pdf_buffer, cierre_ot):
 
     logger.error("No fue posible generar una URL pública para el PDF.")
     return None
+
+
+def descargar_informe_token(request, token):
+    """Descarga el PDF privado asociado a un token de Django sin exponer Google Drive al cliente."""
+    record = get_object_or_404(InformeDriveArchivo, download_token=token)
+    if not record.download_enabled:
+        raise Http404('Este enlace de descarga no está habilitado.')
+
+    temp_file = descargar_archivo_privado_drive(record.drive_file_id)
+    try:
+        response = FileResponse(
+            temp_file,
+            as_attachment=True,
+            filename=record.nombre_archivo,
+            content_type=record.mime_type or 'application/pdf',
+        )
+        response['Content-Type'] = record.mime_type or 'application/pdf'
+        response['Content-Disposition'] = f'attachment; filename="{record.nombre_archivo}"'
+        return response
+    except Exception as exc:
+        logger.error('Error devolviendo PDF privado desde Drive: %s', exc)
+        raise Http404('No se pudo descargar el informe solicitado.')
 
 
 def descargar_informe_pdf(request, filename):
@@ -1343,15 +1423,13 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         
         # Crear email con versión texto y HTML
         text_content = f"Cordial saludo,\n\nAdjunto se encuentra el informe de los trabajos realizados en {cliente_nombre}.\n\nOT-{consecutivo}\nEquipo: {equipo_nombre}\nCliente: {cliente_nombre}\nFecha: {fecha_str}\n\nThermovolt Servicios"
-        
-        # Adjuntar PDF solo si el tamaño es razonable para Brevo; si no, guardar en MEDIA y enviar enlace.
+
         pdf_bytes = pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else bytes(pdf_buffer)
         attachment_size_mb = len(pdf_bytes) / (1024 * 1024)
         logger.info(f"📬 Enviando email via Brevo")
         logger.info(f"   - Destinatarios: {recipient_list}")
         logger.info(f"   - Archivo: {pdf_filename} ({attachment_size_mb:.2f} MB)")
 
-        # Umbral seguro para adjuntar (4 MB). Si supera, guardamos en MEDIA y compartimos enlace.
         if len(pdf_bytes) <= 4 * 1024 * 1024:
             email = EmailMultiAlternatives(
                 subject=subject,
@@ -1364,49 +1442,31 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
             logger.info("📎 PDF adjuntado al email")
         else:
             logger.warning(
-                "⚠️ El PDF supera el umbral seguro para Brevo (%s MB). Guardando en MEDIA y enviando enlace en el cuerpo del correo.",
+                "⚠️ El PDF supera el umbral seguro para Brevo (%s MB). Se sube a Google Drive privado y el email envía un enlace interno de Django.",
                 round(attachment_size_mb, 2),
             )
-            # Guardar copia local de auditoría
             try:
                 guardar_copia_pdf_envio(pdf_buffer, cierre_ot)
             except Exception:
                 pass
 
-            pdf_url = guardar_pdf_en_media(pdf_buffer, cierre_ot)
-            if not pdf_url:
-                # Fallback a Google Drive si el storage actual falla
-                drive_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
-                drive_json_path = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON_PATH') or os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-                if not drive_json and not drive_json_path:
-                    logger.warning('No se configuró ninguna credencial de Drive (GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_SERVICE_ACCOUNT_JSON_PATH / GOOGLE_APPLICATION_CREDENTIALS).')
+            try:
+                registro_drive = _crear_o_actualizar_informe_drive_archivo(cierre_ot, pdf_bytes, pdf_filename)
+                download_url = _build_private_download_url(registro_drive.download_token)
+                if download_url:
+                    download_block = f"<div style=\"background:#f5f5f5;padding:15px;border:1px solid #d1d5db;border-radius:6px;margin:20px 0;\"><p>El informe completo está disponible para descarga aquí: <a href=\"{download_url}\">Descargar informe (PDF)</a></p></div>"
+                    if '</body>' in html_content:
+                        html_content = html_content.replace('</body>', f"{download_block}</body>")
+                    else:
+                        html_content += download_block
+                    text_content += f"\n\nInforme disponible: {download_url}\n"
+                    logger.info("Link privado de descarga agregado al email: %s", download_url)
                 else:
-                    try:
-                        folder_id = os.environ.get('GOOGLE_DRIVE_FOLDER_ID', '').strip()
-                        if not folder_id:
-                            logger.warning('GOOGLE_DRIVE_FOLDER_ID no está configurado o está vacío.')
-                        else:
-                            pdf_url = subir_pdf_a_drive(pdf_bytes, pdf_filename, folder_id=folder_id)
-                            logger.info("PDF subido a Google Drive: %s", pdf_url)
-                    except Exception as drive_exc:
-                        logger.warning("No se pudo subir el PDF a Google Drive: %s", drive_exc)
+                    logger.warning('No se pudo construir el enlace interno privado para el email.')
+            except Exception as drive_exc:
+                logger.warning('No se pudo elevar el PDF a Drive privado para el email: %s', drive_exc)
+                download_url = None
 
-            if pdf_url:
-                if pdf_url.startswith('/'):
-                    scheme = 'https' if not settings.DEBUG else 'http'
-                    host = (settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS and settings.ALLOWED_HOSTS[0] else 'localhost:8000')
-                    pdf_url = f"{scheme}://{host.rstrip('/')}{pdf_url}"
-
-                download_block = f"<div style=\"background:#f5f5f5;padding:15px;border:1px solid #d1d5db;border-radius:6px;margin:20px 0;\"><p>El informe completo está disponible para descarga aquí: <a href=\"{pdf_url}\">Descargar informe (PDF)</a></p></div>"
-                if '</body>' in html_content:
-                    html_content = html_content.replace('</body>', f"{download_block}</body>")
-                else:
-                    html_content += download_block
-                text_content += f"\n\nInforme disponible: {pdf_url}\n"
-                logger.info("Link de descarga del informe agregado al email: %s", pdf_url)
-            else:
-                logger.warning("No se pudo obtener una URL de PDF; se enviará el correo sin adjunto ni enlace.")
-            
             email = EmailMultiAlternatives(
                 subject=subject,
                 body=text_content,
@@ -1418,10 +1478,10 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         # Agregar versión HTML con el contenido final, incluyendo posible enlace.
         email.attach_alternative(html_content, "text/html")
         email.send(fail_silently=False)
-        
+
         logger.info("✅ Email enviado EXITOSAMENTE via Brevo")
         return True
-        
+
     except Exception as e:
         logger.error("❌ Error enviando email: %s", str(e))
         logger.error("   - Tipo: %s", type(e).__name__)

@@ -268,13 +268,18 @@ CLOUDINARY_STORAGE = {
     'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET'),
 }
 
-# Use Cloudinary for media files in production
-if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('CLOUDINARY_CLOUD_NAME'):
+USE_CLOUDINARY_STORAGE = os.environ.get('USE_CLOUDINARY_STORAGE', 'false').lower() == 'true'
+
+# Sólo habilitar Cloudinary si se activa explícitamente por variable de entorno.
+# Esto evita que Railway o la presencia de una variable de entorno obligue a
+# usar Cloudinary como storage global para todos los archivos del proyecto.
+if USE_CLOUDINARY_STORAGE and (os.environ.get('CLOUDINARY_CLOUD_NAME') or os.environ.get('CLOUDINARY_URL')):
     cloudinary.config(**CLOUDINARY_STORAGE)
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
     CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL')
 else:
-    # Use local storage in development
+    # Usar storage local por defecto; Google Drive se usará explícitamente
+    # para PDFs y enlaces si hay una configuración válida en el entorno.
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
 
 # Default primary key field type
