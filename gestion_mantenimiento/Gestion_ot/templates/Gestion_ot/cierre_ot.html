@@ -396,6 +396,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const firmaTecnicoTextarea = document.getElementById('firma-tecnico-data');
     const firmaReceptorTextarea = document.getElementById('firma-receptor-data');
+    const submitButton = document.getElementById('submit-cierre-ot');
+    const statusDiv = document.getElementById('cierre-ot-status');
+    let formSubmitting = false;
 
     if (!firmaTecnicoTextarea) {
         console.error('Textarea de firma del técnico no encontrado');
@@ -406,16 +409,28 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
+    if (!submitButton) {
+        console.error('Botón de envío no encontrado');
+        return;
+    }
+
     console.log('Todos los elementos del DOM encontrados correctamente');
 
     form.addEventListener('submit', function(e) {
+        if (formSubmitting) {
+            console.log('Intento de envío duplicado bloqueado');
+            e.preventDefault();
+            return;
+        }
+
         try {
+            formSubmitting = true;
             console.log('Formulario enviado - iniciando procesamiento de firmas');
 
             // Guardar firma del técnico
             if (!signaturePadTecnico.isEmpty()) {
                 const dataURLTecnico = signaturePadTecnico.toDataURL();
-                document.getElementById('firma-tecnico-data').value = dataURLTecnico;
+                firmaTecnicoTextarea.value = dataURLTecnico;
                 console.log('Firma del técnico guardada en textarea, longitud:', dataURLTecnico.length);
             } else {
                 console.log('Firma del técnico está vacía');
@@ -424,7 +439,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Guardar firma del receptor
             if (!signaturePadReceptor.isEmpty()) {
                 const dataURLReceptor = signaturePadReceptor.toDataURL();
-                document.getElementById('firma-receptor-data').value = dataURLReceptor;
+                firmaReceptorTextarea.value = dataURLReceptor;
                 console.log('Firma del receptor guardada en textarea, longitud:', dataURLReceptor.length);
             } else {
                 console.log('Firma del receptor está vacía');
@@ -432,22 +447,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
             console.log('Firmas procesadas, permitiendo envío nativo del formulario');
 
-            const operationId = document.getElementById('operation-id').value;
-            if (operationId) {
-                const statusDiv = document.getElementById('cierre-ot-status');
-                if (statusDiv) {
-                    statusDiv.textContent = 'Procesando informe...';
-                }
-                const submitButton = document.getElementById('submit-cierre-ot');
-                if (submitButton) {
-                    submitButton.disabled = true;
-                    submitButton.textContent = 'Procesando...';
-                }
+            if (statusDiv) {
+                statusDiv.textContent = 'El informe está siendo procesado. No cierre esta página ni vuelva a presionar el botón.';
             }
+            submitButton.disabled = true;
+            submitButton.textContent = 'Procesando informe...';
         } catch (error) {
             console.error('Error procesando formulario:', error);
+            formSubmitting = false;
             e.preventDefault(); // Prevenir envío si hay error
             alert('Error procesando el formulario: ' + error.message);
+        }
+    });
+
+    submitButton.addEventListener('click', function(e) {
+        if (formSubmitting) {
+            e.preventDefault();
+            console.log('Doble clic bloqueado');
         }
     });
 

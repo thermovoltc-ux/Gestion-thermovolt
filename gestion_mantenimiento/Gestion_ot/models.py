@@ -204,12 +204,14 @@ class ProcesoInforme(models.Model):
             self.mensaje = mensaje
         if last_error is not None:
             self.last_error = last_error
+        if estado == self.ERROR:
+            self.started_at = None
         if estado == self.ENVIADO:
             self.email_enviado = True
             self.email_sent_at = timezone.now()
             self.finished_at = timezone.now()
         if save_fields is None:
-            save_fields = ['estado', 'mensaje', 'last_error', 'email_enviado', 'email_sent_at', 'finished_at', 'updated_at']
+            save_fields = ['estado', 'mensaje', 'last_error', 'email_enviado', 'email_sent_at', 'finished_at', 'started_at', 'updated_at']
         self.save(update_fields=[field for field in save_fields if hasattr(self, field)])
 
 

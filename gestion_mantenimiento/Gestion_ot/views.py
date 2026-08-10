@@ -333,6 +333,10 @@ def _get_active_proceso_para_cierre(cierre_ot):
     return ProcesoInforme.objects.filter(cierre_ot=cierre_ot, estado__in=list(ProcesoInforme.ACTIVE_STATES)).order_by('-updated_at').first()
 
 
+def _get_latest_proceso_para_cierre(cierre_ot):
+    return ProcesoInforme.objects.filter(cierre_ot=cierre_ot).order_by('-updated_at').first()
+
+
 def _crear_o_actualizar_proceso(cierre_ot, operation_id, expected_images=0, required_signatures=None):
     if required_signatures is None:
         required_signatures = ['firma_digital', 'firma_receptor']
@@ -924,6 +928,12 @@ def cierre_ot(request, ot_id):
         else:
             proceso, _ = _crear_o_actualizar_proceso(cierre_ot, operation_id)
 
+        latest_proceso = _get_latest_proceso_para_cierre(cierre_ot)
+        if not existing_active and latest_proceso and latest_proceso.operation_id != operation_id and (latest_proceso.estado == ProcesoInforme.ENVIADO or latest_proceso.email_enviado):
+            logger.info('[INFORME] Se reutiliza informe ya enviado para cierre_ot=%s operation=%s', cierre_ot.id, latest_proceso.operation_id)
+            operation_id = latest_proceso.operation_id
+            proceso = latest_proceso
+
         # Guardar las firmas desde los textareas ocultos
         firma_tecnico = request.POST.get('firma_digital', '')
         firma_receptor = request.POST.get('firma_receptor', '')
@@ -967,21 +977,39 @@ def cierre_ot(request, ot_id):
                 'operation_id': operation_id
             })
 
-        if proceso.estado not in [ProcesoInforme.ENVIANDO, ProcesoInforme.ENVIADO]:
-            try:
-                thread = threading.Thread(target=_procesar_proceso_informe, args=(proceso.operation_id,), daemon=True)
-                thread.start()
-                proceso.set_state(ProcesoInforme.GUARDANDO, f'Guardado y enqueued para procesamiento (imagenes={total_images})')
-                messages.success(request, 'OT cerrada exitosamente. El informe se está procesando en segundo plano.')
+        if proceso.email_enviado or proceso.estado == ProcesoInforme.ENVIADO:
+            logger.info('[INFORME] operation=%s ya enviado, no se iniciará un nuevo proceso', proceso.operation_id)
+            messages.info(request, 'El informe ya fue enviado. No se generará un segundo correo.')
+            return redirect('listar_ot')
+
+        with transaction.atomic():
+            proceso = ProcesoInforme.objects.select_for_update().get(pk=proceso.pk)
+            if proceso.email_enviado or proceso.estado == ProcesoInforme.ENVIADO:
+                logger.info('[INFORME] operation=%s ya enviado tras bloquear en DB', proceso.operation_id)
+                messages.info(request, 'El informe ya fue enviado. No se generará un segundo correo.')
                 return redirect('listar_ot')
-            except Exception as e:
-                logger.error("No se pudo iniciar el proceso en background para PDF/email: %s", e)
-                proceso.set_state(ProcesoInforme.ERROR, "No se pudo iniciar el procesamiento en background", last_error=str(e))
-                messages.warning(request, f"OT guardada pero no se pudo iniciar el procesamiento automáticamente: {e}")
+
+            if proceso.estado in ProcesoInforme.ACTIVE_STATES and proceso.started_at is not None:
+                logger.info('[INFORME] operation=%s ya está siendo procesado en estado=%s', proceso.operation_id, proceso.estado)
+                messages.info(request, 'El informe ya está en proceso. No presione el botón nuevamente.')
                 return redirect('listar_ot')
-        else:
-            logger.info('[INFORME] operation=%s ya está en proceso en estado=%s', proceso.operation_id, proceso.estado)
-            messages.info(request, 'El informe ya está en proceso. No se generará un segundo envío.')
+
+            if proceso.estado == ProcesoInforme.ERROR and not proceso.email_enviado:
+                proceso.set_state(ProcesoInforme.GUARDANDO, 'Reintentando proceso')
+
+            proceso.started_at = timezone.now()
+            proceso.save(update_fields=['started_at'])
+
+        try:
+            thread = threading.Thread(target=_procesar_proceso_informe, args=(proceso.operation_id,), daemon=True)
+            thread.start()
+            proceso.set_state(ProcesoInforme.GUARDANDO, f'Guardado y enqueued para procesamiento (imagenes={total_images})')
+            messages.success(request, 'OT cerrada exitosamente. El informe se está procesando en segundo plano.')
+            return redirect('listar_ot')
+        except Exception as e:
+            logger.error("No se pudo iniciar el proceso en background para PDF/email: %s", e)
+            proceso.set_state(ProcesoInforme.ERROR, "No se pudo iniciar el procesamiento en background", last_error=str(e))
+            messages.warning(request, f"OT guardada pero no se pudo iniciar el procesamiento automáticamente: {e}")
             return redirect('listar_ot')
 
     else:
