@@ -465,6 +465,29 @@ def _procesar_proceso_informe(operation_id):
             if enviado:
                 proceso.set_state(ProcesoInforme.ENVIADO, 'Enviado')
                 logger.info('[INFORME] operation=%s estado=ENVIADO', operation_id)
+                # Marcar OT/CierreOt/Solicitud como 'en revision' de forma atómica
+                try:
+                    estado_en_revision, _ = Estado.objects.get_or_create(nombre='en revision')
+                    with transaction.atomic():
+                        proc = ProcesoInforme.objects.select_related('cierre_ot__orden_trabajo__solicitud').select_for_update().get(operation_id=operation_id)
+                        cierre = proc.cierre_ot
+                        ot_obj = cierre.orden_trabajo
+                        solicitud_obj = ot_obj.solicitud
+
+                        # Sólo actualizar si aún no están en 'en revision'
+                        if not ot_obj.estado or ot_obj.estado.nombre != 'en revision':
+                            ot_obj.estado = estado_en_revision
+                            ot_obj.save(update_fields=['estado'])
+                        if not cierre.estado or cierre.estado.nombre != 'en revision':
+                            cierre.estado = estado_en_revision
+                            cierre.save(update_fields=['estado'])
+                        if not solicitud_obj.estado or solicitud_obj.estado.nombre != 'en revision':
+                            solicitud_obj.estado = estado_en_revision
+                            solicitud_obj.save(update_fields=['estado'])
+                except Exception as exc:
+                    # No marcar el proceso como ERROR porque el email ya fue enviado.
+                    # Registrar el fallo para reintento manual/alerta.
+                    logger.exception('[INFORME] operation=%s fallo al actualizar estados OT tras ENVIADO: %s', operation_id, exc)
             else:
                 proceso.set_state(ProcesoInforme.PDF_LISTO, 'Error enviando email', last_error='La función enviar_pdf_por_email devolvió False')
                 logger.warning('[INFORME] operation=%s email no enviado', operation_id)
@@ -920,20 +943,6 @@ def cierre_ot(request, ot_id):
             operation_id = uuid.uuid4().hex
         logger.debug('Operation ID para informe: %s', operation_id)
 
-        existing_active = _get_active_proceso_para_cierre(cierre_ot)
-        if existing_active and existing_active.operation_id != operation_id:
-            logger.info('[INFORME] Se detecta proceso activo previo para cierre_ot=%s operation=%s existente=%s', cierre_ot.id, operation_id, existing_active.operation_id)
-            operation_id = existing_active.operation_id
-            proceso = existing_active
-        else:
-            proceso, _ = _crear_o_actualizar_proceso(cierre_ot, operation_id)
-
-        latest_proceso = _get_latest_proceso_para_cierre(cierre_ot)
-        if not existing_active and latest_proceso and latest_proceso.operation_id != operation_id and (latest_proceso.estado == ProcesoInforme.ENVIADO or latest_proceso.email_enviado):
-            logger.info('[INFORME] Se reutiliza informe ya enviado para cierre_ot=%s operation=%s', cierre_ot.id, latest_proceso.operation_id)
-            operation_id = latest_proceso.operation_id
-            proceso = latest_proceso
-
         # Guardar las firmas desde los textareas ocultos
         firma_tecnico = request.POST.get('firma_digital', '')
         firma_receptor = request.POST.get('firma_receptor', '')
@@ -949,39 +958,35 @@ def cierre_ot(request, ot_id):
         actividad_formset.save()
         logger.info("Cierre OT guardado con ID: %s", cierre_ot.id)
 
+        existing_active = _get_active_proceso_para_cierre(cierre_ot)
+        if existing_active and existing_active.operation_id != operation_id:
+            logger.info('[INFORME] Se detecta proceso activo previo para cierre_ot=%s operation=%s existente=%s', cierre_ot.id, operation_id, existing_active.operation_id)
+            operation_id = existing_active.operation_id
+            proceso = existing_active
+        else:
+            proceso, _ = _crear_o_actualizar_proceso(cierre_ot, operation_id)
+
+        latest_proceso = _get_latest_proceso_para_cierre(cierre_ot)
+        if not existing_active and latest_proceso and latest_proceso.operation_id != operation_id and (latest_proceso.estado == ProcesoInforme.ENVIADO or latest_proceso.email_enviado):
+            logger.info('[INFORME] Se reutiliza informe ya enviado para cierre_ot=%s operation=%s', cierre_ot.id, latest_proceso.operation_id)
+            operation_id = latest_proceso.operation_id
+            proceso = latest_proceso
+
         # Guardar imágenes y actualizar proceso
         total_images = _guardar_imagenes_del_post(cierre_ot, request, proceso)
         logger.info("Imágenes guardadas para operación %s: %s", proceso.operation_id, total_images)
 
-        # Cambiar estados
-        try:
-            estado_revision, _ = Estado.objects.get_or_create(nombre="en revision")
-            ot.estado = estado_revision
-            ot.save()
-            cierre_ot.estado = estado_revision
-            cierre_ot.save()
-            solicitud = ot.solicitud
-            solicitud.estado = estado_revision
-            solicitud.save()
-            logger.info("Estados actualizados correctamente")
-        except Exception as e:
-            logger.error("Error actualizando estados: %s", e)
-            proceso.set_state(ProcesoInforme.ERROR, f"Error actualizando estados: {e}", last_error=str(e))
-            messages.error(request, f"Error actualizando estados: {e}")
-            return render(request, 'Gestion_ot/cierre_ot.html', {
-                'form': form,
-                'actividad_formset': actividad_formset,
-                'form_antes': form_antes,
-                'form_despues': form_despues,
-                'ot': ot,
-                'operation_id': operation_id
-            })
+        # Nota: no cambiar el estado de la OT aquí. El proceso de informe se
+        # realizará de forma persistente por un worker/management command.
+        # Dejar la OT sin marcar como "en revision" hasta que el informe
+        # haya finalizado correctamente y la tarea marque el proceso como ENVIADO.
 
         if proceso.email_enviado or proceso.estado == ProcesoInforme.ENVIADO:
             logger.info('[INFORME] operation=%s ya enviado, no se iniciará un nuevo proceso', proceso.operation_id)
             messages.info(request, 'El informe ya fue enviado. No se generará un segundo correo.')
             return redirect('listar_ot')
 
+        # Encolar el proceso para que un worker/management command lo procese.
         with transaction.atomic():
             proceso = ProcesoInforme.objects.select_for_update().get(pk=proceso.pk)
             if proceso.email_enviado or proceso.estado == ProcesoInforme.ENVIADO:
@@ -997,20 +1002,12 @@ def cierre_ot(request, ot_id):
             if proceso.estado == ProcesoInforme.ERROR and not proceso.email_enviado:
                 proceso.set_state(ProcesoInforme.GUARDANDO, 'Reintentando proceso')
 
-            proceso.started_at = timezone.now()
-            proceso.save(update_fields=['started_at'])
+            # No establecer `started_at` ni lanzar hilos en memoria. El worker
+            # se encargará de marcar `started_at` al tomar el proceso.
 
-        try:
-            thread = threading.Thread(target=_procesar_proceso_informe, args=(proceso.operation_id,), daemon=True)
-            thread.start()
-            proceso.set_state(ProcesoInforme.GUARDANDO, f'Guardado y enqueued para procesamiento (imagenes={total_images})')
-            messages.success(request, 'OT cerrada exitosamente. El informe se está procesando en segundo plano.')
-            return redirect('listar_ot')
-        except Exception as e:
-            logger.error("No se pudo iniciar el proceso en background para PDF/email: %s", e)
-            proceso.set_state(ProcesoInforme.ERROR, "No se pudo iniciar el procesamiento en background", last_error=str(e))
-            messages.warning(request, f"OT guardada pero no se pudo iniciar el procesamiento automáticamente: {e}")
-            return redirect('listar_ot')
+        proceso.set_state(ProcesoInforme.GUARDANDO, f'Guardado y enqueued para procesamiento (imagenes={total_images})')
+        messages.success(request, 'OT cerrada exitosamente. El informe se ha encolado para procesamiento en background.')
+        return redirect('listar_ot')
 
     else:
         form = CierreOtForm(instance=cierre_ot)
