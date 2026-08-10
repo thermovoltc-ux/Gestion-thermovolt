@@ -133,6 +133,86 @@ class InformeDriveArchivo(models.Model):
         return f"InformeDriveArchivo {self.nombre_archivo} - {self.cierre_ot}"
 
 
+class ProcesoInforme(models.Model):
+    PENDIENTE = 'PENDIENTE'
+    GUARDANDO = 'GUARDANDO'
+    VALIDANDO_ARCHIVOS = 'VALIDANDO_ARCHIVOS'
+    GENERANDO_PDF = 'GENERANDO_PDF'
+    PDF_LISTO = 'PDF_LISTO'
+    ENVIANDO = 'ENVIANDO'
+    ENVIADO = 'ENVIADO'
+    ERROR = 'ERROR'
+
+    ESTADO_CHOICES = [
+        (PENDIENTE, 'Pendiente'),
+        (GUARDANDO, 'Guardando'),
+        (VALIDANDO_ARCHIVOS, 'Validando archivos'),
+        (GENERANDO_PDF, 'Generando PDF'),
+        (PDF_LISTO, 'PDF listo'),
+        (ENVIANDO, 'Enviando'),
+        (ENVIADO, 'Enviado'),
+        (ERROR, 'Error'),
+    ]
+
+    ACTIVE_STATES = {PENDIENTE, GUARDANDO, VALIDANDO_ARCHIVOS, GENERANDO_PDF, PDF_LISTO, ENVIANDO}
+    DEFAULT_REQUIRED_SIGNATURES = ['firma_digital', 'firma_receptor']
+
+    operation_id = models.CharField(max_length=64, unique=True, db_index=True, default=uuid.uuid4)
+    cierre_ot = models.ForeignKey(CierreOt, on_delete=models.CASCADE, related_name='procesos_informe')
+    estado = models.CharField(max_length=32, choices=ESTADO_CHOICES, default=PENDIENTE, db_index=True)
+    mensaje = models.CharField(max_length=255, blank=True, default='Pendiente')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    started_at = models.DateTimeField(blank=True, null=True)
+    finished_at = models.DateTimeField(blank=True, null=True)
+    last_error = models.TextField(blank=True, null=True)
+    expected_images = models.PositiveIntegerField(default=0)
+    confirmed_images = models.PositiveIntegerField(default=0)
+    required_signatures = models.JSONField(default=list, blank=True)
+    pdf_path = models.CharField(max_length=500, blank=True, null=True)
+    pdf_size_bytes = models.BigIntegerField(blank=True, null=True)
+    email_enviado = models.BooleanField(default=False)
+    email_sent_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        constraints = [
+            models.UniqueConstraint(
+                condition=models.Q(estado__in=['PENDIENTE', 'GUARDANDO', 'VALIDANDO_ARCHIVOS', 'GENERANDO_PDF', 'PDF_LISTO', 'ENVIANDO']),
+                fields=['cierre_ot'],
+                name='uniq_active_proceso_informe_por_cierre',
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.operation_id:
+            self.operation_id = uuid.uuid4().hex
+        if not self.required_signatures:
+            self.required_signatures = self.DEFAULT_REQUIRED_SIGNATURES.copy()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"ProcesoInforme {self.operation_id} - {self.cierre_ot}"
+
+    @property
+    def is_active(self):
+        return self.estado in self.ACTIVE_STATES and not self.email_enviado
+
+    def set_state(self, estado, mensaje=None, last_error=None, save_fields=None):
+        self.estado = estado
+        if mensaje is not None:
+            self.mensaje = mensaje
+        if last_error is not None:
+            self.last_error = last_error
+        if estado == self.ENVIADO:
+            self.email_enviado = True
+            self.email_sent_at = timezone.now()
+            self.finished_at = timezone.now()
+        if save_fields is None:
+            save_fields = ['estado', 'mensaje', 'last_error', 'email_enviado', 'email_sent_at', 'finished_at', 'updated_at']
+        self.save(update_fields=[field for field in save_fields if hasattr(self, field)])
+
+
 # ============================================================================
 # MODELOS DE MANTENIMIENTO PREVENTIVO (NUEVOS)
 # ============================================================================

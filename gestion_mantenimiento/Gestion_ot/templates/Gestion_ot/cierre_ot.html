@@ -176,7 +176,9 @@
         {% if read_only %}
             <div class="cierre-ot-alert cierre-ot-alert-info">Esta OT ya fue enviada a revisión y se encuentra en modo solo lectura.</div>
         {% else %}
-            <button type="submit" class="cierre-ot-btn cierre-ot-btn-primary">Guardar y enviar informe</button>
+            <input type="hidden" name="operation_id" id="operation-id" value="{{ operation_id|default:'' }}">
+            <div id="cierre-ot-status" class="cierre-ot-form-status" style="margin-bottom:16px; color:#1f2937;"></div>
+            <button type="submit" class="cierre-ot-btn cierre-ot-btn-primary" id="submit-cierre-ot">Guardar y enviar informe</button>
         {% endif %}
     </form>
     </div>
@@ -429,13 +431,63 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             console.log('Firmas procesadas, permitiendo envío nativo del formulario');
-            
+
+            const operationId = document.getElementById('operation-id').value;
+            if (operationId) {
+                const statusDiv = document.getElementById('cierre-ot-status');
+                if (statusDiv) {
+                    statusDiv.textContent = 'Procesando informe...';
+                }
+                const submitButton = document.getElementById('submit-cierre-ot');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Procesando...';
+                }
+            }
         } catch (error) {
             console.error('Error procesando formulario:', error);
             e.preventDefault(); // Prevenir envío si hay error
             alert('Error procesando el formulario: ' + error.message);
         }
     });
+
+    function actualizarEstadoInforme() {
+        const operationId = document.getElementById('operation-id').value;
+        if (!operationId) {
+            return;
+        }
+
+        const statusUrl = `/Gestion_ot/informes/estado/{{ ot.id }}/${encodeURIComponent(operationId)}/`;
+        fetch(statusUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                const statusDiv = document.getElementById('cierre-ot-status');
+                if (!statusDiv) return;
+
+                statusDiv.textContent = `Estado: ${data.estado.replace(/_/g, ' ')} - ${data.mensaje}`;
+
+                if (['ENVIADO', 'ERROR'].includes(data.estado)) {
+                    const submitButton = document.getElementById('submit-cierre-ot');
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Guardar y enviar informe';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error consultando estado del informe:', error);
+            });
+    }
+
+    if (document.getElementById('operation-id').value) {
+        actualizarEstadoInforme();
+        setInterval(actualizarEstadoInforme, 10000);
+    }
 });
 </script>
 

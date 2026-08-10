@@ -3,7 +3,7 @@ from django.http import JsonResponse, FileResponse, Http404, StreamingHttpRespon
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 import json
-from django.db import models
+from django.db import models, transaction, IntegrityError
 from django.utils import timezone
 from datetime import timedelta
 import datetime
@@ -15,7 +15,7 @@ import os
 from django.contrib import messages
 import os
 import smtplib
-from .models import OrdenTrabajo, Estado, GestionOt, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad, InformeDriveArchivo
+from .models import OrdenTrabajo, Estado, GestionOt, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad, InformeDriveArchivo, ProcesoInforme
 from .forms import GestionOtForm, OrdenTrabajoForm, CierreOtForm, ImagenCierreOtForm, ImagenAntesForm, ImagenDespuesForm, CierreOtActividadFormSet
 from gestion_mantenimiento.solicitudes.models import Solicitud
 import logging
@@ -178,40 +178,319 @@ def obtener_imagen_temporal_para_pdf(file_field):
     Intenta primero descargar desde URL remota (Cloudinary).
     Como fallback, usa path local si existe.
     """
-    # Validar que file_field no sea None o cadena vacía
     if not file_field or isinstance(file_field, str):
         return None, False
-    
+
     try:
-        # Obtener el nombre del archivo de forma segura
-        file_name = getattr(file_field, 'name', 'unknown')
-        
-        # Intentar obtener URL primero (mejor opción para Cloudinary)
+        file_name = getattr(file_field, 'name', None)
+
         if hasattr(file_field, 'url'):
             url = file_field.url
             if url and isinstance(url, str) and re.match(r'^https?://', url):
                 try:
                     response = requests.get(url, timeout=10)
                     response.raise_for_status()
-                    suffix = os.path.splitext(file_name)[1] or '.jpg'
-                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-                    temp_file.write(response.content)
-                    temp_file.close()
-                    return temp_file.name, True
+                    suffix = os.path.splitext(file_name or 'image')[1] or '.jpg'
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+                        temp_file.write(response.content)
+                        return temp_file.name, True
                 except Exception as e:
-                    pass  # Silently fall back to local path
-        
-        # Fallback a path local si URL no está disponible
+                    logger.warning('No se pudo descargar imagen remota para PDF: %s', e)
+
         if hasattr(file_field, 'path'):
             try:
                 local_path = file_field.path
                 if local_path and os.path.exists(local_path):
                     return local_path, False
             except (AttributeError, ValueError, NotImplementedError) as e:
-                pass  # Silently continue
+                logger.warning('No se pudo obtener path local de file_field: %s', e)
+
     except Exception as e:
-        pass  # Silently continue
+        logger.warning('Error al obtener imagen temporal para PDF: %s', e)
+
     return None, False
+
+
+def _imagen_duplicada(cierre_ot, file_obj, tipo):
+    try:
+        name = getattr(file_obj, 'name', None)
+        size = getattr(file_obj, 'size', None)
+        if not name or size is None:
+            return False
+
+        for imagen in cierre_ot.imagenes.filter(tipo=tipo):
+            existing_name = getattr(imagen.imagen, 'name', '')
+            existing_size = None
+            try:
+                existing_size = imagen.imagen.size
+            except Exception:
+                existing_size = None
+            if existing_name and existing_name.endswith(name) and existing_size == size:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _validar_firma_base64(value):
+    if not value or not isinstance(value, str):
+        return False
+    raw_value = value.strip()
+    if not raw_value:
+        return False
+    if raw_value.startswith('data:image'):
+        if ',' not in raw_value:
+            return False
+        _, encoded = raw_value.split(',', 1)
+    else:
+        encoded = raw_value
+    if len(encoded) < 100:
+        return False
+    try:
+        base64.b64decode(encoded, validate=True)
+        return True
+    except Exception:
+        return False
+
+
+def _validar_firmas(cierre_ot):
+    firmas_requeridas = ['firma_digital', 'firma_receptor']
+    faltantes = []
+    for firma_field in firmas_requeridas:
+        valor = getattr(cierre_ot, firma_field, None)
+        if not _validar_firma_base64(valor):
+            faltantes.append(firma_field)
+    if faltantes:
+        mensaje = f"Firmas inválidas o incompletas: {', '.join(faltantes)}"
+        return False, mensaje
+    return True, 'Firmas validadas'
+
+
+def _validar_imagenes(cierre_ot):
+    imagenes = list(cierre_ot.imagenes.all())
+    expected_images = len(imagenes)
+    confirmed_images = 0
+    errores = []
+    temp_files = []
+
+    try:
+        for imagen in imagenes:
+            path, is_temp = obtener_imagen_temporal_para_pdf(imagen.imagen)
+            if not path:
+                errores.append(f"Imagen no disponible: id={imagen.id} tipo={imagen.tipo}")
+                continue
+            try:
+                with open(path, 'rb') as f:
+                    data = f.read(16)
+                    if not data:
+                        raise ValueError('Archivo vacío')
+                confirmed_images += 1
+            except Exception as e:
+                errores.append(f"No se puede leer imagen id={imagen.id}: {e}")
+            finally:
+                if is_temp:
+                    temp_files.append(path)
+    finally:
+        for temp_file in temp_files:
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except Exception:
+                pass
+
+    valido = expected_images == confirmed_images
+    if not valido:
+        mensaje = f"Imágenes inválidas o incompletas ({confirmed_images}/{expected_images})"
+        if errores:
+            mensaje = mensaje + ". " + "; ".join(errores[:3])
+        return False, expected_images, confirmed_images, mensaje
+    return True, expected_images, confirmed_images, 'Imágenes validadas'
+
+
+def _validar_pdf(pdf_buffer):
+    if not pdf_buffer:
+        return False
+    try:
+        pdf_bytes = pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else bytes(pdf_buffer)
+    except Exception:
+        return False
+    if not pdf_bytes or len(pdf_bytes) < 1024:
+        return False
+    if not pdf_bytes.startswith(b'%PDF'):
+        return False
+    if b'%EOF' not in pdf_bytes[-1024:]:
+        return False
+    return True
+
+
+def _normalize_pdf_result(result):
+    if isinstance(result, tuple) and len(result) >= 1:
+        return result[0]
+    return result
+
+
+def _get_active_proceso_para_cierre(cierre_ot):
+    return ProcesoInforme.objects.filter(cierre_ot=cierre_ot, estado__in=list(ProcesoInforme.ACTIVE_STATES)).order_by('-updated_at').first()
+
+
+def _crear_o_actualizar_proceso(cierre_ot, operation_id, expected_images=0, required_signatures=None):
+    if required_signatures is None:
+        required_signatures = ['firma_digital', 'firma_receptor']
+
+    proceso = ProcesoInforme.objects.filter(operation_id=operation_id).first()
+    if proceso and proceso.cierre_ot_id != cierre_ot.id:
+        raise ValueError('operation_id inválido para esta OT')
+
+    if proceso is None:
+        try:
+            proceso = ProcesoInforme.objects.create(
+                operation_id=operation_id,
+                cierre_ot=cierre_ot,
+                estado=ProcesoInforme.GUARDANDO,
+                mensaje='Guardando datos',
+                expected_images=expected_images,
+                confirmed_images=0,
+                required_signatures=required_signatures,
+            )
+            created = True
+        except IntegrityError:
+            proceso = _get_active_proceso_para_cierre(cierre_ot)
+            if not proceso:
+                raise
+            created = False
+    else:
+        created = False
+        if proceso.estado == ProcesoInforme.PENDIENTE:
+            proceso.set_state(ProcesoInforme.GUARDANDO, 'Guardando datos')
+        elif proceso.estado == ProcesoInforme.ERROR and not proceso.email_enviado:
+            proceso.set_state(ProcesoInforme.GUARDANDO, 'Reintentando proceso')
+
+    if proceso.expected_images == 0 and expected_images > 0:
+        proceso.expected_images = expected_images
+        proceso.save(update_fields=['expected_images'])
+
+    return proceso, created
+
+
+def _guardar_imagenes_del_post(cierre_ot, request, proceso):
+    total_guardadas = 0
+    for tipo in ['antes', 'despues']:
+        field_name = 'imagenes_antes' if tipo == 'antes' else 'imagenes_despues'
+        for file in request.FILES.getlist(field_name):
+            if not file:
+                continue
+            if _imagen_duplicada(cierre_ot, file, tipo):
+                logger.info('[INFORME] operation=%s imagen duplicada ignorada: %s %s', proceso.operation_id, tipo, getattr(file, 'name', ''))
+                continue
+            ImagenCierreOt.objects.create(cierre_ot=cierre_ot, imagen=file, tipo=tipo)
+            total_guardadas += 1
+
+    total_imagenes = cierre_ot.imagenes.count()
+    proceso.expected_images = total_imagenes
+    proceso.confirmed_images = total_imagenes
+    proceso.save(update_fields=['expected_images', 'confirmed_images'])
+    return total_imagenes
+
+
+def _procesar_proceso_informe(operation_id):
+    try:
+        proceso = ProcesoInforme.objects.select_related('cierre_ot__orden_trabajo__solicitud').get(operation_id=operation_id)
+    except ProcesoInforme.DoesNotExist:
+        logger.error('[INFORME] operation=%s no encontrado en background', operation_id)
+        return
+
+    if proceso.email_enviado:
+        logger.info('[INFORME] operation=%s ya enviado, no se procesará de nuevo', operation_id)
+        return
+
+    cierre_ot = proceso.cierre_ot
+
+    try:
+        with transaction.atomic():
+            proceso = ProcesoInforme.objects.select_for_update().get(operation_id=operation_id)
+            if proceso.estado == ProcesoInforme.ENVIADO:
+                logger.info('[INFORME] operation=%s ya en estado ENVIADO', operation_id)
+                return
+            if proceso.estado == ProcesoInforme.PDF_LISTO:
+                proceso.set_state(ProcesoInforme.ENVIANDO, 'Reintentando envío')
+                enviar_email = True
+            elif proceso.estado == ProcesoInforme.ENVIANDO:
+                proceso.set_state(ProcesoInforme.ENVIANDO, 'Continuando envío')
+                enviar_email = True
+            else:
+                proceso.set_state(ProcesoInforme.VALIDANDO_ARCHIVOS, 'Validando archivos')
+                validar_firmas_ok, mensaje_firmas = _validar_firmas(cierre_ot)
+                if not validar_firmas_ok:
+                    proceso.set_state(ProcesoInforme.ERROR, mensaje_firmas, last_error=mensaje_firmas)
+                    return
+
+                valid_imgs, expected_images, confirmed_images, mensaje_imgs = _validar_imagenes(cierre_ot)
+                proceso.expected_images = expected_images
+                proceso.confirmed_images = confirmed_images
+                proceso.save(update_fields=['expected_images', 'confirmed_images'])
+                if not valid_imgs:
+                    proceso.set_state(ProcesoInforme.ERROR, mensaje_imgs, last_error=mensaje_imgs)
+                    return
+
+                proceso.set_state(ProcesoInforme.GENERANDO_PDF, 'Generando PDF')
+                enviar_email = True
+
+        pdf_buffer = None
+        if proceso.estado in [ProcesoInforme.GENERANDO_PDF, ProcesoInforme.PDF_LISTO, ProcesoInforme.ENVIANDO]:
+            result = generar_pdf_informe(cierre_ot)
+            pdf_buffer = _normalize_pdf_result(result)
+            if not _validar_pdf(pdf_buffer):
+                proceso.set_state(ProcesoInforme.ERROR, 'PDF inválido después de generar', last_error='La salida no parece un PDF válido.')
+                return
+            proceso.pdf_size_bytes = len(pdf_buffer.getvalue())
+            proceso.set_state(ProcesoInforme.PDF_LISTO, 'PDF listo')
+
+        if enviar_email:
+            proceso.refresh_from_db()
+            if proceso.email_enviado or proceso.estado == ProcesoInforme.ENVIADO:
+                logger.info('[INFORME] operation=%s ya fue enviado antes de intentar enviar otro correo', operation_id)
+                return
+            proceso.set_state(ProcesoInforme.ENVIANDO, 'Enviando correo')
+            try:
+                enviado = enviar_pdf_por_email(pdf_buffer, cierre_ot)
+            except Exception as exc:
+                proceso.set_state(ProcesoInforme.PDF_LISTO, f'Error enviando email: {exc}', last_error=str(exc))
+                logger.error('[INFORME] operation=%s fallo envío: %s', operation_id, exc)
+                return
+
+            if enviado:
+                proceso.set_state(ProcesoInforme.ENVIADO, 'Enviado')
+                logger.info('[INFORME] operation=%s estado=ENVIADO', operation_id)
+            else:
+                proceso.set_state(ProcesoInforme.PDF_LISTO, 'Error enviando email', last_error='La función enviar_pdf_por_email devolvió False')
+                logger.warning('[INFORME] operation=%s email no enviado', operation_id)
+    except Exception as exc:
+        logger.error('[INFORME] operation=%s fallo inesperado: %s', operation_id, exc, exc_info=True)
+        try:
+            proceso = ProcesoInforme.objects.filter(operation_id=operation_id).first()
+            if proceso:
+                proceso.set_state(ProcesoInforme.ERROR, 'Fallo inesperado durante el procesamiento', last_error=str(exc))
+        except Exception:
+            pass
+
+
+@login_required
+def estado_proceso_informe(request, ot_id, operation_id):
+    ot = get_object_or_404(OrdenTrabajo, id=ot_id)
+    cierre_ot = get_object_or_404(CierreOt, orden_trabajo=ot)
+    proceso = get_object_or_404(ProcesoInforme, operation_id=operation_id, cierre_ot=cierre_ot)
+    return JsonResponse({
+        'operation_id': proceso.operation_id,
+        'estado': proceso.estado,
+        'mensaje': proceso.mensaje,
+        'expected_images': proceso.expected_images,
+        'confirmed_images': proceso.confirmed_images,
+        'required_signatures': proceso.required_signatures,
+        'email_enviado': proceso.email_enviado,
+        'created_at': proceso.created_at.isoformat(),
+        'updated_at': proceso.updated_at.isoformat(),
+    })
+
 
 class CustomDjangoJSONEncoder(DjangoJSONEncoder):
     def default(self, obj):
@@ -576,6 +855,8 @@ def cierre_ot(request, ot_id):
     ot = get_object_or_404(OrdenTrabajo, id=ot_id)
     cierre_ot, created = CierreOt.objects.get_or_create(orden_trabajo=ot)
     read_only = ot.estado and ot.estado.nombre in ['en revision', 'finalizada']
+    existing_proceso = _get_active_proceso_para_cierre(cierre_ot)
+    operation_id = existing_proceso.operation_id if existing_proceso else ''
     form_antes = ImagenAntesForm()
     form_despues = ImagenDespuesForm()
 
@@ -601,7 +882,8 @@ def cierre_ot(request, ot_id):
                 'form_antes': form_antes,
                 'form_despues': form_despues,
                 'ot': ot,
-                'read_only': read_only
+                'read_only': read_only,
+                'operation_id': operation_id
             })
 
         logger.debug("cierre_ot POST data keys=%s files keys=%s", list(request.POST.keys()), list(request.FILES.keys()))
@@ -625,8 +907,22 @@ def cierre_ot(request, ot_id):
                 'actividad_formset': actividad_formset,
                 'form_antes': form_antes,
                 'form_despues': form_despues,
-                'ot': ot
+                'ot': ot,
+                'operation_id': operation_id
             })
+
+        operation_id = request.POST.get('operation_id', '').strip()
+        if not operation_id or not re.match(r'^[0-9a-fA-F\-]{32,64}$', operation_id):
+            operation_id = uuid.uuid4().hex
+        logger.debug('Operation ID para informe: %s', operation_id)
+
+        existing_active = _get_active_proceso_para_cierre(cierre_ot)
+        if existing_active and existing_active.operation_id != operation_id:
+            logger.info('[INFORME] Se detecta proceso activo previo para cierre_ot=%s operation=%s existente=%s', cierre_ot.id, operation_id, existing_active.operation_id)
+            operation_id = existing_active.operation_id
+            proceso = existing_active
+        else:
+            proceso, _ = _crear_o_actualizar_proceso(cierre_ot, operation_id)
 
         # Guardar las firmas desde los textareas ocultos
         firma_tecnico = request.POST.get('firma_digital', '')
@@ -643,21 +939,9 @@ def cierre_ot(request, ot_id):
         actividad_formset.save()
         logger.info("Cierre OT guardado con ID: %s", cierre_ot.id)
 
-        # Guardar imágenes antes
-        imagenes_antes_count = 0
-        for file in request.FILES.getlist('imagenes_antes'):
-            if file:
-                ImagenCierreOt.objects.create(cierre_ot=cierre_ot, imagen=file, tipo='antes')
-                imagenes_antes_count += 1
-        logger.info("Imágenes antes guardadas: %s", imagenes_antes_count)
-
-        # Guardar imágenes después
-        imagenes_despues_count = 0
-        for file in request.FILES.getlist('imagenes_despues'):
-            if file:
-                ImagenCierreOt.objects.create(cierre_ot=cierre_ot, imagen=file, tipo='despues')
-                imagenes_despues_count += 1
-        logger.info("Imágenes después guardadas: %s", imagenes_despues_count)
+        # Guardar imágenes y actualizar proceso
+        total_images = _guardar_imagenes_del_post(cierre_ot, request, proceso)
+        logger.info("Imágenes guardadas para operación %s: %s", proceso.operation_id, total_images)
 
         # Cambiar estados
         try:
@@ -672,57 +956,32 @@ def cierre_ot(request, ot_id):
             logger.info("Estados actualizados correctamente")
         except Exception as e:
             logger.error("Error actualizando estados: %s", e)
+            proceso.set_state(ProcesoInforme.ERROR, f"Error actualizando estados: {e}", last_error=str(e))
             messages.error(request, f"Error actualizando estados: {e}")
             return render(request, 'Gestion_ot/cierre_ot.html', {
                 'form': form,
                 'actividad_formset': actividad_formset,
                 'form_antes': form_antes,
                 'form_despues': form_despues,
-                'ot': ot
+                'ot': ot,
+                'operation_id': operation_id
             })
 
-        # Generar y enviar PDF en segundo plano para no bloquear la petición HTTP
-        def _background_pdf_and_email(cierre_id):
+        if proceso.estado not in [ProcesoInforme.ENVIANDO, ProcesoInforme.ENVIADO]:
             try:
-                cierre = CierreOt.objects.get(pk=cierre_id)
-                try:
-                    result = generar_pdf_informe(cierre)
-                except Exception as exc:
-                    logger.error("Error generando PDF en background: %s", exc)
-                    # Intentar fallback con ReportLab
-                    try:
-                        result = generar_pdf_reportlab(cierre)
-                    except Exception as exc2:
-                        logger.error("Fallback ReportLab falló en background: %s", exc2)
-                        return
-
-                # Normalizar resultado
-                firma_tec_agregada = False
-                firma_rec_agregada = False
-                if isinstance(result, tuple) and len(result) == 3:
-                    pdf_buffer, firma_tec_agregada, firma_rec_agregada = result
-                else:
-                    pdf_buffer = result
-
-                # Enviar por email (si aplica)
-                try:
-                    enviar_pdf_por_email(pdf_buffer, cierre)
-                except Exception as exc:
-                    logger.error("Error enviando email en background: %s", exc)
-                    return
-
-            except CierreOt.DoesNotExist:
-                logger.error("CierreOt con id %s no encontrado en background", cierre_id)
-                return
-
-        try:
-            thread = threading.Thread(target=_background_pdf_and_email, args=(cierre_ot.id,), daemon=True)
-            thread.start()
-            messages.success(request, 'OT cerrada exitosamente. El PDF se está generando y enviando en segundo plano.')
-            return redirect('listar_ot')
-        except Exception as e:
-            logger.error("No se pudo iniciar el proceso en background para PDF/email: %s", e)
-            messages.warning(request, f"OT guardada pero no se pudo iniciar el envío de PDF automáticamente: {e}")
+                thread = threading.Thread(target=_procesar_proceso_informe, args=(proceso.operation_id,), daemon=True)
+                thread.start()
+                proceso.set_state(ProcesoInforme.GUARDANDO, f'Guardado y enqueued para procesamiento (imagenes={total_images})')
+                messages.success(request, 'OT cerrada exitosamente. El informe se está procesando en segundo plano.')
+                return redirect('listar_ot')
+            except Exception as e:
+                logger.error("No se pudo iniciar el proceso en background para PDF/email: %s", e)
+                proceso.set_state(ProcesoInforme.ERROR, "No se pudo iniciar el procesamiento en background", last_error=str(e))
+                messages.warning(request, f"OT guardada pero no se pudo iniciar el procesamiento automáticamente: {e}")
+                return redirect('listar_ot')
+        else:
+            logger.info('[INFORME] operation=%s ya está en proceso en estado=%s', proceso.operation_id, proceso.estado)
+            messages.info(request, 'El informe ya está en proceso. No se generará un segundo envío.')
             return redirect('listar_ot')
 
     else:
@@ -751,7 +1010,8 @@ def cierre_ot(request, ot_id):
         'form_antes': form_antes,
         'form_despues': form_despues,
         'ot': ot,
-        'read_only': read_only
+        'read_only': read_only,
+        'operation_id': operation_id
     })
 
 
@@ -941,12 +1201,10 @@ def generar_pdf_reportlab(cierre_ot):
         else:
             logger.warning(f"Firma receptor no disponible o vacía")
     except Exception as e:
-        logger.warning("Error agregando firma del receptor: %s", e)
-        pass
-    
+        logger.error("Error agregando firma del receptor: %s", e)
+        raise RuntimeError(f"Error al procesar firma receptor: {e}") from e
+
     story.append(Spacer(1, 12))
-    
-    # Sección de técnico con firma debajo
     story.append(Paragraph("<b>REALIZADO POR</b>", styles['Heading2']))
     story.append(Spacer(1, 6))
     
@@ -977,12 +1235,10 @@ def generar_pdf_reportlab(cierre_ot):
             img = PILImage.open(img_buffer)
             logger.info(f"Imagen firma técnica cargada: {img.size}, mode: {img.mode}")
             
-            # Convertir a RGB si es necesario
             if img.mode != 'RGB':
                 img = img.convert('RGB')
                 logger.info("Imagen convertida a RGB")
             
-            # Guardar temporalmente
             temp_img_path = f"/tmp/firma_{cierre_ot.id}.png"
             img.save(temp_img_path)
             temp_files.append(temp_img_path)  # Rastrear para limpiar después
@@ -995,8 +1251,8 @@ def generar_pdf_reportlab(cierre_ot):
         else:
             logger.warning(f"Firma técnica no disponible o vacía")
     except Exception as e:
-        logger.warning("Error agregando firma técnica: %s", e)
-        pass  # Silently continue with PDF
+        logger.error("Error agregando firma técnica: %s", e)
+        raise RuntimeError(f"Error al procesar firma técnica: {e}") from e
     
     # Agregar imágenes antes si existen
     imagenes_antes = cierre_ot.imagenes.filter(tipo='antes')
@@ -1010,10 +1266,10 @@ def generar_pdf_reportlab(cierre_ot):
         data = []
         row = []
         for i, img in enumerate(imagenes_antes):
+            img_path, is_temp = obtener_imagen_temporal_para_pdf(img.imagen)
+            if not img_path:
+                raise RuntimeError(f"No se pudo obtener imagen antes id={img.id} tipo={img.tipo}")
             try:
-                img_path, is_temp = obtener_imagen_temporal_para_pdf(img.imagen)
-                if not img_path:
-                    continue
                 if is_temp:
                     temp_files.append(img_path)  # Rastrear para limpiar después
                 img_reportlab = Image(img_path, width=150, height=100)
@@ -1022,7 +1278,7 @@ def generar_pdf_reportlab(cierre_ot):
                     data.append(row)
                     row = []
             except Exception as e:
-                pass  # Silently skip image
+                raise RuntimeError(f"Error generando imagen antes id={img.id}: {e}") from e
         
         if data:
             table = Table(data)
@@ -1045,10 +1301,10 @@ def generar_pdf_reportlab(cierre_ot):
         data = []
         row = []
         for i, img in enumerate(imagenes_despues):
+            img_path, is_temp = obtener_imagen_temporal_para_pdf(img.imagen)
+            if not img_path:
+                raise RuntimeError(f"No se pudo obtener imagen despues id={img.id} tipo={img.tipo}")
             try:
-                img_path, is_temp = obtener_imagen_temporal_para_pdf(img.imagen)
-                if not img_path:
-                    continue
                 if is_temp:
                     temp_files.append(img_path)  # Rastrear para limpiar después
                 img_reportlab = Image(img_path, width=150, height=100)
@@ -1057,7 +1313,7 @@ def generar_pdf_reportlab(cierre_ot):
                     data.append(row)
                     row = []
             except Exception as e:
-                pass  # Silently skip image
+                raise RuntimeError(f"Error generando imagen despues id={img.id}: {e}") from e
         
         if data:
             table = Table(data)
