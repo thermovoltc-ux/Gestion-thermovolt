@@ -884,6 +884,10 @@ def cierre_ot(request, ot_id):
     read_only = ot.estado and ot.estado.nombre in ['en revision', 'finalizada']
     existing_proceso = _get_active_proceso_para_cierre(cierre_ot)
     operation_id = existing_proceso.operation_id if existing_proceso else ''
+    if not operation_id:
+        latest_proceso = _get_latest_proceso_para_cierre(cierre_ot)
+        if latest_proceso and latest_proceso.estado == ProcesoInforme.ERROR and not latest_proceso.email_enviado:
+            operation_id = latest_proceso.operation_id
     form_antes = ImagenAntesForm()
     form_despues = ImagenDespuesForm()
 
@@ -1002,10 +1006,17 @@ def cierre_ot(request, ot_id):
             if proceso.estado == ProcesoInforme.ERROR and not proceso.email_enviado:
                 proceso.set_state(ProcesoInforme.GUARDANDO, 'Reintentando proceso')
 
-            # No establecer `started_at` ni lanzar hilos en memoria. El worker
-            # se encargará de marcar `started_at` al tomar el proceso.
+            proceso.started_at = timezone.now()
+            proceso.save(update_fields=['started_at'])
 
         proceso.set_state(ProcesoInforme.GUARDANDO, f'Guardado y enqueued para procesamiento (imagenes={total_images})')
+        try:
+            thread = threading.Thread(target=_procesar_proceso_informe, args=(proceso.operation_id,), daemon=True)
+            thread.start()
+            logger.info('[INFORME] operation=%s procesamiento en segundo plano iniciado', proceso.operation_id)
+        except Exception as exc:
+            logger.error('[INFORME] operation=%s no se pudo iniciar procesamiento en segundo plano: %s', proceso.operation_id, exc)
+
         messages.success(request, 'OT cerrada exitosamente. El informe se ha encolado para procesamiento en background.')
         return redirect('listar_ot')
 
