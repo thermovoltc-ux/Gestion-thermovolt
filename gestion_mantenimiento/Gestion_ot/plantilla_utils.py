@@ -219,7 +219,8 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
             parent=styles['BodyText'],
             fontSize=9,
             leading=11,
-            alignment=TA_LEFT
+            alignment=TA_LEFT,
+            wordWrap='CJK'
         )
         
         # ==================== ENCABEZADO ====================
@@ -309,9 +310,10 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         # ==================== DESCRIPCIÓN ====================
         
         desc_texto = _limpiar_texto(cierre_ot.descripcion_falla) or 'N/A'
+        desc_paragraph = Paragraph(desc_texto.replace('\n', '<br/>'), body_style)
         tabla_desc_data = [
             ['DESCRIPCIÓN DEL TRABAJO REALIZADO'],
-            [desc_texto]
+            [desc_paragraph]
         ]
         tabla_desc = Table(tabla_desc_data, colWidths=[7.5*inch])
         tabla_desc.setStyle(TableStyle([
@@ -335,9 +337,10 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
         # ==================== OBSERVACIONES ====================
         
         obs_texto = _limpiar_texto(cierre_ot.observaciones) or 'N/A'
+        obs_paragraph = Paragraph(obs_texto.replace('\n', '<br/>'), body_style)
         tabla_obs_data = [
             ['OBSERVACIONES'],
-            [obs_texto]
+            [obs_paragraph]
         ]
         tabla_obs = Table(tabla_obs_data, colWidths=[7.5*inch])
         tabla_obs.setStyle(TableStyle([
