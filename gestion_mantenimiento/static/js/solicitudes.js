@@ -89,7 +89,7 @@ $(document).ready(function() {
         }
     });
 
-    $('#ubicacion_busqueda').on('input', function() {
+    $('#nombre_ubicacion').on('input', function() {
         const query = $(this).val().trim();
         const container = $('#ubicacion_busqueda_results');
         if (!query) {
@@ -120,7 +120,6 @@ $(document).ready(function() {
                     const ubicacionNombre = $(this).data('nombre');
 
                     $('#ubicacion_id').val(ubicacionId);
-                    $('#ubicacion_busqueda').val(ubicacionNombre);
                     $('#nombre_ubicacion').val(ubicacionNombre);
                     $('#nombre_ubicacion_area').empty().append(new Option('Seleccione una ubicación', ''));
                     clearEquipoSelection({ preserveCodigo: false, preserveUbicacion: true });

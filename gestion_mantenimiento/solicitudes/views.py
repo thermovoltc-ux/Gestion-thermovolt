@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 import json
+import unicodedata
 from django.utils import timezone
 from datetime import timedelta
 import datetime
@@ -161,19 +162,36 @@ def get_ubicacion_por_codigo(request):
     except Ubicacion.DoesNotExist:
         return JsonResponse({'error': 'Ubicación no encontrada'}, status=404)
 
+def _normalizar_texto(value):
+    if value is None:
+        return ''
+    texto = str(value).casefold()
+    texto = unicodedata.normalize('NFKD', texto)
+    return ''.join(ch for ch in texto if not unicodedata.combining(ch))
+
 @login_required
 def buscar_ubicaciones(request):
     query = (request.GET.get('q') or '').strip()
     if not query:
         return JsonResponse({'results': []})
 
-    ubicaciones = Ubicacion.objects.filter(nombre__icontains=query).order_by('nombre')[:10]
-    return JsonResponse({
-        'results': [
-            {'id': ubicacion.id, 'nombre': ubicacion.nombre, 'codigo': ubicacion.codigo}
-            for ubicacion in ubicaciones
-        ]
-    })
+    query_normalizado = _normalizar_texto(query)
+    ubicaciones = Ubicacion.objects.order_by('nombre')[:200]
+    resultados = []
+
+    for ubicacion in ubicaciones:
+        nombre_normalizado = _normalizar_texto(ubicacion.nombre)
+        if query_normalizado in nombre_normalizado:
+            resultados.append({
+                'id': ubicacion.id,
+                'nombre': ubicacion.nombre,
+                'codigo': ubicacion.codigo,
+            })
+
+        if len(resultados) >= 10:
+            break
+
+    return JsonResponse({'results': resultados})
 
 @login_required
 def get_equipos_por_ubicacion(request):
