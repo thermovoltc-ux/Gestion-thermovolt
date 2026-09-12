@@ -89,78 +89,82 @@ $(document).ready(function() {
         }
     });
 
-    $('#nombre_ubicacion').on('input', function() {
-        const query = $(this).val().trim();
-        const container = $('#ubicacion_busqueda_results');
-        if (!query) {
-            container.hide().empty();
-            return;
-        }
+    $('#nombre_ubicacion')
+        .off('input.ubicacionSearch')
+        .on('input.ubicacionSearch', function() {
+            const query = $(this).val().trim();
+            const container = $('#ubicacion_busqueda_results');
 
-        $.ajax({
-            url: '/solicitudes/buscar-ubicaciones/',
-            method: 'GET',
-            data: { q: query },
-            success: function(response) {
-                const results = response.results || [];
-                if (!results.length) {
-                    container.html('<div style="padding:8px; color:#6b7280;">No se encontraron ubicaciones.</div>').show();
-                    return;
-                }
-
-                const items = results.map(item => `
-                    <div class="ubicacion-search-item" data-id="${item.id}" data-nombre="${item.nombre}" data-codigo="${item.codigo}" style="padding:8px 10px; cursor:pointer; border-bottom:1px solid #e5e7eb;">
-                        ${item.nombre}${item.codigo ? ` (${item.codigo})` : ''}
-                    </div>
-                `).join('');
-
-                container.html(items).show();
-                container.find('.ubicacion-search-item').on('click', function() {
-                    const ubicacionId = $(this).data('id');
-                    const ubicacionNombre = $(this).data('nombre');
-
-                    $('#ubicacion_id').val(ubicacionId);
-                    $('#nombre_ubicacion').val(ubicacionNombre);
-                    $('#nombre_ubicacion_area').empty().append(new Option('Seleccione una ubicación', ''));
-                    clearEquipoSelection({ preserveCodigo: false, preserveUbicacion: true });
-                    $('#equipo_por_ubicacion').empty().append(new Option('Buscando equipos...', ''));
-                    $('#equipo_por_ubicacion').prop('disabled', true);
-                    container.hide().empty();
-
-                    $.ajax({
-                        url: '/solicitudes/get-equipos-por-ubicacion/',
-                        method: 'GET',
-                        data: { ubicacion_id: ubicacionId },
-                        success: function(equiposResponse) {
-                            const results = equiposResponse.results || [];
-                            const select = $('#equipo_por_ubicacion');
-                            equiposPorUbicacion = results;
-                            select.empty().append(new Option('Seleccione un equipo', ''));
-
-                            if (!results.length) {
-                                select.append(new Option('No hay equipos para esta ubicación', ''));
-                                select.prop('disabled', true);
-                                return;
-                            }
-
-                            results.forEach(function(item) {
-                                select.append(new Option(`${item.nombre}${item.codigo ? ` (${item.codigo})` : ''}`, item.id));
-                            });
-                            select.prop('disabled', false);
-                        },
-                        error: function() {
-                            equiposPorUbicacion = [];
-                            $('#equipo_por_ubicacion').empty().append(new Option('Error cargando equipos', ''));
-                            $('#equipo_por_ubicacion').prop('disabled', true);
-                        }
-                    });
-                });
-            },
-            error: function() {
-                container.html('<div style="padding:8px; color:#6b7280;">Error buscando ubicaciones.</div>').show();
+            if (!query) {
+                container.hide().empty();
+                return;
             }
+
+            $.ajax({
+                url: '/solicitudes/buscar-ubicaciones/',
+                method: 'GET',
+                data: { q: query },
+                success: function(response) {
+                    const results = Array.isArray(response && response.results) ? response.results : [];
+                    if (!results.length) {
+                        container.html('<div style="padding:10px 12px; color:#6b7280; font-size:14px;">No se encontraron ubicaciones.</div>').show();
+                        return;
+                    }
+
+                    const items = results.map(item => `
+                        <div class="ubicacion-search-item" data-id="${item.id}" data-nombre="${item.nombre || ''}" data-codigo="${item.codigo || ''}" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid #e5e7eb; background:#fff; color:#111827; font-size:14px;">
+                            ${(item.nombre || '')}${item.codigo ? ` (${item.codigo})` : ''}
+                        </div>
+                    `).join('');
+
+                    container.html(items).show();
+                    container.off('click.ubicacionSearchItem').on('click.ubicacionSearchItem', '.ubicacion-search-item', function() {
+                        const ubicacionId = $(this).data('id');
+                        const ubicacionNombre = $(this).data('nombre');
+
+                        $('#ubicacion_id').val(ubicacionId);
+                        $('#nombre_ubicacion').val(ubicacionNombre);
+                        $('#nombre_ubicacion_area').empty().append(new Option('Seleccione una ubicación', ''));
+                        clearEquipoSelection({ preserveCodigo: false, preserveUbicacion: true });
+                        $('#equipo_por_ubicacion').empty().append(new Option('Buscando equipos...', ''));
+                        $('#equipo_por_ubicacion').prop('disabled', true);
+                        container.hide().empty();
+
+                        $.ajax({
+                            url: '/solicitudes/get-equipos-por-ubicacion/',
+                            method: 'GET',
+                            data: { ubicacion_id: ubicacionId },
+                            success: function(equiposResponse) {
+                                const results = equiposResponse.results || [];
+                                const select = $('#equipo_por_ubicacion');
+                                equiposPorUbicacion = results;
+                                select.empty().append(new Option('Seleccione un equipo', ''));
+
+                                if (!results.length) {
+                                    select.append(new Option('No hay equipos para esta ubicación', ''));
+                                    select.prop('disabled', true);
+                                    return;
+                                }
+
+                                results.forEach(function(item) {
+                                    select.append(new Option(`${item.nombre}${item.codigo ? ` (${item.codigo})` : ''}`, item.id));
+                                });
+                                select.prop('disabled', false);
+                            },
+                            error: function() {
+                                equiposPorUbicacion = [];
+                                $('#equipo_por_ubicacion').empty().append(new Option('Error cargando equipos', ''));
+                                $('#equipo_por_ubicacion').prop('disabled', true);
+                            }
+                        });
+                    });
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error buscando ubicaciones:', status, error);
+                    container.html('<div style="padding:10px 12px; color:#b91c1c; font-size:14px;">No se pudo cargar la búsqueda de ubicaciones.</div>').show();
+                }
+            });
         });
-    });
 
     $('#equipo_por_ubicacion').on('change', function() {
         const equipoId = $(this).val();
