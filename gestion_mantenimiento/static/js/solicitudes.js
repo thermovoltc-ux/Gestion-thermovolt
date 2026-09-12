@@ -39,6 +39,8 @@ function applyEquipoSelection({ equipoId, equipoNombre, equipoCodigo, ubicacionN
 }
 
 $(document).ready(function() {
+    console.log('[UBICACION-SEARCH] Listener registrado');
+
     $("#codigo").on("change", function() {
         let codigoVal = $(this).val();
         if (codigoVal) {
@@ -96,16 +98,22 @@ $(document).ready(function() {
             const query = $(this).val().trim();
             const container = $('#ubicacion_busqueda_results');
 
+            console.log('[UBICACION-SEARCH] Input detectado:', query);
+            console.log('[UBICACION-SEARCH] URL final:', searchUrl);
+
             if (!query) {
+                console.log('[UBICACION-SEARCH] Input vacío, ocultando contenedor');
                 container.hide().empty();
                 return;
             }
 
             if (query.length < 2) {
+                console.log('[UBICACION-SEARCH] Longitud insuficiente:', query.length);
                 container.html('<div style="padding:10px 12px; color:#6b7280; font-size:14px;">Buscando ubicaciones...</div>').show();
                 return;
             }
 
+            console.log('[UBICACION-SEARCH] Enviando AJAX:', searchUrl, 'q=', query);
             container.html('<div style="padding:10px 12px; color:#6b7280; font-size:14px;">Buscando ubicaciones...</div>').show();
 
             $.ajax({
@@ -113,13 +121,18 @@ $(document).ready(function() {
                 method: 'GET',
                 data: { q: query },
                 success: function(response) {
+                    console.log('[UBICACION-SEARCH] Respuesta recibida:', response);
                     const results = Array.isArray(response && response.results) ? response.results : [];
+                    console.log('[UBICACION-SEARCH] Cantidad de resultados:', results.length);
 
                     if (!results.length) {
+                        console.log('[UBICACION-SEARCH] Sin resultados');
                         container.html('<div style="padding:10px 12px; color:#6b7280; font-size:14px;">No se encontraron ubicaciones.</div>').show();
+                        console.log('[UBICACION-SEARCH] Contenedor visible:', container.is(':visible'));
                         return;
                     }
 
+                    console.log('[UBICACION-SEARCH] Renderizando resultados');
                     const items = results.map(item => `
                         <div class="ubicacion-search-item" data-id="${item.id}" data-nombre="${item.nombre || ''}" data-codigo="${item.codigo || ''}" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid #e5e7eb; background:#fff; color:#111827; font-size:14px;">
                             ${(item.nombre || '')}${item.codigo ? ` (${item.codigo})` : ''}
@@ -127,10 +140,12 @@ $(document).ready(function() {
                     `).join('');
 
                     container.html(items).show();
+                    console.log('[UBICACION-SEARCH] Contenedor visible:', container.is(':visible'));
                     container.off('click.ubicacionSearchItem').on('click.ubicacionSearchItem', '.ubicacion-search-item', function() {
                         const ubicacionId = $(this).data('id');
                         const ubicacionNombre = $(this).data('nombre');
 
+                        console.log('[UBICACION-SEARCH] Seleccionando ubicación:', ubicacionId, ubicacionNombre);
                         $('#ubicacion_id').val(ubicacionId);
                         $('#nombre_ubicacion').val(ubicacionNombre);
                         $('#nombre_ubicacion_area').empty().append(new Option('Seleccione una ubicación', ''));
@@ -169,7 +184,9 @@ $(document).ready(function() {
                     });
                 },
                 error: function(xhr, status, error) {
-                    console.error('Error al buscar ubicaciones:', status, error, xhr && xhr.responseText ? xhr.responseText : '');
+                    console.log('[UBICACION-SEARCH] ERROR AJAX');
+                    console.error(error);
+                    console.error(xhr && xhr.responseText ? xhr.responseText : '');
                     container.html('<div style="padding:10px 12px; color:#b91c1c; font-size:14px;">Error al buscar ubicaciones.</div>').show();
                 }
             });

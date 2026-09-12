@@ -171,26 +171,42 @@ def _normalizar_texto(value):
 
 @login_required
 def buscar_ubicaciones(request):
+    logger.info('[UBICACION-SEARCH] Endpoint recibido')
     query = (request.GET.get('q') or '').strip()
+    logger.info('[UBICACION-SEARCH] q=%s', query)
+
     if not query:
+        logger.info('[UBICACION-SEARCH] Resultados vacíos')
         return JsonResponse({'results': []})
 
     query_normalizado = _normalizar_texto(query)
+    logger.info('[UBICACION-SEARCH] query_normalizado=%s', query_normalizado)
+
     if not query_normalizado:
+        logger.info('[UBICACION-SEARCH] Resultados vacíos')
         return JsonResponse({'results': []})
 
     resultados = []
-    for ubicacion in Ubicacion.objects.order_by('nombre'):
+    ubicaciones_totales = list(Ubicacion.objects.order_by('nombre'))
+    logger.info('[UBICACION-SEARCH] Total ubicaciones consultadas: %s', len(ubicaciones_totales))
+
+    for ubicacion in ubicaciones_totales:
         nombre = ubicacion.nombre or ''
         nombre_normalizado = _normalizar_texto(nombre)
         if query_normalizado in nombre_normalizado:
-            resultados.append({
+            resultado = {
                 'id': ubicacion.id,
                 'nombre': ubicacion.nombre,
                 'codigo': ubicacion.codigo,
-            })
+            }
+            resultados.append(resultado)
+            logger.info('[UBICACION-SEARCH] Match: id=%s nombre=%s', ubicacion.id, ubicacion.nombre)
             if len(resultados) >= 10:
                 break
+
+    logger.info('[UBICACION-SEARCH] Resultados devueltos: %s', len(resultados))
+    if not resultados:
+        logger.info('[UBICACION-SEARCH] Resultados vacíos')
 
     return JsonResponse({'results': resultados})
 
