@@ -1,6 +1,15 @@
 import './csrf.js';
 
-let equiposPorUbicacion = [];
+console.log('[UBICACION-SEARCH-TEST] JS CARGADO');
+
+function normalizeText(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
 
 function clearEquipoSelection({ preserveCodigo = false, preserveUbicacion = true } = {}) {
     $('#nombre_equipo').val('');
@@ -14,10 +23,6 @@ function clearEquipoSelection({ preserveCodigo = false, preserveUbicacion = true
 
     const equipoField = document.getElementById('id_equipo') || document.getElementById('equipo');
     if (equipoField) equipoField.value = '';
-
-    $('#equipo_por_ubicacion').empty().append(new Option('Seleccione un equipo', ''));
-    $('#equipo_por_ubicacion').prop('disabled', true);
-    equiposPorUbicacion = [];
 
     if (!preserveUbicacion) {
         $('#ubicacion_id').val('');
@@ -39,7 +44,22 @@ function applyEquipoSelection({ equipoId, equipoNombre, equipoCodigo, ubicacionN
 }
 
 $(document).ready(function() {
+    console.log('[UBICACION-TEST] solicitudes.js activo');
+    console.log('[UBICACION-SEARCH-TEST] LISTENER REGISTRADO');
     console.log('[UBICACION-SEARCH] Listener registrado');
+
+    $('#nombre_ubicacion')
+        .off('input.ubicacionTest')
+        .on('input.ubicacionTest', function() {
+            const texto = $(this).val() || '';
+            console.log('[UBICACION-TEST] input detectado:', texto);
+
+            if (texto.length >= 1) {
+                $('#ubicacion_test_status').show().text('JS ACTIVO - buscando ubicación...');
+            } else {
+                $('#ubicacion_test_status').hide().text('');
+            }
+        });
 
     $("#codigo").on("change", function() {
         let codigoVal = $(this).val();
@@ -54,8 +74,6 @@ $(document).ready(function() {
                         console.error(response.error);
                         clearEquipoSelection();
                         $("#nombre_ubicacion").val('');
-                        $("#nombre_ubicacion_area").empty();
-                        $("#nombre_ubicacion_area").append(new Option("Seleccione una ubicación", ""));
                         return;
                     }
                     $("#nombre_equipo").val(response.equipo);
@@ -65,11 +83,6 @@ $(document).ready(function() {
                     }
                     $("#nombre_ubicacion").val(response.ubicacion);
                     $('#ubicacion_id').val('');
-                    $("#nombre_ubicacion_area").empty();
-                    $("#nombre_ubicacion_area").append(new Option("Seleccione una ubicación", ""));
-                    response.areas.forEach(function(area) {
-                        $("#nombre_ubicacion_area").append(new Option(area.nombre, area.id));
-                    });
                     $("#centro_costo").val(response.centro_costo);
                     $("#numero_serie").val(response.numero_serie);
                     $("#PDV").val(response.ubicacion);
@@ -79,15 +92,11 @@ $(document).ready(function() {
                     console.error("Error al obtener el equipo por código");
                     clearEquipoSelection();
                     $("#nombre_ubicacion").val('');
-                    $("#nombre_ubicacion_area").empty();
-                    $("#nombre_ubicacion_area").append(new Option("Seleccione una ubicación", ""));
                 }
             });
         } else {
             clearEquipoSelection();
             $("#nombre_ubicacion").val('');
-            $("#nombre_ubicacion_area").empty();
-            $("#nombre_ubicacion_area").append(new Option("Seleccione una ubicación", ""));
         }
     });
 
@@ -148,10 +157,8 @@ $(document).ready(function() {
                         console.log('[UBICACION-SEARCH] Seleccionando ubicación:', ubicacionId, ubicacionNombre);
                         $('#ubicacion_id').val(ubicacionId);
                         $('#nombre_ubicacion').val(ubicacionNombre);
-                        $('#nombre_ubicacion_area').empty().append(new Option('Seleccione una ubicación', ''));
                         clearEquipoSelection({ preserveCodigo: false, preserveUbicacion: true });
-                        $('#equipo_por_ubicacion').empty().append(new Option('Buscando equipos...', ''));
-                        $('#equipo_por_ubicacion').prop('disabled', true);
+                        $('#nombre_equipo').val('').trigger('focus');
                         container.hide().empty();
 
                         $.ajax({
@@ -160,25 +167,9 @@ $(document).ready(function() {
                             data: { ubicacion_id: ubicacionId },
                             success: function(equiposResponse) {
                                 const results = equiposResponse.results || [];
-                                const select = $('#equipo_por_ubicacion');
-                                equiposPorUbicacion = results;
-                                select.empty().append(new Option('Seleccione un equipo', ''));
-
                                 if (!results.length) {
-                                    select.append(new Option('No hay equipos para esta ubicación', ''));
-                                    select.prop('disabled', true);
                                     return;
                                 }
-
-                                results.forEach(function(item) {
-                                    select.append(new Option(`${item.nombre}${item.codigo ? ` (${item.codigo})` : ''}`, item.id));
-                                });
-                                select.prop('disabled', false);
-                            },
-                            error: function() {
-                                equiposPorUbicacion = [];
-                                $('#equipo_por_ubicacion').empty().append(new Option('Error cargando equipos', ''));
-                                $('#equipo_por_ubicacion').prop('disabled', true);
                             }
                         });
                     });
@@ -192,35 +183,79 @@ $(document).ready(function() {
             });
         });
 
-    $('#equipo_por_ubicacion').on('change', function() {
-        const equipoId = $(this).val();
-        const ubicacionId = $('#ubicacion_id').val();
+    $('#nombre_equipo')
+        .off('input.equipoSearch')
+        .on('input.equipoSearch', function() {
+            const ubicacionId = $('#ubicacion_id').val();
+            const searchUrl = $('#nombre_equipo').data('search-url') || '/solicitudes/get-equipos-por-ubicacion/';
+            const query = $(this).val().trim();
+            const container = $('#equipo_busqueda_results');
 
-        if (!equipoId || !ubicacionId) {
-            clearEquipoSelection({ preserveCodigo: false, preserveUbicacion: true });
-            return;
-        }
+            console.log('[EQUIPO-SEARCH] Input detectado:', query);
 
-        const selected = equiposPorUbicacion.find(function(item) {
-            return String(item.id) === String(equipoId);
+            if (!ubicacionId) {
+                console.log('[EQUIPO-SEARCH] No hay ubicación seleccionada');
+                container.hide().empty();
+                return;
+            }
+
+            if (!query) {
+                console.log('[EQUIPO-SEARCH] Input vacío, ocultando contenedor');
+                container.hide().empty();
+                return;
+            }
+
+            if (query.length < 2) {
+                console.log('[EQUIPO-SEARCH] Longitud insuficiente:', query.length);
+                container.html('<div style="padding:10px 12px; color:#6b7280; font-size:14px;">Escriba más letras para buscar equipos.</div>').show();
+                return;
+            }
+
+            console.log('[EQUIPO-SEARCH] Enviando AJAX:', searchUrl, 'ubicacion_id=', ubicacionId, 'q=', query);
+            container.html('<div style="padding:10px 12px; color:#6b7280; font-size:14px;">Buscando equipos...</div>').show();
+
+            $.ajax({
+                url: searchUrl,
+                method: 'GET',
+                data: { ubicacion_id: ubicacionId, q: query },
+                success: function(response) {
+                    const results = Array.isArray(response && response.results) ? response.results : [];
+                    console.log('[EQUIPO-SEARCH] Resultados:', results.length);
+
+                    if (!results.length) {
+                        container.html('<div style="padding:10px 12px; color:#6b7280; font-size:14px;">No se encontraron equipos para esta ubicación.</div>').show();
+                        return;
+                    }
+
+                    const items = results.map(item => `
+                        <div class="equipo-search-item" data-id="${item.id}" data-nombre="${item.nombre || ''}" data-codigo="${item.codigo || ''}" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid #e5e7eb; background:#fff; color:#111827; font-size:14px;">
+                            ${(item.nombre || '')}${item.codigo ? ` (${item.codigo})` : ''}
+                        </div>
+                    `).join('');
+
+                    container.html(items).show();
+                    container.off('click.equipoSearchItem').on('click.equipoSearchItem', '.equipo-search-item', function() {
+                        const equipoId = $(this).data('id');
+                        const equipoNombre = $(this).data('nombre');
+                        const equipoCodigo = $(this).data('codigo');
+
+                        console.log('[EQUIPO-SEARCH] Seleccionando equipo:', equipoId, equipoNombre, equipoCodigo);
+                        const equipoField = document.getElementById('id_equipo') || document.getElementById('equipo');
+                        if (equipoField) equipoField.value = equipoId;
+
+                        $('#nombre_equipo').val(equipoNombre);
+                        $('#codigo').val(equipoCodigo || '');
+                        $('#equipo_busqueda_results').hide().empty();
+                    });
+                },
+                error: function(xhr, status, error) {
+                    console.log('[EQUIPO-SEARCH] ERROR AJAX');
+                    console.error(error);
+                    console.error(xhr && xhr.responseText ? xhr.responseText : '');
+                    container.html('<div style="padding:10px 12px; color:#b91c1c; font-size:14px;">Error al buscar equipos.</div>').show();
+                }
+            });
         });
-
-        if (!selected) {
-            clearEquipoSelection({ preserveCodigo: false, preserveUbicacion: true });
-            return;
-        }
-
-        const ubicacionNombre = $('#nombre_ubicacion').val();
-        applyEquipoSelection({
-            equipoId: selected.id,
-            equipoNombre: selected.nombre,
-            equipoCodigo: selected.codigo,
-            ubicacionNombre: ubicacionNombre,
-            ubicacionId: ubicacionId,
-            centroCosto: $('#centro_costo').val() || '',
-            numeroSerie: $('#numero_serie').val() || ''
-        });
-    });
 
     $('#ubicacion_id').on('change', function() {
         if (!$(this).val()) {
