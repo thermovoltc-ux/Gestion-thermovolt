@@ -176,20 +176,21 @@ def buscar_ubicaciones(request):
         return JsonResponse({'results': []})
 
     query_normalizado = _normalizar_texto(query)
-    ubicaciones = Ubicacion.objects.order_by('nombre')[:200]
-    resultados = []
+    if not query_normalizado:
+        return JsonResponse({'results': []})
 
-    for ubicacion in ubicaciones:
-        nombre_normalizado = _normalizar_texto(ubicacion.nombre)
+    resultados = []
+    for ubicacion in Ubicacion.objects.order_by('nombre'):
+        nombre = ubicacion.nombre or ''
+        nombre_normalizado = _normalizar_texto(nombre)
         if query_normalizado in nombre_normalizado:
             resultados.append({
                 'id': ubicacion.id,
                 'nombre': ubicacion.nombre,
                 'codigo': ubicacion.codigo,
             })
-
-        if len(resultados) >= 10:
-            break
+            if len(resultados) >= 10:
+                break
 
     return JsonResponse({'results': resultados})
 
