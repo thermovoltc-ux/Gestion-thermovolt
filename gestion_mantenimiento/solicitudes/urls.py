@@ -12,7 +12,9 @@ urlpatterns = [
     path('get-ubicacion-por-codigo/', views.get_ubicacion_por_codigo, name='get-ubicacion-por-codigo'),
     path('get-numero-activo/', views.get_numero_activo, name='get_numero_activo'),
     path('get-ubicacion-equipos/', views.get_ubicacion_equipos, name='get_ubicacion_equipos'),
-    path('get-equipo-por-codigo/', views.get_equipo_por_codigo, name='get_equipo_por_codigo'),  # Nueva ruta
+    path('get-equipo-por-codigo/', views.get_equipo_por_codigo, name='get_equipo_por_codigo'),
+    path('buscar-ubicaciones/', views.buscar_ubicaciones, name='buscar_ubicaciones'),
+    path('get-equipos-por-ubicacion/', views.get_equipos_por_ubicacion, name='get_equipos_por_ubicacion'),
 ]
 
 

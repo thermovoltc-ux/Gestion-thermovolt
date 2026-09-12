@@ -37,6 +37,12 @@
         <label for="creado-por">Creado por</label>
     </div>
     <div class="form-group">
+        <input type="text" id="ubicacion_busqueda" name="ubicacion_busqueda" placeholder="" autocomplete="off">
+        <label for="ubicacion_busqueda">Buscar ubicación</label>
+        <div id="ubicacion_busqueda_results" style="display:none; position:absolute; z-index:10; background:#fff; border:1px solid #d0d7de; max-height:180px; overflow:auto; width:100%;"></div>
+        <input type="hidden" id="ubicacion_id" name="ubicacion_id">
+    </div>
+    <div class="form-group">
         <input type="text" id="nombre_ubicacion" name="nombre_ubicacion" placeholder="" readonly>
         <label for="nombre_ubicacion">Nombre de la Ubicación</label>
     </div>
@@ -45,6 +51,12 @@
             <option value="">Seleccione una ubicación</option>
         </select>
         <label for="nombre_ubicacion_area">Ubicación (Opcional)</label>
+    </div>
+    <div class="form-group">
+        <select id="equipo_por_ubicacion" name="equipo_por_ubicacion" disabled>
+            <option value="">Seleccione un equipo</option>
+        </select>
+        <label for="equipo_por_ubicacion">Equipo por ubicación</label>
     </div>
     <div class="form-group">
         <input type="text" id="centro_costo" name="centro_costo" placeholder="" readonly>

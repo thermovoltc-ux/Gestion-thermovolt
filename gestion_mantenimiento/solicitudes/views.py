@@ -33,6 +33,26 @@ def crear_solicitud(request):
         form = SolicitudForm(request.POST)
 
         if form.is_valid():
+            equipo = form.cleaned_data.get('equipo')
+            ubicacion_id = request.POST.get('ubicacion_id')
+
+            if equipo:
+                if ubicacion_id:
+                    ubicacion_seleccionada = Ubicacion.objects.filter(id=ubicacion_id).first()
+                    if not ubicacion_seleccionada:
+                        form.add_error(None, 'La ubicación seleccionada no existe.')
+                        return render(request, 'solicitudes/crear_solicitud.html', {'form': form})
+                    if equipo.ubicacion_id != ubicacion_seleccionada.id:
+                        form.add_error(None, 'La ubicación seleccionada no coincide con el equipo elegido.')
+                        return render(request, 'solicitudes/crear_solicitud.html', {'form': form})
+                else:
+                    ubicacion_seleccionada = equipo.ubicacion
+
+                if ubicacion_seleccionada:
+                    form.instance.ubicacion = ubicacion_seleccionada
+                    form.instance.PDV = ubicacion_seleccionada.nombre
+                    form.instance.co = ubicacion_seleccionada.codigo
+
             nueva_solicitud = form.save(commit=False)
 
             ultimo_consecutivo = Solicitud.objects.aggregate(models.Max('consecutivo'))['consecutivo__max'] or 0
@@ -140,6 +160,46 @@ def get_ubicacion_por_codigo(request):
         return JsonResponse(response_data)
     except Ubicacion.DoesNotExist:
         return JsonResponse({'error': 'Ubicación no encontrada'}, status=404)
+
+@login_required
+def buscar_ubicaciones(request):
+    query = (request.GET.get('q') or '').strip()
+    if not query:
+        return JsonResponse({'results': []})
+
+    ubicaciones = Ubicacion.objects.filter(nombre__icontains=query).order_by('nombre')[:10]
+    return JsonResponse({
+        'results': [
+            {'id': ubicacion.id, 'nombre': ubicacion.nombre, 'codigo': ubicacion.codigo}
+            for ubicacion in ubicaciones
+        ]
+    })
+
+@login_required
+def get_equipos_por_ubicacion(request):
+    ubicacion_id = request.GET.get('ubicacion_id')
+    query = (request.GET.get('q') or '').strip()
+
+    if not ubicacion_id:
+        return JsonResponse({'error': 'ubicacion_id no proporcionado'}, status=400)
+
+    ubicacion = get_object_or_404(Ubicacion, id=ubicacion_id)
+    equipos_qs = Equipo.objects.filter(ubicacion_id=ubicacion.id)
+    if query:
+        equipos_qs = equipos_qs.filter(nombre__icontains=query)
+    equipos_qs = equipos_qs.order_by('nombre')[:20]
+
+    return JsonResponse({
+        'ubicacion': {
+            'id': ubicacion.id,
+            'nombre': ubicacion.nombre,
+            'codigo': ubicacion.codigo,
+        },
+        'results': [
+            {'id': equipo.id, 'nombre': equipo.nombre, 'codigo': equipo.codigo}
+            for equipo in equipos_qs
+        ]
+    })
 
 @login_required
 def get_equipos_por_area(request):
