@@ -76,7 +76,11 @@ fi
 
 echo "✓ STARTUP: dependencias configuradas"
 
-
+echo "STARTUP: building frontend bundle"
+cd gestion_mantenimiento || exit 1
+npm install --no-fund --no-audit || exit 1
+npm run build || exit 1
+cd .. || exit 1
 
 echo "STARTUP: running all migrations"
 python manage.py migrate --noinput
