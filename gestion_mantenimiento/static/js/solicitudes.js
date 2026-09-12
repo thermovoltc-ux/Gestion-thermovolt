@@ -92,6 +92,7 @@ $(document).ready(function() {
     $('#nombre_ubicacion')
         .off('input.ubicacionSearch')
         .on('input.ubicacionSearch', function() {
+            const searchUrl = $('#nombre_ubicacion').data('search-url') || '/solicitudes/buscar-ubicaciones/';
             const query = $(this).val().trim();
             const container = $('#ubicacion_busqueda_results');
 
@@ -100,12 +101,20 @@ $(document).ready(function() {
                 return;
             }
 
+            if (query.length < 2) {
+                container.html('<div style="padding:10px 12px; color:#6b7280; font-size:14px;">Buscando ubicaciones...</div>').show();
+                return;
+            }
+
+            container.html('<div style="padding:10px 12px; color:#6b7280; font-size:14px;">Buscando ubicaciones...</div>').show();
+
             $.ajax({
-                url: '/solicitudes/buscar-ubicaciones/',
+                url: searchUrl,
                 method: 'GET',
                 data: { q: query },
                 success: function(response) {
                     const results = Array.isArray(response && response.results) ? response.results : [];
+
                     if (!results.length) {
                         container.html('<div style="padding:10px 12px; color:#6b7280; font-size:14px;">No se encontraron ubicaciones.</div>').show();
                         return;
@@ -160,8 +169,8 @@ $(document).ready(function() {
                     });
                 },
                 error: function(xhr, status, error) {
-                    console.error('Error buscando ubicaciones:', status, error);
-                    container.html('<div style="padding:10px 12px; color:#b91c1c; font-size:14px;">No se pudo cargar la búsqueda de ubicaciones.</div>').show();
+                    console.error('Error al buscar ubicaciones:', status, error, xhr && xhr.responseText ? xhr.responseText : '');
+                    container.html('<div style="padding:10px 12px; color:#b91c1c; font-size:14px;">Error al buscar ubicaciones.</div>').show();
                 }
             });
         });
