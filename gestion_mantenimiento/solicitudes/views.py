@@ -24,6 +24,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
+from gestion_mantenimiento.users.access import obtener_scope_ubicacion_ids
 
 # Configurar el logger
 logger = logging.getLogger(__name__)
@@ -36,6 +37,22 @@ def crear_solicitud(request):
         if form.is_valid():
             equipo = form.cleaned_data.get('equipo')
             ubicacion_id = request.POST.get('ubicacion_id')
+
+            if request.session.get('tipo_cuenta') == 'administrador':
+                scope_ids = obtener_scope_ubicacion_ids(request)
+                if not scope_ids:
+                    form.add_error(None, 'No tienes acceso a ningún alcance de CO válido.')
+                    return render(request, 'solicitudes/crear_solicitud.html', {'form': form})
+
+                if equipo and equipo.ubicacion_id not in scope_ids:
+                    form.add_error(None, 'El equipo seleccionado no pertenece a tu alcance de CO.')
+                    return render(request, 'solicitudes/crear_solicitud.html', {'form': form})
+
+                if ubicacion_id:
+                    ubicacion_seleccionada = Ubicacion.objects.filter(id=ubicacion_id).first()
+                    if not ubicacion_seleccionada or ubicacion_seleccionada.id not in scope_ids:
+                        form.add_error(None, 'La ubicación seleccionada no pertenece a tu alcance de CO.')
+                        return render(request, 'solicitudes/crear_solicitud.html', {'form': form})
 
             if equipo:
                 if ubicacion_id:
@@ -114,8 +131,14 @@ def lista_solicitudes(request):
 
     if tipo_cuenta == 'tecnico':
         solicitudes = Solicitud.objects.filter(creado_por=request.user.username)
-    elif tipo_cuenta == 'administrador' and co:
-        solicitudes = Solicitud.objects.filter(co=co)
+    elif tipo_cuenta == 'administrador':
+        scope_ids = obtener_scope_ubicacion_ids(request)
+        if not scope_ids:
+            solicitudes = Solicitud.objects.none()
+        else:
+            solicitudes = Solicitud.objects.filter(
+                Q(ubicacion_id__in=scope_ids) | Q(equipo__ubicacion_id__in=scope_ids)
+            )
     else:
         solicitudes = Solicitud.objects.all()
 
@@ -175,6 +198,14 @@ def buscar_ubicaciones(request):
     query = (request.GET.get('q') or '').strip()
     logger.info('[UBICACION-SEARCH] q=%s', query)
 
+    if request.session.get('tipo_cuenta') == 'administrador':
+        scope_ids = obtener_scope_ubicacion_ids(request)
+        if not scope_ids:
+            return JsonResponse({'results': []})
+        ubicaciones_base = Ubicacion.objects.filter(id__in=scope_ids)
+    else:
+        ubicaciones_base = Ubicacion.objects.all()
+
     if not query:
         logger.info('[UBICACION-SEARCH] Resultados vacíos')
         return JsonResponse({'results': []})
@@ -187,7 +218,7 @@ def buscar_ubicaciones(request):
         return JsonResponse({'results': []})
 
     resultados = []
-    ubicaciones_totales = list(Ubicacion.objects.order_by('nombre'))
+    ubicaciones_totales = list(ubicaciones_base.order_by('nombre'))
     logger.info('[UBICACION-SEARCH] Total ubicaciones consultadas: %s', len(ubicaciones_totales))
 
     for ubicacion in ubicaciones_totales:
@@ -217,6 +248,11 @@ def get_equipos_por_ubicacion(request):
 
     if not ubicacion_id:
         return JsonResponse({'error': 'ubicacion_id no proporcionado'}, status=400)
+
+    if request.session.get('tipo_cuenta') == 'administrador':
+        scope_ids = obtener_scope_ubicacion_ids(request)
+        if not scope_ids or int(ubicacion_id) not in scope_ids:
+            return JsonResponse({'results': []})
 
     ubicacion = get_object_or_404(Ubicacion, id=ubicacion_id)
     equipos_qs = Equipo.objects.filter(ubicacion_id=ubicacion.id)

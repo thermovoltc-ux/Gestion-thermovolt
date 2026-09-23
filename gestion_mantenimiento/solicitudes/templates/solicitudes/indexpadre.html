@@ -67,6 +67,26 @@
                                 <span class="title">Lista de Solicitudes</span>
                             </a>
                         </li>
+
+                        <li>
+                            <a href="{% url 'gestion_ot' %}">
+                                <span class="icon">
+                                    <ion-icon name="construct-outline"></ion-icon>
+                                </span>
+                                <span class="title">Gestión de OT</span>
+                            </a>
+                        </li>
+
+                        {% if request.session.co %}
+                            <li>
+                                <a href="{% url 'lista_activos' %}">
+                                    <span class="icon">
+                                        <ion-icon name="layers-outline"></ion-icon>
+                                    </span>
+                                    <span class="title">Gestión de Activos</span>
+                                </a>
+                            </li>
+                        {% endif %}
                     {% elif request.session.tipo_cuenta == 'jefe_de_area' %}
                         <!-- Elementos accesibles solo para jefes de área -->
                         <li>

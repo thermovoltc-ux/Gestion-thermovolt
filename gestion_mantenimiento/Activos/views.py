@@ -18,6 +18,7 @@ from reportlab.lib import colors
 from reportlab.platypus import Image as RLImage
 from PIL import Image as PILImage
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo
+from gestion_mantenimiento.users.access import obtener_scope_ubicacion_ids
 
 def _perfil_usuario_actual(user):
     try:
@@ -145,8 +146,22 @@ def crear_equipo_dinamico(request):
     return redirect('lista_activos')
 
 def lista_activos(request):
-    ubicaciones = Ubicacion.objects.filter(parent__isnull=True)
-    ubicaciones_all = Ubicacion.objects.all()
+    tipo_cuenta = request.session.get('tipo_cuenta')
+    scope_ids = set()
+
+    if tipo_cuenta == 'administrador':
+        scope_ids = obtener_scope_ubicacion_ids(request)
+
+    if tipo_cuenta == 'administrador' and scope_ids:
+        ubicaciones = Ubicacion.objects.filter(id__in=scope_ids, parent__isnull=True).order_by('nombre')
+        ubicaciones_all = Ubicacion.objects.filter(id__in=scope_ids).order_by('nombre')
+    elif tipo_cuenta == 'administrador':
+        ubicaciones = Ubicacion.objects.none()
+        ubicaciones_all = Ubicacion.objects.none()
+    else:
+        ubicaciones = Ubicacion.objects.filter(parent__isnull=True)
+        ubicaciones_all = Ubicacion.objects.all()
+
     context = {
         'ubicaciones': ubicaciones,
         'ubicaciones_all': ubicaciones_all,

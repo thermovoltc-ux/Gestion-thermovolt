@@ -808,7 +808,16 @@ def listar_ot(request):
     equipo_id = request.GET.get('equipo_id')
     ubicacion_id = request.GET.get('ubicacion_id')
 
-    if request.user.groups.filter(name='Admin').exists():
+    tipo_cuenta = request.session.get('tipo_cuenta')
+    if tipo_cuenta == 'administrador':
+        scope_ids = obtener_scope_ubicacion_ids(request)
+        if not scope_ids:
+            ots = OrdenTrabajo.objects.none()
+        else:
+            ots = OrdenTrabajo.objects.filter(
+                Q(solicitud__ubicacion_id__in=scope_ids) | Q(solicitud__equipo__ubicacion_id__in=scope_ids)
+            )
+    elif request.user.groups.filter(name='Admin').exists():
         ots = OrdenTrabajo.objects.all()
     else:
         ots = OrdenTrabajo.objects.filter(tecnico_asignado=request.user.username)

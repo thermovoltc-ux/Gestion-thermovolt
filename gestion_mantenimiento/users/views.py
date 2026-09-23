@@ -11,6 +11,7 @@ from allauth.socialaccount.models import SocialApp
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo, TareaMantenimiento
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
+from gestion_mantenimiento.users.access import obtener_cliente_actual, obtener_scope_ubicacion_ids
 
 def register(request):
     if request.method == 'POST':
@@ -77,14 +78,33 @@ def dashboard(request):
     equipo_id = request.GET.get('equipo_id')
     ubicacion_id = request.GET.get('ubicacion_id')
 
-    equipos = Equipo.objects.all().order_by('nombre')
-    ubicaciones = Ubicacion.objects.all().order_by('nombre')
-
     tipo_cuenta = request.session.get('tipo_cuenta', 'tecnico')
+    scope_ids = set()
+    cliente = obtener_cliente_actual(request.user)
+    if tipo_cuenta == 'administrador':
+        scope_ids = obtener_scope_ubicacion_ids(request)
+        cliente = obtener_cliente_actual(request.user)
+        if cliente is None or not scope_ids:
+            scope_ids = set()
+
+    equipos = Equipo.objects.none()
+    ubicaciones = Ubicacion.objects.none()
+    if tipo_cuenta == 'administrador' and scope_ids:
+        equipos = Equipo.objects.filter(ubicacion_id__in=scope_ids).order_by('nombre')
+        ubicaciones = Ubicacion.objects.filter(id__in=scope_ids).order_by('nombre')
+    elif tipo_cuenta != 'administrador':
+        equipos = Equipo.objects.all().order_by('nombre')
+        ubicaciones = Ubicacion.objects.all().order_by('nombre')
 
     ots_base = OrdenTrabajo.objects.all()
     if tipo_cuenta == 'tecnico':
         ots_base = ots_base.filter(tecnico_asignado=request.user.username)
+    elif tipo_cuenta == 'administrador' and scope_ids:
+        ots_base = ots_base.filter(
+            Q(solicitud__ubicacion_id__in=scope_ids) | Q(solicitud__equipo__ubicacion_id__in=scope_ids)
+        )
+    elif tipo_cuenta == 'administrador':
+        ots_base = OrdenTrabajo.objects.none()
 
     ot_en_proceso = ots_base.filter(estado__nombre='en proceso').count()
     ot_en_revision = ots_base.filter(estado__nombre='en revision').count()
@@ -94,12 +114,27 @@ def dashboard(request):
     solicitudes_qs = Solicitud.objects.all()
     if tipo_cuenta == 'tecnico':
         solicitudes_qs = solicitudes_qs.filter(creado_por=request.user.username)
+    elif tipo_cuenta == 'administrador' and scope_ids:
+        solicitudes_qs = solicitudes_qs.filter(
+            Q(ubicacion_id__in=scope_ids) | Q(equipo__ubicacion_id__in=scope_ids)
+        )
+    elif tipo_cuenta == 'administrador':
+        solicitudes_qs = Solicitud.objects.none()
 
     solicitudes_totales = solicitudes_qs.count()
     solicitudes_solicitadas = solicitudes_qs.filter(estado__nombre='solicitado').count()
 
     tareas_planificadas_qs = TareaMantenimiento.objects.select_related('plan__equipo__ubicacion')
     tareas_no_planificadas_qs = Solicitud.objects.select_related('equipo__ubicacion', 'ubicacion')
+
+    if tipo_cuenta == 'administrador' and scope_ids:
+        tareas_planificadas_qs = tareas_planificadas_qs.filter(plan__equipo__ubicacion_id__in=scope_ids)
+        tareas_no_planificadas_qs = tareas_no_planificadas_qs.filter(
+            Q(ubicacion_id__in=scope_ids) | Q(equipo__ubicacion_id__in=scope_ids)
+        )
+    elif tipo_cuenta == 'administrador':
+        tareas_planificadas_qs = TareaMantenimiento.objects.none()
+        tareas_no_planificadas_qs = Solicitud.objects.none()
 
     if equipo_id:
         tareas_planificadas_qs = tareas_planificadas_qs.filter(plan__equipo_id=equipo_id)
@@ -123,6 +158,14 @@ def dashboard(request):
     tareas_planificadas = tareas_planificadas_qs.count()
     tareas_no_planificadas = tareas_no_planificadas_qs.count()
     tareas_atrasadas = TareaMantenimiento.objects.filter(estado='pendiente', fecha_programada__lt=today).count()
+    if tipo_cuenta == 'administrador' and scope_ids:
+        tareas_atrasadas = TareaMantenimiento.objects.filter(
+            estado='pendiente',
+            fecha_programada__lt=today,
+            plan__equipo__ubicacion_id__in=scope_ids,
+        ).count()
+    elif tipo_cuenta == 'administrador':
+        tareas_atrasadas = 0
     activos_detenidos = ots_base.filter(estado__nombre__in=['en proceso', 'en revision']).count()
     porcentaje_cumplimiento = 0
     total_ots = ot_en_proceso + ot_en_revision + ot_finalizada
