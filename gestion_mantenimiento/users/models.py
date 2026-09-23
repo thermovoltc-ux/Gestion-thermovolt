@@ -1,3 +1,39 @@
+from django.contrib.auth.models import User
 from django.db import models
 
-# Create your models here.
+
+class Cliente(models.Model):
+    nombre = models.CharField(max_length=200)
+    codigo = models.CharField(max_length=50, unique=True)
+    activo = models.BooleanField(default=True)
+    descripcion = models.TextField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = 'Cliente'
+        verbose_name_plural = 'Clientes'
+
+    def __str__(self):
+        return self.nombre
+
+
+class PerfilUsuario(models.Model):
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='perfil_usuario',
+    )
+    cliente = models.ForeignKey(
+        Cliente,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='perfiles_usuario',
+    )
+    is_administrador_cliente = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = 'Perfil de usuario'
+        verbose_name_plural = 'Perfiles de usuario'
+
+    def __str__(self):
+        return f'{self.user.username} -> {self.cliente.nombre if self.cliente else "Sin cliente"}'
