@@ -5,8 +5,6 @@ from mptt.models import MPTTModel, TreeForeignKey
 
 from django.db import models
 
-from gestion_mantenimiento.users.models import Cliente
-
 
 # Modelo Regional
 class Regional(models.Model):
@@ -25,46 +23,19 @@ class UnidadNegocio(models.Model):
     def __str__(self):
         return self.nombre
 
-class CentroOperaciones(models.Model):
-    cliente = models.ForeignKey(
-        Cliente,
-        on_delete=models.PROTECT,
-        related_name='centros_operaciones',
-    )
-    nombre = models.CharField(max_length=200)
-    codigo = models.CharField(max_length=50)
-    descripcion = models.TextField(blank=True, null=True)
-    activo = models.BooleanField(default=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=['cliente', 'codigo'], name='uniq_codigo_por_cliente')
-        ]
-        verbose_name = 'Centro de Operaciones'
-        verbose_name_plural = 'Centros de Operaciones'
-
-    def __str__(self):
-        return f'{self.nombre} ({self.cliente.nombre})'
-
 
 # Modelo Ubicacion
 class Ubicacion(models.Model):
     id = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=100, null=False, blank=False)
     codigo = models.CharField(max_length=20, null=False, blank=False)
+    co = models.CharField(max_length=100, null=True, blank=True)
     descripcion = models.TextField(null=True, blank=True)
     direccion = models.CharField(max_length=255, null=True, blank=True)
     pais = models.CharField(max_length=100, null=True, blank=True)
     ciudad = models.CharField(max_length=100, null=True, blank=True)
     imagen = models.ImageField(upload_to='ubicaciones/', null=True, blank=True)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
-    centro_operaciones = models.ForeignKey(
-        CentroOperaciones,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='ubicaciones',
-    )
 
     def __str__(self):
         return self.nombre

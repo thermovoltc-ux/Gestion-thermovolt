@@ -39,11 +39,7 @@ def custom_login(request):
         if form.is_valid():
             user = form.get_user()
             tipo_cuenta = form.cleaned_data.get('tipo_cuenta')
-            perfil = getattr(user, 'perfil_usuario', None)
-            if perfil and perfil.centro_operaciones:
-                co = perfil.centro_operaciones.codigo
-            else:
-                co = form.cleaned_data.get('co')
+            co = form.cleaned_data.get('co')
 
             # Permitir a superusuarios / staff iniciar sesión sin validar grupos
             if user.is_superuser or user.is_staff:

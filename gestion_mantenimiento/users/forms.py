@@ -43,15 +43,6 @@ class CustomAuthenticationForm(AuthenticationForm):
         tipo_cuenta = cleaned_data.get('tipo_cuenta')
         co = cleaned_data.get('co')
 
-        perfil = getattr(self.user_cache, 'perfil_usuario', None) if getattr(self, 'user_cache', None) else None
-        perfil_co = None
-        if perfil is not None and getattr(perfil, 'centro_operaciones', None) is not None:
-            perfil_co = perfil.centro_operaciones.codigo
-
-        if not co and perfil_co:
-            cleaned_data['co'] = perfil_co
-            co = perfil_co
-
         if tipo_cuenta == 'administrador' and not co:
             self.add_error('co', 'El CO del PDV es requerido para administradores.')
 
