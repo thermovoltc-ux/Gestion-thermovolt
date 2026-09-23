@@ -16,14 +16,18 @@ class UbicacionForm(forms.ModelForm):
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         cliente = None
+        centro = None
         if user is not None:
             perfil = getattr(user, 'perfil_usuario', None)
             if perfil is not None:
                 cliente = perfil.cliente
+                centro = perfil.centro_operaciones
 
         if cliente is not None:
             self.fields['parent'].queryset = Ubicacion.objects.filter(centro_operaciones__cliente=cliente)
             self.fields['centro_operaciones'].queryset = CentroOperaciones.objects.filter(cliente=cliente).order_by('nombre')
+            if centro is not None:
+                self.fields['centro_operaciones'].queryset = self.fields['centro_operaciones'].queryset.filter(id=centro.id)
         else:
             self.fields['parent'].queryset = Ubicacion.objects.all()
             self.fields['centro_operaciones'].queryset = CentroOperaciones.objects.all().order_by('cliente__nombre', 'nombre')
@@ -43,14 +47,21 @@ class EquipoForm(forms.ModelForm):
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         cliente = None
+        centro = None
         if user is not None:
             perfil = getattr(user, 'perfil_usuario', None)
             if perfil is not None:
                 cliente = perfil.cliente
+                centro = perfil.centro_operaciones
 
         if cliente is not None:
-            self.fields['ubicacion'].queryset = Ubicacion.objects.filter(centro_operaciones__cliente=cliente).order_by('centro_operaciones__nombre', 'nombre')
+            ubicaciones = Ubicacion.objects.filter(centro_operaciones__cliente=cliente)
+            if centro is not None:
+                ubicaciones = ubicaciones.filter(centro_operaciones=centro)
+            self.fields['ubicacion'].queryset = ubicaciones.order_by('centro_operaciones__nombre', 'nombre')
             self.fields['parent'].queryset = Equipo.objects.filter(ubicacion__centro_operaciones__cliente=cliente)
+            if centro is not None:
+                self.fields['parent'].queryset = self.fields['parent'].queryset.filter(ubicacion__centro_operaciones=centro)
         else:
             self.fields['ubicacion'].queryset = Ubicacion.objects.all()
             self.fields['parent'].queryset = Equipo.objects.all()

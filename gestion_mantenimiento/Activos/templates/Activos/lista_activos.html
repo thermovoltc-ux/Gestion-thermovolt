@@ -8,43 +8,6 @@ Lista de Activos - Gestión de Activos y Equipos
 <div class="container-arbol-mejorado">
     <h1>Árbol de Activos y Equipos</h1>
 
-    <form method="get" class="filtros-activos" id="filtros-activos">
-        <div class="filtro-grupo">
-            <label for="cliente-filter">Cliente</label>
-            <select id="cliente-filter" name="cliente" onchange="onClienteChange()">
-                <option value="">Todos</option>
-                {% for cliente in clientes %}
-                    <option value="{{ cliente.id }}" {% if selected_cliente == cliente.id|stringformat:'s' %}selected{% endif %}>{{ cliente.nombre }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="filtro-grupo">
-            <label for="co-filter">Centro de Operaciones</label>
-            <select id="co-filter" name="centro_operaciones" onchange="onCoChange()">
-                <option value="">Todos</option>
-                {% for co in centros_operaciones %}
-                    <option value="{{ co.id }}" {% if selected_co == co.id|stringformat:'s' %}selected{% endif %}>{{ co.nombre }} ({{ co.cliente.nombre }})</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="filtro-grupo">
-            <label for="ubicacion-filter">Ubicación</label>
-            <select id="ubicacion-filter" name="ubicacion" onchange="onUbicacionChange()">
-                <option value="">Todas</option>
-                {% for ubicacion in ubicaciones_all %}
-                    <option value="{{ ubicacion.id }}" {% if selected_ubicacion == ubicacion.id|stringformat:'s' %}selected{% endif %}>{{ ubicacion.nombre }}{% if ubicacion.codigo %} ({{ ubicacion.codigo }}){% endif %}{% if ubicacion.centro_operaciones %} - {{ ubicacion.centro_operaciones.nombre }}{% endif %}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="filtro-acciones">
-            <button type="submit" class="btn-crear-raiz">Filtrar</button>
-            <a href="{% url 'lista_activos' %}" class="btn-accion-filtro">Limpiar</a>
-        </div>
-    </form>
-    
     <div class="arbol-layout">
         <!-- Panel izquierdo: árbol -->
         <div class="arbol-panel-izquierdo">
@@ -1081,87 +1044,8 @@ Lista de Activos - Gestión de Activos y Equipos
         {% endfor %}
     ];
 
-    const clientesData = {
-        {% for cliente in clientes %}
-            '{{ cliente.id }}': {{ cliente.id }},
-        {% endfor %}
-    };
-
-    const centrosData = {
-        {% for centro in centros_operaciones %}
-            '{{ centro.id }}': {{ centro.id }},
-        {% endfor %}
-    };
-
     function matchUbicacionLabel(label) {
         return ubicacionesData.find(item => item.label === label);
-    }
-
-    function onClienteChange() {
-        const clienteSelect = document.getElementById('cliente-filter');
-        const coSelect = document.getElementById('co-filter');
-        const ubicacionSelect = document.getElementById('ubicacion-filter');
-        const clienteId = clienteSelect.value;
-
-        coSelect.value = '';
-        ubicacionSelect.value = '';
-
-        if (!clienteId) {
-            coSelect.innerHTML = '<option value="">Todos</option>';
-            ubicacionSelect.innerHTML = '<option value="">Todas</option>';
-            return;
-        }
-
-        const coOptions = [{id: '', label: 'Todos'}];
-        {% for co in centros_operaciones %}
-            if ('{{ co.cliente.id }}' === clienteId) {
-                coOptions.push({ id: '{{ co.id }}', label: '{{ co.nombre|escapejs }} ({{ co.cliente.nombre|escapejs }})' });
-            }
-        {% endfor %}
-        coSelect.innerHTML = coOptions.map(option => `<option value="${option.id}">${option.label}</option>`).join('');
-
-        const ubicacionOptions = [{id: '', label: 'Todas'}];
-        {% for ubicacion in ubicaciones_all %}
-            if ('{{ ubicacion.centro_operaciones.cliente.id }}' === clienteId) {
-                ubicacionOptions.push({ id: '{{ ubicacion.id }}', label: '{{ ubicacion.nombre|escapejs }}{% if ubicacion.codigo %} ({{ ubicacion.codigo|escapejs }}){% endif %}{% if ubicacion.centro_operaciones %} - {{ ubicacion.centro_operaciones.nombre|escapejs }}{% endif %}' });
-            }
-        {% endfor %}
-        ubicacionSelect.innerHTML = ubicacionOptions.map(option => `<option value="${option.id}">${option.label}</option>`).join('');
-    }
-
-    function onCoChange() {
-        const coSelect = document.getElementById('co-filter');
-        const ubicacionSelect = document.getElementById('ubicacion-filter');
-        const coId = coSelect.value;
-        ubicacionSelect.value = '';
-
-        if (!coId) {
-            const clienteId = document.getElementById('cliente-filter').value;
-            if (!clienteId) {
-                ubicacionSelect.innerHTML = '<option value="">Todas</option>';
-                return;
-            }
-            const ubicacionOptions = [{id: '', label: 'Todas'}];
-            {% for ubicacion in ubicaciones_all %}
-                if ('{{ ubicacion.centro_operaciones.cliente.id }}' === clienteId) {
-                    ubicacionOptions.push({ id: '{{ ubicacion.id }}', label: '{{ ubicacion.nombre|escapejs }}{% if ubicacion.codigo %} ({{ ubicacion.codigo|escapejs }}){% endif %}{% if ubicacion.centro_operaciones %} - {{ ubicacion.centro_operaciones.nombre|escapejs }}{% endif %}' });
-                }
-            {% endfor %}
-            ubicacionSelect.innerHTML = ubicacionOptions.map(option => `<option value="${option.id}">${option.label}</option>`).join('');
-            return;
-        }
-
-        const ubicacionOptions = [{id: '', label: 'Todas'}];
-        {% for ubicacion in ubicaciones_all %}
-            if ('{{ ubicacion.centro_operaciones_id }}' === coId) {
-                ubicacionOptions.push({ id: '{{ ubicacion.id }}', label: '{{ ubicacion.nombre|escapejs }}{% if ubicacion.codigo %} ({{ ubicacion.codigo|escapejs }}){% endif %}{% if ubicacion.centro_operaciones %} - {{ ubicacion.centro_operaciones.nombre|escapejs }}{% endif %}' });
-            }
-        {% endfor %}
-        ubicacionSelect.innerHTML = ubicacionOptions.map(option => `<option value="${option.id}">${option.label}</option>`).join('');
-    }
-
-    function onUbicacionChange() {
-        return;
     }
 
     function actualizarUbicacionSeleccionada() {

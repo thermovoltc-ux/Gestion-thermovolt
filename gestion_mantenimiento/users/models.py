@@ -29,11 +29,29 @@ class PerfilUsuario(models.Model):
         blank=True,
         related_name='perfiles_usuario',
     )
+    centro_operaciones = models.ForeignKey(
+        'Activos.CentroOperaciones',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='perfiles_usuario',
+    )
     is_administrador_cliente = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Perfil de usuario'
         verbose_name_plural = 'Perfiles de usuario'
 
+    def clean(self):
+        super().clean()
+        if self.cliente_id and self.centro_operaciones_id and self.centro_operaciones.cliente_id != self.cliente_id:
+            raise models.ValidationError('El centro de operaciones debe pertenecer al mismo cliente del perfil.')
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
     def __str__(self):
-        return f'{self.user.username} -> {self.cliente.nombre if self.cliente else "Sin cliente"}'
+        cliente_nombre = self.cliente.nombre if self.cliente else 'Sin cliente'
+        co_nombre = self.centro_operaciones.nombre if self.centro_operaciones else 'Sin CO'
+        return f'{self.user.username} -> {cliente_nombre} / {co_nombre}'
