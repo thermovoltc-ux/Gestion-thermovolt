@@ -83,7 +83,31 @@ def crear_ubicacion(request):
     if request.method == 'POST':
         form = UbicacionForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
+            codigo_co = (request.POST.get('centro_operaciones_codigo') or '').strip()
             ubicacion = form.save(commit=False)
+
+            if codigo_co:
+                centro_co = CentroOperaciones.objects.filter(codigo=codigo_co).first()
+                if centro_co is None:
+                    form.add_error('centro_operaciones_codigo', 'El código de Centro de Operaciones no existe.')
+                    return render(request, 'Activos/crear_ubicacion.html', {
+                        'form': form,
+                        'page_title': 'Crear Ubicación',
+                        'submit_text': 'Crear Ubicación',
+                        'action_url': reverse('crear_ubicacion'),
+                    })
+                if cliente is not None and centro_co.cliente_id != cliente.id:
+                    form.add_error('centro_operaciones_codigo', 'El Centro de Operaciones no corresponde al cliente permitido para este usuario.')
+                    return render(request, 'Activos/crear_ubicacion.html', {
+                        'form': form,
+                        'page_title': 'Crear Ubicación',
+                        'submit_text': 'Crear Ubicación',
+                        'action_url': reverse('crear_ubicacion'),
+                    })
+                ubicacion.centro_operaciones = centro_co
+            else:
+                ubicacion.centro_operaciones = None
+
             if cliente is not None and not _cliente_tiene_acceso_a_ubicacion(cliente, ubicacion, centro=centro):
                 return HttpResponseForbidden('No tienes permiso para usar ese centro de operaciones.')
             ubicacion.save()
@@ -110,7 +134,31 @@ def editar_ubicacion(request, ubicacion_id):
     if request.method == 'POST':
         form = UbicacionForm(request.POST, request.FILES, instance=ubicacion, user=request.user)
         if form.is_valid():
+            codigo_co = (request.POST.get('centro_operaciones_codigo') or '').strip()
             ubicacion_guardada = form.save(commit=False)
+
+            if codigo_co:
+                centro_co = CentroOperaciones.objects.filter(codigo=codigo_co).first()
+                if centro_co is None:
+                    form.add_error('centro_operaciones_codigo', 'El código de Centro de Operaciones no existe.')
+                    return render(request, 'Activos/crear_ubicacion.html', {
+                        'form': form,
+                        'page_title': 'Editar Ubicación',
+                        'submit_text': 'Actualizar Ubicación',
+                        'action_url': reverse('editar_ubicacion', args=[ubicacion.id]),
+                    })
+                if cliente is not None and centro_co.cliente_id != cliente.id:
+                    form.add_error('centro_operaciones_codigo', 'El Centro de Operaciones no corresponde al cliente permitido para este usuario.')
+                    return render(request, 'Activos/crear_ubicacion.html', {
+                        'form': form,
+                        'page_title': 'Editar Ubicación',
+                        'submit_text': 'Actualizar Ubicación',
+                        'action_url': reverse('editar_ubicacion', args=[ubicacion.id]),
+                    })
+                ubicacion_guardada.centro_operaciones = centro_co
+            else:
+                ubicacion_guardada.centro_operaciones = None
+
             if cliente is not None and not _cliente_tiene_acceso_a_ubicacion(cliente, ubicacion_guardada, centro=centro):
                 return HttpResponseForbidden('No tienes permiso para usar ese centro de operaciones.')
             ubicacion_guardada.save()
