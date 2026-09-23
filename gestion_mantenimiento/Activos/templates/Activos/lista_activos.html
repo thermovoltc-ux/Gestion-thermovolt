@@ -177,6 +177,15 @@ Lista de Activos - Gestión de Activos y Equipos
                         <input type="text" name="codigo" required placeholder="Ej: BOT-001">
                     </div>
                     <div class="form-group-modal">
+                        <label>Centro de Operaciones</label>
+                        <select name="centro_operaciones" id="centro-operaciones-ubicacion">
+                            <option value="">Seleccione un centro de operaciones</option>
+                            {% for centro in centros_operaciones %}
+                                <option value="{{ centro.id }}" {% if selected_co and centro.id|stringformat:'s' == selected_co %}selected{% endif %}>{{ centro.nombre }}{% if centro.codigo %} ({{ centro.codigo }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group-modal">
                         <label>Descripción</label>
                         <textarea name="descripcion" placeholder="Descripción de la ubicación"></textarea>
                     </div>
@@ -1238,6 +1247,8 @@ Lista de Activos - Gestión de Activos y Equipos
         const advancedSection = modal.querySelector('details.modal-advanced-section');
         const form = modal.querySelector('form');
         const submitButton = form.querySelector('button[type="submit"]');
+        const centroSelect = document.getElementById('centro-operaciones-ubicacion');
+        const selectedCo = '{{ selected_co|default:"" }}';
 
         parentInput.value = '';
         parentDisplay.style.display = 'none';
@@ -1245,6 +1256,10 @@ Lista de Activos - Gestión de Activos y Equipos
         title.textContent = 'Crear Nueva Ubicación';
         if (form) {
             form.action = '{% url "crear_ubicacion" %}';
+            form.reset();
+        }
+        if (centroSelect && selectedCo) {
+            centroSelect.value = selectedCo;
         }
         if (submitButton) submitButton.textContent = 'Crear Ubicación';
         if (advancedSection) {
@@ -1262,6 +1277,8 @@ Lista de Activos - Gestión de Activos y Equipos
         const advancedSection = modal.querySelector('details.modal-advanced-section');
         const form = modal.querySelector('form');
         const submitButton = form.querySelector('button[type="submit"]');
+        const centroSelect = document.getElementById('centro-operaciones-ubicacion');
+        const selectedCo = '{{ selected_co|default:"" }}';
 
         parentInput.value = parentId;
         parentDisplay.style.display = 'block';
@@ -1269,6 +1286,10 @@ Lista de Activos - Gestión de Activos y Equipos
         title.textContent = `Crear Sub-Ubicación dentro de ${parentName}`;
         if (form) {
             form.action = '{% url "crear_ubicacion" %}';
+            form.reset();
+        }
+        if (centroSelect && selectedCo) {
+            centroSelect.value = selectedCo;
         }
         if (submitButton) submitButton.textContent = 'Crear Ubicación';
         if (advancedSection) {
@@ -1419,6 +1440,7 @@ Lista de Activos - Gestión de Activos y Equipos
         const parentNameInput = document.getElementById('parent-ubicacion-nombre');
         const advancedSection = modal.querySelector('details.modal-advanced-section');
         const submitButton = form.querySelector('button[type="submit"]');
+        const centroSelect = document.getElementById('centro-operaciones-ubicacion');
 
         form.action = `/Activos/editar_ubicacion/${id}/`;
         if (submitButton) submitButton.textContent = 'Actualizar Ubicación';
@@ -1433,6 +1455,12 @@ Lista de Activos - Gestión de Activos y Equipos
         form.querySelector('input[name="direccion"]').value = nodoSeleccionado.direccion || '';
         form.querySelector('input[name="pais"]').value = nodoSeleccionado.pais || '';
         form.querySelector('input[name="ciudad"]').value = nodoSeleccionado.ciudad || '';
+        if (centroSelect) {
+            const selectedCo = '{{ selected_co|default:"" }}';
+            if (selectedCo) {
+                centroSelect.value = selectedCo;
+            }
+        }
 
         if (advancedSection) {
             advancedSection.setAttribute('open', '');
