@@ -547,11 +547,34 @@ logger = logging.getLogger(__name__)
 @login_required
 # Vista para gestionar órdenes de trabajo
 def gestion_ot(request):
-    ordenes_trabajo = OrdenTrabajo.objects.all()
-    solicitudes_pendientes = Solicitud.objects.filter(gestionot__isnull=True)
-    tareas_mantenimiento = TareaMantenimiento.objects.filter(
-        estado__in=['pendiente', 'en_progreso']
-    ).select_related('plan', 'actividad', 'tecnico').order_by('fecha_programada')
+    tipo_cuenta = request.session.get('tipo_cuenta')
+    scope_ids = set()
+    if tipo_cuenta == 'administrador':
+        scope_ids = obtener_scope_ubicacion_ids(request)
+
+    if tipo_cuenta == 'administrador':
+        if not scope_ids:
+            ordenes_trabajo = OrdenTrabajo.objects.none()
+            solicitudes_pendientes = Solicitud.objects.none()
+            tareas_mantenimiento = TareaMantenimiento.objects.none()
+        else:
+            ordenes_trabajo = OrdenTrabajo.objects.filter(
+                Q(solicitud__ubicacion_id__in=scope_ids) | Q(solicitud__equipo__ubicacion_id__in=scope_ids)
+            )
+            solicitudes_pendientes = Solicitud.objects.filter(
+                Q(ubicacion_id__in=scope_ids) | Q(equipo__ubicacion_id__in=scope_ids),
+                gestionot__isnull=True,
+            )
+            tareas_mantenimiento = TareaMantenimiento.objects.filter(
+                plan__equipo__ubicacion_id__in=scope_ids,
+                estado__in=['pendiente', 'en_progreso'],
+            ).select_related('plan', 'actividad', 'tecnico').order_by('fecha_programada')
+    else:
+        ordenes_trabajo = OrdenTrabajo.objects.all()
+        solicitudes_pendientes = Solicitud.objects.filter(gestionot__isnull=True)
+        tareas_mantenimiento = TareaMantenimiento.objects.filter(
+            estado__in=['pendiente', 'en_progreso']
+        ).select_related('plan', 'actividad', 'tecnico').order_by('fecha_programada')
     tecnicos = User.objects.filter(groups__name='Tecnico')
 
     # Filtros

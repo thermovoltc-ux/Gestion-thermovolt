@@ -31,15 +31,8 @@ def obtener_scope_ubicacion_ids(request):
     if tipo_cuenta != 'administrador':
         return set()
 
-    cliente = obtener_cliente_actual(user)
-    if cliente is None:
-        return set()
-
     co = request.session.get('co')
-    if co in (None, ''):
-        return set()
-
-    co_value = str(co).strip()
+    co_value = (co or '').strip()
     if not co_value:
         return set()
 
