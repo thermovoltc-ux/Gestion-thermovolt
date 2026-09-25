@@ -177,16 +177,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 return response.json();
             })
             .then(data => {
+                console.log('[DEBUG] Respuesta del servidor:', data);
                 const actualizarElemento = (id, valor) => {
                     const elemento = document.getElementById(id);
+                    console.log(`[DEBUG] Intentando actualizar ${id}, elemento existe: ${!!elemento}, valor: "${valor}"`);
                     if (elemento) {
-                        if (valor) {
-                            elemento.textContent = valor;
-                            elemento.parentElement.style.display = 'block';
-                        } else {
-                            elemento.textContent = '';
-                            elemento.parentElement.style.display = 'none';
-                        }
+                        const text = (valor !== undefined && valor !== null && String(valor).trim() !== '') ? valor : 'N/A';
+                        elemento.textContent = text;
+                        elemento.parentElement.style.display = 'block';
                     } else {
                         console.warn(`El elemento con id "${id}" no existe.`);
                     }
@@ -194,6 +192,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 actualizarElemento('modalNumeroActivo', data.consecutivo);
                 actualizarElemento('modalPDV', data.pdv);
+                actualizarElemento('modalEquipo', data.equipo);
+                console.log('[DEBUG] Equipo recibido en JS:', data.equipo);
                 actualizarElemento('modalDescripcion', data.descripcion);
                 actualizarElemento('modalFechaCreacion', data.fecha_creacion);
                 actualizarElemento('modalEstado', data.estado);

@@ -1622,21 +1622,27 @@ tr:hover {
   .list-container td:nth-child(4):before { content: "Descripción"; }
   .list-container td:nth-child(5):before { content: "Fecha de Creación"; }
   .list-container td:nth-child(6):before { content: "Estado"; }
+
+  .assigned-ot-table td:nth-child(1):before { content: "Número de OT"; }
+  .assigned-ot-table td:nth-child(2):before { content: "Técnico"; }
+  .assigned-ot-table td:nth-child(3):before { content: "Fecha de actividad"; }
+  .assigned-ot-table td:nth-child(4):before { content: "Estado"; }
+  .assigned-ot-table td:nth-child(5):before { content: "Acciones"; }
 }
 
 @media (max-width: 480px) {
-  td {
+  .list-container td {
     font-size: 0.8rem;
     padding-left: 45%;
   }
 
-  td:before {
+  .list-container td:before {
     font-size: 0.78rem;
   }
 
-  /* Ocultar campos menos críticos para tablas largas, pero mantener el botón de acción en tablas de OT con 5 columnas */
-  .list-container td:nth-child(4),
-  .list-container td:nth-child(5):not(:last-child) {
+  /* Ocultar campos menos críticos sólo en tablas largas distintas a la lista de OT asignadas */
+  .list-container table:not(.assigned-ot-table) td:nth-child(4),
+  .list-container table:not(.assigned-ot-table) td:nth-child(5):not(:last-child) {
     display: none;
   }
 }
@@ -1999,6 +2005,40 @@ tr:hover {
 
 .fc-event {
   cursor: pointer;
+}
+
+/* Mejorar legibilidad de eventos en FullCalendar en móviles */
+.fc-event .fc-event-main {
+  white-space: normal !important;
+}
+
+.fc-event-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  word-break: break-word;
+}
+
+.fc-event-custom-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.fc-event-custom-status {
+  font-size: 0.75rem;
+  opacity: 0.92;
+  text-transform: capitalize;
+}
+
+@media (max-width: 770px) {
+  .fc-event-custom-title {
+    font-size: 0.84rem;
+  }
+
+  .fc-event-custom-status {
+    font-size: 0.72rem;
+  }
 }
 
 /* Ajustes de calendario para anchos pequeños */

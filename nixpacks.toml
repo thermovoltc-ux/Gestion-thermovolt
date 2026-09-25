@@ -1,0 +1,19 @@
+providers = ["python", "node"]
+
+[phases.setup]
+nixPkgs = ["python311", "nodejs", "npm"]
+
+[phases.install]
+cmds = [
+  "python -m pip install --upgrade pip",
+  "pip install -r requirements.txt",
+  "cd gestion_mantenimiento && npm ci"
+]
+
+[phases.build]
+cmds = [
+  "cd gestion_mantenimiento && npm run build"
+]
+
+[start]
+cmd = "bash start.sh"
