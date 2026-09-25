@@ -6,7 +6,6 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -32,3 +31,7 @@ db.sqlite3
 staticfiles/
 *.log
 .DS_Store
+# Permitir solo el bundle compilado que queremos versionar
+!static/dist/main.bundle.js
+# Mantener el resto de dist ignorado
+/dist/
