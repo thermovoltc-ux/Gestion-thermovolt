@@ -346,9 +346,9 @@ body {
   height: 60px;
   line-height: 60px;
   text-align: start;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   flex: 1;
   opacity: 0;
   visibility: hidden;
@@ -373,7 +373,12 @@ body {
   transform: rotate(180deg);
 }
 
+.navigation ul li.has-submenu {
+  position: relative;
+}
+
 .navigation ul li .submenu {
+  position: relative;
   display: block;
   width: 100%;
   margin: 0;
@@ -386,7 +391,8 @@ body {
 }
 
 .navigation ul li.has-submenu.active .submenu {
-  max-height: 999px;
+  max-height: 500px;
+  overflow: visible;
   pointer-events: auto;
 }
 
