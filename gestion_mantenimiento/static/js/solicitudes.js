@@ -1,7 +1,18 @@
 import './csrf.js';
 
+// ---------------------------------------------------
+// MODULO DE SOLICITUDES
+// ---------------------------------------------------
+// Este bloque centraliza la lógica del formulario de solicitudes:
+// - búsqueda por código
+// - búsqueda por ubicación
+// - búsqueda por equipo según ubicación
+// - selección y sincronización de campos ocultos y visibles
+// ---------------------------------------------------
+
 console.log('[UBICACION-SEARCH-TEST] JS CARGADO');
 
+// normalizeText: normaliza el texto para comparar sin distinguir mayúsculas, minúsculas ni tildes.
 function normalizeText(value) {
     if (value === null || value === undefined) return '';
     return String(value)
@@ -11,6 +22,8 @@ function normalizeText(value) {
         .trim();
 }
 
+// clearEquipoSelection: limpia la selección actual de equipo y los campos derivados.
+// Sirve para resetear el estado cuando cambia la ubicación o se invalida un equipo.
 function clearEquipoSelection({ preserveCodigo = false, preserveUbicacion = true } = {}) {
     $('#nombre_equipo').val('');
     if (!preserveCodigo) {
@@ -29,6 +42,8 @@ function clearEquipoSelection({ preserveCodigo = false, preserveUbicacion = true
     }
 }
 
+// applyEquipoSelection: toma un equipo seleccionado y rellena los campos del formulario con sus datos reales.
+// También mantiene la ubicación activa y sincroniza los inputs ocultos del backend.
 function applyEquipoSelection({ equipoId, equipoNombre, equipoCodigo, ubicacionNombre, ubicacionId, centroCosto, numeroSerie }) {
     const equipoField = document.getElementById('id_equipo') || document.getElementById('equipo');
     if (equipoField) equipoField.value = equipoId || '';
@@ -48,6 +63,8 @@ $(document).ready(function() {
     console.log('[UBICACION-SEARCH-TEST] LISTENER REGISTRADO');
     console.log('[UBICACION-SEARCH] Listener registrado');
 
+    // initUbicacionInputStatus: marca visualmente cuando el input de ubicación está activo.
+    // Sirve como depuración rápida para confirmar que JavaScript está respondiendo al escribir.
     $('#nombre_ubicacion')
         .off('input.ubicacionTest')
         .on('input.ubicacionTest', function() {
@@ -61,6 +78,8 @@ $(document).ready(function() {
             }
         });
 
+    // initCodigoLookup: cuando el usuario escribe o cambia el código, consulta el equipo asociado.
+    // Si encuentra un equipo, rellena ubicación, centro de costo y serie automáticamente.
     $("#codigo").on("change", function() {
         let codigoVal = $(this).val();
         if (codigoVal) {
@@ -100,6 +119,8 @@ $(document).ready(function() {
         }
     });
 
+    // initUbicacionSearch: escucha el input de ubicación y consulta ubicaciones coincidentes por texto.
+    // Si el texto tiene longitud suficiente, envía AJAX a /solicitudes/buscar-ubicaciones/ y muestra un dropdown.
     $('#nombre_ubicacion')
         .off('input.ubicacionSearch')
         .on('input.ubicacionSearch', function() {
@@ -183,6 +204,8 @@ $(document).ready(function() {
             });
         });
 
+    // initEquipoSearch: escucha el input del equipo pero solo si ya hay una ubicación seleccionada.
+    // Consulta los equipos de esa ubicación y muestra solo los resultados válidos para ese contexto.
     $('#nombre_equipo')
         .off('input.equipoSearch')
         .on('input.equipoSearch', function() {
@@ -257,12 +280,14 @@ $(document).ready(function() {
             });
         });
 
+    // onUbicacionIdChange: si la ubicación se limpia, también limpia la selección de equipo y el estado derivado.
     $('#ubicacion_id').on('change', function() {
         if (!$(this).val()) {
             clearEquipoSelection({ preserveCodigo: false, preserveUbicacion: false });
         }
     });
 
+    // submitSolicitud: valida antes de enviar el formulario y comprueba si ya existe una solicitud activa.
     $("#solicitud-form").on("submit", function(event) {
         event.preventDefault();
 
@@ -308,6 +333,7 @@ $(document).ready(function() {
         }
     });
 
+    // clearForm: reinicia el formulario y deja el estado inicial limpio para una nueva solicitud.
     function clearForm() {
         $("#solicitud-form")[0].reset();
     }
