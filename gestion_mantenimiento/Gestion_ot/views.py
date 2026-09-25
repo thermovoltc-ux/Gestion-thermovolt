@@ -19,6 +19,7 @@ import smtplib
 from .models import OrdenTrabajo, Estado, GestionOt, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad, InformeDriveArchivo, ProcesoInforme
 from .forms import GestionOtForm, OrdenTrabajoForm, CierreOtForm, ImagenCierreOtForm, ImagenAntesForm, ImagenDespuesForm, CierreOtActividadFormSet
 from gestion_mantenimiento.solicitudes.models import Solicitud
+from gestion_mantenimiento.users.access import obtener_scope_ubicacion_ids
 import logging
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
