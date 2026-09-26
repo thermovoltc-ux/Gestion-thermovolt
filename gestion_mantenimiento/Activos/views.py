@@ -145,42 +145,129 @@ def crear_equipo_dinamico(request):
 
     return redirect('lista_activos')
 
-def _serialize_ubicacion_node(ubicacion, scope_ids=None):
-    children = []
+def _safe_node_value(value):
+    if value is None:
+        return ''
+    return str(value)
+
+
+def _equipo_a_nodo(equipo):
+    """Convierte un Equipo en un dict compatible con jsTree con todos los campos relevantes."""
+    foto_url = ''
+    try:
+        if getattr(equipo, 'imagen', None):
+            foto_url = equipo.imagen.url
+    except Exception:
+        foto_url = ''
+
+    ubicacion_padre_id = ''
+    ubicacion_padre_nombre = ''
+    try:
+        if getattr(equipo, 'ubicacion', None):
+            ubicacion_padre_id = str(equipo.ubicacion_id)
+            ubicacion_padre_nombre = getattr(equipo.ubicacion, 'nombre', '') or ''
+    except Exception:
+        ubicacion_padre_id = ''
+        ubicacion_padre_nombre = ''
+
+    centro_costo = ''
+    try:
+        if getattr(equipo, 'ubicacion', None):
+            ubicacion_obj = equipo.ubicacion
+            areas = getattr(ubicacion_obj, 'areas', None)
+            if areas is not None:
+                for area in areas.all():
+                    centros = getattr(area, 'centros_costos', None)
+                    if centros is not None:
+                        centro_costo_obj = centros.order_by('nombre').first()
+                        if centro_costo_obj:
+                            centro_costo = centro_costo_obj.nombre
+                            break
+    except Exception:
+        centro_costo = ''
+
+    numero_serie = ''
+    for candidate in ('serie', 'numero_serie', 'numero_activo'):
+        value = getattr(equipo, candidate, None)
+        if value:
+            numero_serie = str(value)
+            break
+
+    return {
+        'id': f'equipo-{equipo.id}',
+        'text': getattr(equipo, 'nombre', '') or f'Equipo {equipo.id}',
+        'parent': f'ubicacion-{equipo.ubicacion_id}' if getattr(equipo, 'ubicacion_id', None) else '#',
+        'type': 'equipo',
+        'icon': 'fa fa-cogs',
+        'children': [_equipo_a_nodo(hijo) for hijo in getattr(equipo, 'children', None).all().order_by('nombre')] if hasattr(equipo, 'children') and hasattr(getattr(equipo, 'children', None), 'all') else [],
+        'a_attr': {
+            'data-tipo': 'equipo',
+            'data-id': str(equipo.id),
+            'data-nombre': _safe_node_value(getattr(equipo, 'nombre', '')),
+            'data-codigo': _safe_node_value(getattr(equipo, 'codigo', '')),
+            'data-serie': _safe_node_value(numero_serie),
+            'data-numero-serie': _safe_node_value(numero_serie),
+            'data-numero-activo': _safe_node_value(numero_serie),
+            'data-centro-costo': _safe_node_value(centro_costo),
+            'data-descripcion': _safe_node_value(getattr(equipo, 'descripcion', '')),
+            'data-foto-url': _safe_node_value(foto_url),
+            'data-ubicacion-padre-id': _safe_node_value(ubicacion_padre_id),
+            'data-ubicacion-padre-nombre': _safe_node_value(ubicacion_padre_nombre),
+        },
+    }
+
+
+def _ubicacion_a_nodo(ubicacion):
+    """Convierte una Ubicacion en un dict compatible con jsTree con todos los campos relevantes."""
+    foto_url = ''
+    try:
+        if getattr(ubicacion, 'imagen', None):
+            foto_url = ubicacion.imagen.url
+    except Exception:
+        foto_url = ''
+
+    hijos = []
     for child in ubicacion.children.all().order_by('nombre'):
-        if scope_ids is not None and child.id not in scope_ids:
-            continue
-        children.append(_serialize_ubicacion_node(child, scope_ids=scope_ids))
+        hijos.append(_ubicacion_a_nodo(child))
 
     for equipo in Equipo.objects.filter(ubicacion_id=ubicacion.id).order_by('nombre'):
-        children.append({
-            'id': f'equipo-{equipo.id}',
-            'text': equipo.nombre,
-            'parent': f'ubicacion-{ubicacion.id}',
-            'type': 'equipo',
-            'icon': 'fa fa-cogs',
-            'children': [],
-            'a_attr': {
-                'data-tipo': 'equipo',
-                'data-id': str(equipo.id),
-                'data-nombre': equipo.nombre,
-            },
-        })
+        hijos.append(_equipo_a_nodo(equipo))
 
     return {
         'id': f'ubicacion-{ubicacion.id}',
-        'text': ubicacion.nombre,
-        'parent': '#' if ubicacion.parent_id is None else f'ubicacion-{ubicacion.parent_id}',
+        'text': getattr(ubicacion, 'nombre', '') or f'Ubicación {ubicacion.id}',
+        'parent': '#' if getattr(ubicacion, 'parent_id', None) is None else f'ubicacion-{ubicacion.parent_id}',
         'type': 'ubicacion',
         'icon': 'fa fa-building',
-        'children': children,
+        'children': hijos,
         'a_attr': {
             'data-tipo': 'ubicacion',
             'data-id': str(ubicacion.id),
-            'data-nombre': ubicacion.nombre,
-            'data-codigo': ubicacion.codigo,
+            'data-nombre': _safe_node_value(getattr(ubicacion, 'nombre', '')),
+            'data-codigo': _safe_node_value(getattr(ubicacion, 'codigo', '')),
+            'data-co': _safe_node_value(getattr(ubicacion, 'co', '')),
+            'data-descripcion': _safe_node_value(getattr(ubicacion, 'descripcion', '')),
+            'data-direccion': _safe_node_value(getattr(ubicacion, 'direccion', '')),
+            'data-ciudad': _safe_node_value(getattr(ubicacion, 'ciudad', '')),
+            'data-pais': _safe_node_value(getattr(ubicacion, 'pais', '')),
+            'data-foto-url': _safe_node_value(foto_url),
         },
     }
+
+
+def _serialize_ubicacion_node(ubicacion, scope_ids=None):
+    node = _ubicacion_a_nodo(ubicacion)
+    if scope_ids is not None:
+        filtered_children = []
+        for child in node.get('children', []):
+            child_id = child.get('id', '')
+            if child_id.startswith('ubicacion-'):
+                child_ubicacion_id = int(child_id.replace('ubicacion-', '', 1))
+                if child_ubicacion_id not in scope_ids:
+                    continue
+            filtered_children.append(child)
+        node['children'] = filtered_children
+    return node
 
 
 def api_arbol_json(request):
@@ -212,19 +299,7 @@ def api_arbol_json(request):
             children.append(_serialize_ubicacion_node(child, scope_ids=scope_ids))
 
         for equipo in Equipo.objects.filter(ubicacion_id=ubicacion.id).order_by('nombre'):
-            children.append({
-                'id': f'equipo-{equipo.id}',
-                'text': equipo.nombre,
-                'parent': f'ubicacion-{ubicacion.id}',
-                'type': 'equipo',
-                'icon': 'fa fa-cogs',
-                'children': [],
-                'a_attr': {
-                    'data-tipo': 'equipo',
-                    'data-id': str(equipo.id),
-                    'data-nombre': equipo.nombre,
-                },
-            })
+            children.append(_equipo_a_nodo(equipo))
 
         return JsonResponse({'data': children})
 
