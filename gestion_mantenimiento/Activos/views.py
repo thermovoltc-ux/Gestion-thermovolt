@@ -226,8 +226,16 @@ def _equipo_a_nodo(equipo):
             'data-centro-costo': _safe_node_value(centro_costo),
             'data-descripcion': _safe_node_value(getattr(equipo, 'descripcion', '')),
             'data-foto-url': _safe_node_value(foto_url),
+            'data-ubicacion-id': _safe_node_value(ubicacion_padre_id),
             'data-ubicacion-padre-id': _safe_node_value(ubicacion_padre_id),
             'data-ubicacion-padre-nombre': _safe_node_value(ubicacion_padre_nombre),
+            'data-fabricante': _safe_node_value(getattr(equipo, 'fabricante', '')),
+            'data-modelo': _safe_node_value(getattr(equipo, 'modelo', '')),
+            'data-prioridad': _safe_node_value(getattr(equipo, 'prioridad', '')),
+            'data-fecha-adquisicion': _safe_node_value(getattr(equipo, 'fecha_adquisicion', '') or ''),
+            'data-horas-uso': _safe_node_value(getattr(equipo, 'horas_uso', '') or ''),
+            'data-valor-compra': _safe_node_value(getattr(equipo, 'valor_compra', '') or ''),
+            'data-valor-actual': _safe_node_value(getattr(equipo, 'valor_actual', '') or ''),
         },
     }
 
