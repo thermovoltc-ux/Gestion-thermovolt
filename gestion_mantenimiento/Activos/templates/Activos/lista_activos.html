@@ -1042,17 +1042,24 @@ Lista de Activos - Gestión de Activos y Equipos
 
         $arbol.jstree({
             'core': {
-                'data': {
-                    'url': '{% url "api_arbol_json" %}',
-                    'dataType': 'json',
-                    'data': function(node) {
-                        return { 'node': node.id || '' };
-                    },
-                    'success': function(data) {
-                        console.log('[jsTree] Datos recibidos:', data);
-                    },
-                    'error': function(xhr, status, error) {
-                        console.error('[jsTree] Error:', xhr.status, error);
+                'data': function(node, callback) {
+                    if (node.id === '#') {
+                        jQuery.ajax({
+                            'url': '{% url "api_arbol_json" %}',
+                            'dataType': 'json',
+                            'success': function(response) {
+                                console.log('[jsTree] Datos recibidos:', response);
+                                var data = response && response.data ? response.data : [];
+                                console.log('[jsTree] Nodos raíz:', data.length);
+                                callback(data);
+                            },
+                            'error': function(xhr, status, error) {
+                                console.error('[jsTree] Error al cargar:', xhr.status, error);
+                                callback([]);
+                            }
+                        });
+                    } else {
+                        callback(node.children || []);
                     }
                 },
                 'check_callback': true,
@@ -1079,7 +1086,32 @@ Lista de Activos - Gestión de Activos y Equipos
         });
 
         $arbol.on('select_node.jstree', function(e, data) {
-            console.log('[jsTree] Nodo seleccionado:', data.node.id, data.node.text);
+            var original = data.node.original || {};
+            var a_attr = original.a_attr || {};
+            var tipo = a_attr['data-tipo'];
+            var id = a_attr['data-id'];
+            var nombre = a_attr['data-nombre'];
+            var codigo = a_attr['data-codigo'];
+
+            console.log('[jsTree] Nodo seleccionado:', {
+                idOriginal: id,
+                tipo: tipo,
+                nombre: nombre,
+                codigo: codigo,
+                idInterno: data.node.id
+            });
+
+            var $panel = jQuery('#node-details-container');
+            if (!$panel.length) {
+                console.warn('[jsTree] #node-details-container no encontrado');
+                return;
+            }
+
+            var html = '<h3>' + (nombre || data.node.text) + '</h3>';
+            if (tipo) html += '<p><strong>Tipo:</strong> ' + tipo + '</p>';
+            if (codigo) html += '<p><strong>Código:</strong> ' + codigo + '</p>';
+
+            $panel.html(html);
         });
     }
 
