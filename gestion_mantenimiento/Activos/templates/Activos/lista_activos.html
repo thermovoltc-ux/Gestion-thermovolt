@@ -1315,6 +1315,30 @@ Lista de Activos - Gestión de Activos y Equipos
             var tipo = a['data-tipo'];
             var id = a['data-id'];
             var nombre = a['data-nombre'] || data.node.text;
+
+            // Sincronizar estado del nodo selecionado para el flujo de edición
+            nodoSeleccionado = {
+                tipo: tipo,
+                id: id,
+                nombre: nombre,
+                codigo: a['data-codigo'] || '',
+                descripcion: a['data-descripcion'] || '',
+                ubicacionId: a['data-ubicacion-id'] || null,
+                imagenUrl: a['data-foto-url'] || '',
+                fabricante: a['data-fabricante'] || '',
+                modelo: a['data-modelo'] || '',
+                serie: a['data-serie'] || '',
+                prioridad: a['data-prioridad'] || '',
+                fechaAdq: a['data-fecha-adq'] || '',
+                horasUso: a['data-horas-uso'] || '',
+                valorCompra: a['data-valor-compra'] || '',
+                valorActual: a['data-valor-actual'] || '',
+                direccion: a['data-direccion'] || '',
+                pais: a['data-pais'] || '',
+                ciudad: a['data-ciudad'] || ''
+            };
+            console.log('[jsTree] nodoSeleccionado actualizado:', nodoSeleccionado);
+
             var codigo = a['data-codigo'];
             var descripcion = a['data-descripcion'];
             var fotoUrl = a['data-foto-url'] || '';
