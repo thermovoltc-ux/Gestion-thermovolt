@@ -1284,56 +1284,114 @@ Lista de Activos - Gestión de Activos y Equipos
                 return;
             }
 
-            var html = '';
-            var icono = tipo === 'ubicacion' ? '🏢' : '⚙️';
-            html += '<h3 style="margin-top:0; margin-bottom: 12px; color: #0d6efd;">' + icono + ' ' + (nombre || '') + '</h3>';
+            $panel.empty();
+            var $content = jQuery('<div></div>');
 
-            if (codigo) {
-                html += '<p style="margin: 6px 0;"><strong>Código:</strong> ' + codigo + '</p>';
+            var icono = tipo === 'ubicacion' ? '🏢' : '⚙️';
+            jQuery('<h3></h3>')
+                .css({marginTop: 0, marginBottom: '12px', color: '#0d6efd'})
+                .text(icono + ' ' + (nombre || ''))
+                .appendTo($content);
+
+            function addField(label, value) {
+                if (!value) return;
+                jQuery('<p></p>')
+                    .css({margin: '6px 0'})
+                    .append(jQuery('<strong></strong>').text(label + ': '))
+                    .append(document.createTextNode(value))
+                    .appendTo($content);
             }
+
+            addField('Código', codigo);
 
             if (tipo === 'ubicacion') {
-                if (a['data-co']) html += '<p style="margin: 6px 0;"><strong>CO:</strong> ' + a['data-co'] + '</p>';
-                if (a['data-direccion']) html += '<p style="margin: 6px 0;"><strong>Dirección:</strong> ' + a['data-direccion'] + '</p>';
-                if (a['data-ciudad']) html += '<p style="margin: 6px 0;"><strong>Ciudad:</strong> ' + a['data-ciudad'] + '</p>';
-                if (a['data-pais']) html += '<p style="margin: 6px 0;"><strong>País:</strong> ' + a['data-pais'] + '</p>';
+                addField('CO', a['data-co']);
+                addField('Dirección', a['data-direccion']);
+                addField('Ciudad', a['data-ciudad']);
+                addField('País', a['data-pais']);
             } else if (tipo === 'equipo') {
-                var numeroActivo = a['data-numero-activo'] || a['data-numero-serie'] || a['data-serie'] || '';
-                var numeroSerie = a['data-serie'] || a['data-numero-serie'] || '';
-                if (numeroActivo) html += '<p style="margin: 6px 0;"><strong>N° Activo:</strong> ' + numeroActivo + '</p>';
-                if (numeroSerie) html += '<p style="margin: 6px 0;"><strong>N° Serie:</strong> ' + numeroSerie + '</p>';
-                if (a['data-centro-costo']) html += '<p style="margin: 6px 0;"><strong>Centro Costo:</strong> ' + a['data-centro-costo'] + '</p>';
-                if (a['data-ubicacion-padre-nombre']) html += '<p style="margin: 6px 0;"><strong>Ubicación:</strong> ' + a['data-ubicacion-padre-nombre'] + '</p>';
+                addField('N° Activo', a['data-numero-activo'] || a['data-numero-serie'] || a['data-serie']);
+                addField('N° Serie', a['data-serie'] || a['data-numero-serie']);
+                addField('Centro Costo', a['data-centro-costo']);
+                addField('Ubicación', a['data-ubicacion-padre-nombre']);
             }
 
-            if (descripcion) {
-                html += '<p style="margin: 6px 0;"><strong>Descripción:</strong> ' + descripcion + '</p>';
-            }
+            addField('Descripción', descripcion);
 
             if (fotoUrl) {
-                html += '<div style="margin: 12px 0;">';
-                html += '<img src="' + fotoUrl + '" alt="' + (nombre || '') + '" style="max-width: 100%; max-height: 200px; border-radius: 8px; border: 1px solid #e5e7eb; background: #f9fafb;" onerror="this.style.display=\'none\'">';
-                html += '</div>';
+                jQuery('<img>')
+                    .attr({ src: fotoUrl, alt: nombre || '' })
+                    .css({
+                        maxWidth: '100%',
+                        maxHeight: '200px',
+                        borderRadius: '8px',
+                        border: '1px solid #e5e7eb',
+                        margin: '12px 0',
+                        display: 'block'
+                    })
+                    .on('error', function() {
+                        jQuery(this).hide();
+                    })
+                    .appendTo($content);
             }
 
-            html += '<hr style="margin: 16px 0; border: none; border-top: 1px solid #e5e7eb;">';
-            html += '<div class="panel-actions" style="display: flex; flex-wrap: wrap; gap: 8px;">';
+            jQuery('<hr>').css({
+                margin: '16px 0',
+                border: 'none',
+                borderTop: '1px solid #e5e7eb'
+            }).appendTo($content);
 
-            html += '<button type="button" class="btn-action" onclick="abrirEditarNodo(\'' + tipo + '\', ' + id + ')" style="padding: 8px 14px; border-radius: 6px; border: 1px solid #0d6efd; background: white; color: #0d6efd; cursor: pointer; font-size: 13px;">✏️ Editar</button>';
+            var $actions = jQuery('<div></div>').css({ display: 'flex', flexWrap: 'wrap', gap: '8px' });
+
+            function addButton(label, color, handler) {
+                jQuery('<button></button>')
+                    .attr('type', 'button')
+                    .text(label)
+                    .css({
+                        padding: '8px 14px',
+                        borderRadius: '6px',
+                        border: '1px solid ' + color,
+                        background: 'white',
+                        color: color,
+                        cursor: 'pointer',
+                        fontSize: '13px'
+                    })
+                    .on('click', handler)
+                    .appendTo($actions);
+            }
+
+            addButton('✏️ Editar', '#0d6efd', function() {
+                if (typeof abrirEditarNodo === 'function') {
+                    abrirEditarNodo(tipo, id);
+                }
+            });
 
             if (tipo === 'equipo') {
-                html += '<button type="button" class="btn-action" onclick="window.open(\'/Activos/hoja_vida/' + id + '/\', \'_blank\')" style="padding: 8px 14px; border-radius: 6px; border: 1px solid #198754; background: white; color: #198754; cursor: pointer; font-size: 13px;">📄 Hoja de Vida</button>';
-                html += '<button type="button" class="btn-action" onclick="abrirModalCrearPlan(' + id + ', \'" + (nombre || '').replace(/\\'/g, "\\\\'") + "\')" style="padding: 8px 14px; border-radius: 6px; border: 1px solid #fd7e14; background: white; color: #fd7e14; cursor: pointer; font-size: 13px;">📋 Plan</button>';
+                addButton('📄 Hoja de Vida', '#198754', function() {
+                    window.open('/Activos/hoja_vida/' + id + '/', '_blank');
+                });
+
+                addButton('📋 Plan', '#fd7e14', function() {
+                    if (typeof abrirModalCrearPlan === 'function') {
+                        abrirModalCrearPlan(id, nombre || '');
+                    }
+                });
             }
 
             if (tipo === 'ubicacion') {
-                html += '<button type="button" class="btn-action" onclick="window.open(\'/Activos/zip_hojas_vida/' + id + '/\', \'_blank\')" style="padding: 8px 14px; border-radius: 6px; border: 1px solid #198754; background: white; color: #198754; cursor: pointer; font-size: 13px;">📦 Descargar HVs</button>';
+                addButton('📦 Descargar HVs', '#198754', function() {
+                    window.open('/Activos/zip_hojas_vida/' + id + '/', '_blank');
+                });
             }
 
-            html += '<button type="button" class="btn-action" onclick="verHistorial(' + id + ', \'' + tipo + '\')" style="padding: 8px 14px; border-radius: 6px; border: 1px solid #6c757d; background: white; color: #6c757d; cursor: pointer; font-size: 13px;">📊 Historial OT</button>';
-            html += '</div>';
+            addButton('📊 Historial OT', '#6c757d', function() {
+                if (typeof verHistorial === 'function') {
+                    verHistorial(id, tipo);
+                }
+            });
 
-            $panel.html(html);
+            $actions.appendTo($content);
+            $panel.append($content);
         });
     }
 
