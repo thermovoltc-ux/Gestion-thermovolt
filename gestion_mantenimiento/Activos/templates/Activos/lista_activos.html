@@ -1050,35 +1050,34 @@ Lista de Activos - Gestión de Activos y Equipos
                             'success': function(response) {
                                 console.log('[jsTree] Datos recibidos:', response);
                                 var data = response && response.data ? response.data : [];
-                                console.log('[jsTree] Nodos raíz:', data.length);
-                                callback(data);
+                                var cleanData = data.map(function limpiar(nodo) {
+                                    var salida = {
+                                        id: nodo.id,
+                                        text: nodo.text,
+                                        type: nodo.type,
+                                        icon: nodo.icon,
+                                        a_attr: nodo.a_attr || {}
+                                    };
+                                    if (nodo.children && nodo.children.length) {
+                                        salida.children = nodo.children.map(limpiar);
+                                    }
+                                    return salida;
+                                });
+                                console.log('[jsTree] Nodos limpios:', cleanData.length);
+                                console.log('[jsTree] Primer nodo:', cleanData[0]);
+                                callback(cleanData);
                             },
                             'error': function(xhr, status, error) {
-                                console.error('[jsTree] Error al cargar:', xhr.status, error);
+                                console.error('[jsTree] Error:', xhr.status, error);
                                 callback([]);
                             }
                         });
                     } else {
                         callback(node.children || []);
                     }
-                },
-                'check_callback': true,
-                'themes': {
-                    'name': 'default',
-                    'responsive': true,
-                    'dots': false,
-                    'icons': true
                 }
             },
-            'plugins': ['types', 'search'],
-            'types': {
-                'ubicacion': {
-                    'icon': 'fa fa-building'
-                },
-                'equipo': {
-                    'icon': 'fa fa-cogs'
-                }
-            }
+            'plugins': []
         });
 
         $arbol.on('loaded.jstree', function() {
