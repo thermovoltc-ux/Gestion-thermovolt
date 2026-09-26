@@ -19,14 +19,14 @@ Lista de Activos - Gestión de Activos y Equipos
                 </button>
             </div>
             
-            <div class="tree-view" id="tree-container">
+            <div class="tree-view" id="tree-container" style="display: none;">
                 {% for ubicacion in ubicaciones %}
                     {% include 'Activos/ubicacion_node.html' with ubicacion=ubicacion %}
                 {% endfor %}
             </div>
 
-            {# NUEVO: Contenedor para jsTree (oculto temporalmente, sin retirar el árbol actual) #}
-            <div id="arbol-js-container" style="display: none;">
+            {# NUEVO: Contenedor para jsTree, visible en la etapa 1 del switch #}
+            <div id="arbol-js-container" style="display: block;">
                 <div id="arbol-js"></div>
             </div>
         </div>
