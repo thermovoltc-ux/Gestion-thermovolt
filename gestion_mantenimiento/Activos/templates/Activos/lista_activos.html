@@ -27,6 +27,41 @@ Lista de Activos - Gestión de Activos y Equipos
 
             {# NUEVO: Contenedor para jsTree, visible en la etapa 1 del switch #}
             <div id="arbol-js-container" style="display: block;">
+                <div id="arbol-toolbar" style="
+                    display: flex;
+                    gap: 8px;
+                    padding: 8px 12px;
+                    border-bottom: 1px solid #e5e7eb;
+                    background: #f9fafb;
+                    align-items: center;
+                    flex-wrap: wrap;
+                ">
+                    <input type="text" id="arbol-search-input" placeholder="🔍 Buscar en el árbol..." style="
+                        flex: 1;
+                        min-width: 150px;
+                        padding: 6px 12px;
+                        border: 1px solid #d1d5db;
+                        border-radius: 6px;
+                        font-size: 14px;
+                        outline: none;
+                    ">
+                    <button type="button" id="arbol-btn-expand" title="Expandir todo" style="
+                        padding: 6px 10px;
+                        background: white;
+                        border: 1px solid #d1d5db;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 14px;
+                    ">⊞</button>
+                    <button type="button" id="arbol-btn-collapse" title="Colapsar todo" style="
+                        padding: 6px 10px;
+                        background: white;
+                        border: 1px solid #d1d5db;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 14px;
+                    ">⊟</button>
+                </div>
                 <div id="arbol-js"></div>
             </div>
         </div>
@@ -1051,6 +1086,13 @@ Lista de Activos - Gestión de Activos y Equipos
     #arbol-js .node-action-btn:hover {
         background: #0b5ed7;
     }
+
+    /* Resaltado de búsqueda */
+    #arbol-js .jstree-search {
+        background-color: #fef08a;
+        font-weight: bold;
+        border-radius: 2px;
+    }
 </style>
 
 {% block extra_css %}
@@ -1121,7 +1163,14 @@ Lista de Activos - Gestión de Activos y Equipos
                     }
                 }
             },
-            'plugins': ['contextmenu'],
+            'plugins': ['contextmenu', 'search'],
+            'search': {
+                'show_only_matches': false,
+                'show_only_matches_children': false,
+                'fuzzy': true,
+                'case_sensitive': false,
+                'close_opened_onclear': false
+            },
             'contextmenu': {
                 'items': function(node) {
                     var original = node.original || {};
@@ -1392,6 +1441,37 @@ Lista de Activos - Gestión de Activos y Equipos
 
             $actions.appendTo($content);
             $panel.append($content);
+        });
+
+        // ===== C.4.1: Búsqueda + Expandir/Colapsar =====
+        jQuery(function() {
+            var $arbol = jQuery('#arbol-js');
+            var searchTimeout = null;
+
+            jQuery('#arbol-search-input').on('input', function() {
+                var query = jQuery(this).val();
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(function() {
+                    if ($arbol.jstree(true)) {
+                        $arbol.jstree('search', query);
+                        console.log('[jsTree] Búsqueda:', query || '(vacío)');
+                    }
+                }, 250);
+            });
+
+            jQuery('#arbol-btn-expand').on('click', function() {
+                if ($arbol.jstree(true)) {
+                    $arbol.jstree('open_all');
+                    console.log('[jsTree] Expandir todo');
+                }
+            });
+
+            jQuery('#arbol-btn-collapse').on('click', function() {
+                if ($arbol.jstree(true)) {
+                    $arbol.jstree('close_all');
+                    console.log('[jsTree] Colapsar todo');
+                }
+            });
         });
     }
 
