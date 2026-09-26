@@ -1009,8 +1009,11 @@ Lista de Activos - Gestión de Activos y Equipos
     }
 </style>
 
+{% block extra_css %}
 <link rel="stylesheet" href="{% static 'vendor/jstree/themes/default/style.min.css' %}">
+{% endblock %}
 
+{% block extra_js %}
 <script src="{% static 'vendor/jstree/jstree.min.js' %}"></script>
 <script>
 (function() {
@@ -1087,6 +1090,7 @@ Lista de Activos - Gestión de Activos y Equipos
     }
 })();
 </script>
+{% endblock %}
 
 <script>
     let nodoSeleccionado = null;
