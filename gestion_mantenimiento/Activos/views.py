@@ -20,6 +20,21 @@ from PIL import Image as PILImage
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo
 from gestion_mantenimiento.users.access import obtener_scope_ubicacion_ids
 
+
+def _normalizar_url_media(url):
+    """
+    Normaliza URLs de imagen que puedan tener /media/media/ duplicado.
+    NO toca la base de datos ni los modelos. Solo corrige el string al vuelo.
+    """
+    if not url:
+        return ''
+
+    url_str = str(url)
+    if '/media/media/' in url_str:
+        url_str = url_str.replace('/media/media/', '/media/')
+    return url_str
+
+
 def _perfil_usuario_actual(user):
     try:
         return user.perfil_usuario
@@ -156,7 +171,7 @@ def _equipo_a_nodo(equipo):
     foto_url = ''
     try:
         if getattr(equipo, 'imagen', None):
-            foto_url = equipo.imagen.url
+            foto_url = _normalizar_url_media(equipo.imagen.url)
     except Exception:
         foto_url = ''
 
@@ -222,7 +237,7 @@ def _ubicacion_a_nodo(ubicacion):
     foto_url = ''
     try:
         if getattr(ubicacion, 'imagen', None):
-            foto_url = ubicacion.imagen.url
+            foto_url = _normalizar_url_media(ubicacion.imagen.url)
     except Exception:
         foto_url = ''
 
