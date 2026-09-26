@@ -1007,6 +1007,50 @@ Lista de Activos - Gestión de Activos y Equipos
         background-color: #1976D2;
         transform: translateX(-5px);
     }
+
+    #arbol-js .jstree-anchor {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        max-width: calc(100% - 110px);
+        padding-right: 90px !important;
+    }
+
+    #arbol-js .jstree-anchor .node-actions {
+        display: none;
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        gap: 4px;
+        z-index: 20;
+    }
+
+    #arbol-js .jstree-anchor:hover .node-actions,
+    #arbol-js .jstree-anchor:focus-within .node-actions {
+        display: inline-flex;
+    }
+
+    #arbol-js .node-action-btn {
+        width: 22px;
+        height: 22px;
+        border: none;
+        border-radius: 4px;
+        background: #0d6efd;
+        color: white;
+        cursor: pointer;
+        font-size: 12px;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        box-shadow: 0 2px 6px rgba(13, 110, 253, 0.24);
+    }
+
+    #arbol-js .node-action-btn:hover {
+        background: #0b5ed7;
+    }
 </style>
 
 {% block extra_css %}
@@ -1077,11 +1121,143 @@ Lista de Activos - Gestión de Activos y Equipos
                     }
                 }
             },
-            'plugins': []
+            'plugins': ['contextmenu'],
+            'contextmenu': {
+                'items': function(node) {
+                    var original = node.original || {};
+                    var a_attr = (original.a_attr || node.a_attr || {});
+                    var tipo = a_attr['data-tipo'];
+                    var id = a_attr['data-id'];
+                    var nombre = a_attr['data-nombre'];
+                    var items = {};
+
+                    if (tipo === 'ubicacion') {
+                        items.crear_equipo = {
+                            label: '➕ Crear Equipo',
+                            action: function(data) {
+                                var inst = jQuery.jstree.reference(data.reference);
+                                var n = inst.get_node(data.reference);
+                                var a = (n.original && n.original.a_attr) || n.a_attr || {};
+                                abrirModalCrearHijo(a['data-id'], 'ubicacion', a['data-nombre']);
+                            }
+                        };
+
+                        items.crear_sub_ubicacion = {
+                            label: '📁 Crear Sub-Ubicación',
+                            action: function(data) {
+                                var inst = jQuery.jstree.reference(data.reference);
+                                var n = inst.get_node(data.reference);
+                                var a = (n.original && n.original.a_attr) || n.a_attr || {};
+                                abrirModalCrearSubUbicacion(a['data-id'], a['data-nombre']);
+                            }
+                        };
+                    } else if (tipo === 'equipo') {
+                        items.crear_sub_equipo = {
+                            label: '➕ Crear Sub-Equipo',
+                            action: function(data) {
+                                var inst = jQuery.jstree.reference(data.reference);
+                                var n = inst.get_node(data.reference);
+                                var a = (n.original && n.original.a_attr) || n.a_attr || {};
+                                abrirModalCrearHijo(a['data-id'], 'equipo', a['data-nombre']);
+                            }
+                        };
+                    }
+
+                    items.editar = {
+                        label: '✏️ Editar',
+                        action: function(data) {
+                            var inst = jQuery.jstree.reference(data.reference);
+                            var n = inst.get_node(data.reference);
+                            var a = (n.original && n.original.a_attr) || n.a_attr || {};
+                            abrirEditarNodo(a['data-tipo'], a['data-id']);
+                        }
+                    };
+
+                    if (tipo === 'equipo') {
+                        items.plan = {
+                            label: '📋 Plan de Mantenimiento',
+                            action: function(data) {
+                                var inst = jQuery.jstree.reference(data.reference);
+                                var n = inst.get_node(data.reference);
+                                var a = (n.original && n.original.a_attr) || n.a_attr || {};
+                                abrirModalCrearPlan(a['data-id'], a['data-nombre']);
+                            }
+                        };
+                    }
+
+                    items.historial = {
+                        label: '📊 Historial OT',
+                        action: function(data) {
+                            var inst = jQuery.jstree.reference(data.reference);
+                            var n = inst.get_node(data.reference);
+                            var a = (n.original && n.original.a_attr) || n.a_attr || {};
+                            verHistorial(a['data-id'], a['data-tipo']);
+                        }
+                    };
+
+                    return items;
+                }
+            }
         });
 
         $arbol.on('loaded.jstree', function() {
             console.log('[jsTree] Cargado OK');
+        });
+
+        $arbol.on('ready.jstree after_open.jstree', function() {
+            $arbol.find('.jstree-anchor').each(function() {
+                var $anchor = jQuery(this);
+                if ($anchor.find('.node-actions').length) {
+                    return;
+                }
+
+                var tipo = $anchor.attr('data-tipo') || '';
+                var id = $anchor.attr('data-id') || '';
+                var nombre = $anchor.attr('data-nombre') || $anchor.text().trim();
+                var html = '';
+
+                if (tipo === 'ubicacion') {
+                    html = '<span class="node-actions">' +
+                        '<button type="button" class="node-action-btn btn-add-equipo" data-id="' + id + '" data-nombre="' + nombre + '" title="Crear Equipo">+</button>' +
+                        '<button type="button" class="node-action-btn btn-add-sub-ubicacion" data-id="' + id + '" data-nombre="' + nombre + '" title="Crear Sub-Ubicación">📁</button>' +
+                        '</span>';
+                } else if (tipo === 'equipo') {
+                    html = '<span class="node-actions">' +
+                        '<button type="button" class="node-action-btn btn-add-sub-equipo" data-id="' + id + '" data-nombre="' + nombre + '" title="Crear Sub-Equipo">+</button>' +
+                        '</span>';
+                }
+
+                if (html) {
+                    $anchor.append(html);
+                }
+            });
+        });
+
+        jQuery(document).on('click', '#arbol-js .btn-add-equipo', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var $anchor = jQuery(this).closest('.jstree-anchor');
+            var id = $anchor.attr('data-id');
+            var nombre = $anchor.attr('data-nombre');
+            abrirModalCrearHijo(id, 'ubicacion', nombre);
+        });
+
+        jQuery(document).on('click', '#arbol-js .btn-add-sub-ubicacion', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var $anchor = jQuery(this).closest('.jstree-anchor');
+            var id = $anchor.attr('data-id');
+            var nombre = $anchor.attr('data-nombre');
+            abrirModalCrearSubUbicacion(id, nombre);
+        });
+
+        jQuery(document).on('click', '#arbol-js .btn-add-sub-equipo', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var $anchor = jQuery(this).closest('.jstree-anchor');
+            var id = $anchor.attr('data-id');
+            var nombre = $anchor.attr('data-nombre');
+            abrirModalCrearHijo(id, 'equipo', nombre);
         });
 
         $arbol.on('select_node.jstree', function(e, data) {
