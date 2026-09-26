@@ -1816,7 +1816,8 @@ Lista de Activos - Gestión de Activos y Equipos
     }
 
     function abrirModalEditarEquipo(id) {
-        if (!nodoSeleccionado || nodoSeleccionado.id !== id) {
+        const selectedId = String(nodoSeleccionado && nodoSeleccionado.id !== undefined ? nodoSeleccionado.id : '');
+        if (!nodoSeleccionado || selectedId !== String(id)) {
             return;
         }
         const modal = document.getElementById('modal-crear-hijo');
@@ -1868,7 +1869,8 @@ Lista de Activos - Gestión de Activos y Equipos
     }
 
     function abrirModalEditarUbicacion(id) {
-        if (!nodoSeleccionado || nodoSeleccionado.id !== id) {
+        const selectedId = String(nodoSeleccionado && nodoSeleccionado.id !== undefined ? nodoSeleccionado.id : '');
+        if (!nodoSeleccionado || selectedId !== String(id)) {
             return;
         }
         const modal = document.getElementById('modal-crear-ubicacion');
