@@ -259,8 +259,8 @@ Lista de Activos - Gestión de Activos y Equipos
         <span><ion-icon name="add-outline" class="icon-large"></ion-icon></span>
     </a>
     <div id="floating-options" class="floating-options">
-        <a href="javascript:abrirModalCrearUbicacion()" class="floating-option">+ Ubicación Raíz</a>
-        <a href="javascript:abrirModalCrearEquipo(null, null, null)" class="floating-option">+ Equipo Independiente</a>
+        <a href="javascript:abrirModalCrearUbicacion()" class="floating-option">🏢 Crear Ubicación Raíz</a>
+        <a href="javascript:abrirModalCrearEquipo(null, null, null)" class="floating-option">⚙️ Crear Equipo Independiente</a>
     </div>
 </div>
 
@@ -1020,6 +1020,8 @@ Lista de Activos - Gestión de Activos y Equipos
         right: 0;
         flex-direction: column;
         gap: 10px;
+        min-width: 260px;
+        white-space: nowrap;
     }
 
     .floating-options.open {
@@ -1030,12 +1032,14 @@ Lista de Activos - Gestión de Activos y Equipos
         display: block;
         background-color: rgb(70, 135, 241);
         color: white;
-        padding: 10px 20px;
-        border-radius: 4px;
+        padding: 12px 20px;
+        border-radius: 8px;
         text-decoration: none;
-        text-align: center;
+        text-align: left;
         transition: all 0.3s;
         white-space: nowrap;
+        min-width: 100%;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
 
     .floating-option:hover {
