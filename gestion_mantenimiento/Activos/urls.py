@@ -9,6 +9,7 @@ urlpatterns = [
     path('crear_equipo/', views.crear_equipo, name='crear_equipo'),
     path('editar_equipo/<int:equipo_id>/', views.editar_equipo, name='editar_equipo'),
     path('crear_equipo_dinamico/', views.crear_equipo_dinamico, name='crear_equipo_dinamico'),
+    path('api_arbol_json/', views.api_arbol_json, name='api_arbol_json'),
     path('lista_activos/', views.lista_activos, name='lista_activos'),
     path('hoja_vida/<int:equipo_id>/', views.hoja_vida_equipo, name='hoja_vida_equipo'),
     path('zip_hojas_vida/<int:ubicacion_id>/', views.descargar_hojas_vida_ubicacion, name='descargar_hojas_vida_ubicacion'),

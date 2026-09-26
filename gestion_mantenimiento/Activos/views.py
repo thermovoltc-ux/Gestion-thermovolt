@@ -8,7 +8,7 @@ from django.utils.text import slugify
 from .forms import UbicacionForm, EquipoForm
 from .models import Ubicacion, Equipo
 from gestion_mantenimiento.users.models import Cliente
-from django.http import FileResponse, Http404, HttpResponseForbidden
+from django.http import FileResponse, Http404, HttpResponseForbidden, JsonResponse
 from django.core.files.storage import default_storage
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
@@ -144,6 +144,101 @@ def crear_equipo_dinamico(request):
         return redirect('lista_activos')
 
     return redirect('lista_activos')
+
+def _serialize_ubicacion_node(ubicacion, scope_ids=None):
+    children = []
+    for child in ubicacion.children.all().order_by('nombre'):
+        if scope_ids is not None and child.id not in scope_ids:
+            continue
+        children.append(_serialize_ubicacion_node(child, scope_ids=scope_ids))
+
+    for equipo in Equipo.objects.filter(ubicacion_id=ubicacion.id).order_by('nombre'):
+        children.append({
+            'id': f'equipo-{equipo.id}',
+            'text': equipo.nombre,
+            'parent': f'ubicacion-{ubicacion.id}',
+            'type': 'equipo',
+            'icon': 'fa fa-cogs',
+            'children': [],
+            'a_attr': {
+                'data-tipo': 'equipo',
+                'data-id': str(equipo.id),
+                'data-nombre': equipo.nombre,
+            },
+        })
+
+    return {
+        'id': f'ubicacion-{ubicacion.id}',
+        'text': ubicacion.nombre,
+        'parent': '#' if ubicacion.parent_id is None else f'ubicacion-{ubicacion.parent_id}',
+        'type': 'ubicacion',
+        'icon': 'fa fa-building',
+        'children': children,
+        'a_attr': {
+            'data-tipo': 'ubicacion',
+            'data-id': str(ubicacion.id),
+            'data-nombre': ubicacion.nombre,
+            'data-codigo': ubicacion.codigo,
+        },
+    }
+
+
+def api_arbol_json(request):
+    """Endpoint preparatorio para jsTree: expone el árbol de ubicaciones y equipos en JSON."""
+    tipo_cuenta = request.session.get('tipo_cuenta')
+    scope_ids = set()
+
+    if tipo_cuenta == 'administrador':
+        scope_ids = obtener_scope_ubicacion_ids(request)
+
+    if tipo_cuenta == 'administrador' and not scope_ids:
+        return JsonResponse({'data': []})
+
+    node_id = request.GET.get('node', '')
+    if node_id.startswith('ubicacion-'):
+        try:
+            ubicacion_id = int(node_id.replace('ubicacion-', '', 1))
+        except ValueError:
+            return JsonResponse({'data': []})
+
+        ubicacion = Ubicacion.objects.filter(id=ubicacion_id).first()
+        if not ubicacion:
+            return JsonResponse({'data': []})
+
+        children = []
+        for child in ubicacion.children.all().order_by('nombre'):
+            if scope_ids and child.id not in scope_ids:
+                continue
+            children.append(_serialize_ubicacion_node(child, scope_ids=scope_ids))
+
+        for equipo in Equipo.objects.filter(ubicacion_id=ubicacion.id).order_by('nombre'):
+            children.append({
+                'id': f'equipo-{equipo.id}',
+                'text': equipo.nombre,
+                'parent': f'ubicacion-{ubicacion.id}',
+                'type': 'equipo',
+                'icon': 'fa fa-cogs',
+                'children': [],
+                'a_attr': {
+                    'data-tipo': 'equipo',
+                    'data-id': str(equipo.id),
+                    'data-nombre': equipo.nombre,
+                },
+            })
+
+        return JsonResponse({'data': children})
+
+    if node_id.startswith('equipo-'):
+        return JsonResponse({'data': []})
+
+    if tipo_cuenta == 'administrador':
+        roots = Ubicacion.objects.filter(id__in=scope_ids, parent__isnull=True).order_by('nombre')
+    else:
+        roots = Ubicacion.objects.filter(parent__isnull=True).order_by('nombre')
+
+    data = [_serialize_ubicacion_node(root, scope_ids=scope_ids or None) for root in roots]
+    return JsonResponse({'data': data})
+
 
 def lista_activos(request):
     tipo_cuenta = request.session.get('tipo_cuenta')
