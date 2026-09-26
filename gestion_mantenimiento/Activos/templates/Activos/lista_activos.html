@@ -1,4 +1,5 @@
 {% extends "solicitudes/indexpadre.html" %}
+{% load static %}
 
 {% block title %}
 Lista de Activos - Gestión de Activos y Equipos
@@ -22,6 +23,11 @@ Lista de Activos - Gestión de Activos y Equipos
                 {% for ubicacion in ubicaciones %}
                     {% include 'Activos/ubicacion_node.html' with ubicacion=ubicacion %}
                 {% endfor %}
+            </div>
+
+            {# NUEVO: Contenedor para jsTree (oculto temporalmente, sin retirar el árbol actual) #}
+            <div id="arbol-js-container" style="display: none;">
+                <div id="arbol-js"></div>
             </div>
         </div>
 
@@ -1002,6 +1008,85 @@ Lista de Activos - Gestión de Activos y Equipos
         transform: translateX(-5px);
     }
 </style>
+
+<link rel="stylesheet" href="{% static 'vendor/jstree/themes/default/style.min.css' %}">
+
+<script src="{% static 'vendor/jstree/jstree.min.js' %}"></script>
+<script>
+(function() {
+    'use strict';
+
+    function initJsTree() {
+        if (typeof jQuery === 'undefined') {
+            console.error('jsTree: jQuery no está cargado');
+            return;
+        }
+        if (typeof jQuery.fn.jstree === 'undefined') {
+            console.error('jsTree: plugin no está cargado');
+            return;
+        }
+
+        var $arbol = jQuery('#arbol-js');
+        if (!$arbol.length) {
+            console.warn('jsTree: #arbol-js no encontrado');
+            return;
+        }
+        if ($arbol.data('jstree')) {
+            return;
+        }
+
+        console.log('[jsTree] Inicializando...');
+
+        $arbol.jstree({
+            'core': {
+                'data': {
+                    'url': '{% url "api_arbol_json" %}',
+                    'dataType': 'json',
+                    'data': function(node) {
+                        return { 'node': node.id || '' };
+                    },
+                    'success': function(data) {
+                        console.log('[jsTree] Datos recibidos:', data);
+                    },
+                    'error': function(xhr, status, error) {
+                        console.error('[jsTree] Error:', xhr.status, error);
+                    }
+                },
+                'check_callback': true,
+                'themes': {
+                    'name': 'default',
+                    'responsive': true,
+                    'dots': false,
+                    'icons': true
+                }
+            },
+            'plugins': ['types', 'search', 'state'],
+            'types': {
+                'ubicacion': {
+                    'icon': 'fa fa-building'
+                },
+                'equipo': {
+                    'icon': 'fa fa-cogs'
+                }
+            }
+        });
+
+        $arbol.on('loaded.jstree', function() {
+            console.log('[jsTree] Cargado OK');
+        });
+
+        $arbol.on('select_node.jstree', function(e, data) {
+            console.log('[jsTree] Nodo seleccionado:', data.node.id, data.node.text);
+        });
+    }
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        initJsTree();
+    } else {
+        document.addEventListener('DOMContentLoaded', initJsTree);
+    }
+})();
+</script>
 
 <script>
     let nodoSeleccionado = null;
