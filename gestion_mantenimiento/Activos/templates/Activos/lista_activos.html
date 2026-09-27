@@ -1397,21 +1397,37 @@ Lista de Activos - Gestión de Activos y Equipos
         display: block;
         width: 16px;
         height: 16px;
-        background-size: contain;
-        background-repeat: no-repeat;
-        background-position: center;
+        background: none !important;
+        font-family: "Font Awesome 6 Free";
+        font-weight: 900;
+        font-size: 14px;
+        line-height: 1;
+        text-align: center;
+        color: #64748b;
     }
 
     #arbol-js.jstree-default .jstree-icon.jstree-themeicon.fa-building::before,
     #arbol-js.jstree-default .jstree-icon.jstree-themeicon.fa.fa-building::before,
     #arbol-js.jstree-default .jstree-icon.jstree-themeicon[class*="building"]::before {
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234687F1'%3E%3Cpath d='M3 21V8l9-5 9 5v13h-6v-7h-6v7H3zm2-2h2v-3h2v3h6v-3h2v3h2V9.2l-7-3.9-7 3.9V19z'/%3E%3C/svg%3E");
+        content: "\f1ad";
+        font-family: "Font Awesome 6 Free";
+        font-weight: 900;
+        color: #4687F1;
+        background: none !important;
+        width: auto;
+        height: auto;
     }
 
     #arbol-js.jstree-default .jstree-icon.jstree-themeicon.fa-cogs::before,
     #arbol-js.jstree-default .jstree-icon.jstree-themeicon.fa.fa-cogs::before,
     #arbol-js.jstree-default .jstree-icon.jstree-themeicon[class*="cogs"]::before {
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2316a34a'%3E%3Cpath d='M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'/%3E%3C/svg%3E");
+        content: "\f085";
+        font-family: "Font Awesome 6 Free";
+        font-weight: 900;
+        color: #16a34a;
+        background: none !important;
+        width: auto;
+        height: auto;
     }
 
     #arbol-js.jstree-default .jstree-ocl,
@@ -1457,32 +1473,6 @@ Lista de Activos - Gestión de Activos y Equipos
         }
     }
 </style>
-
-    #arbol-js.jstree-default .jstree-icon.jstree-themeicon.fa-building::before,
-    #arbol-js.jstree-default .jstree-icon.jstree-themeicon.fa.fa-building::before,
-    #arbol-js.jstree-default .jstree-icon.jstree-themeicon[class*="building"]::before {
-        content: '';
-        display: block;
-        width: 18px;
-        height: 18px;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234687F1'%3E%3Cpath d='M3 21V8l9-5 9 5v13h-6v-7h-6v7H3zm2-2h2v-3h2v3h6v-3h2v3h2V9.2l-7-3.9-7 3.9V19z'/%3E%3C/svg%3E");
-        background-size: contain;
-        background-repeat: no-repeat;
-        background-position: center;
-    }
-
-    #arbol-js.jstree-default .jstree-icon.jstree-themeicon.fa-cogs::before,
-    #arbol-js.jstree-default .jstree-icon.jstree-themeicon.fa.fa-cogs::before,
-    #arbol-js.jstree-default .jstree-icon.jstree-themeicon[class*="cogs"]::before {
-        content: '';
-        display: block;
-        width: 18px;
-        height: 18px;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2316a34a'%3E%3Cpath d='M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'/%3E%3C/svg%3E");
-        background-size: contain;
-        background-repeat: no-repeat;
-        background-position: center;
-    }
 
     #arbol-js.jstree-default ul.jstree-children {
         animation: jstree-fade-in 0.2s ease-in-out;
@@ -1538,6 +1528,7 @@ Lista de Activos - Gestión de Activos y Equipos
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'vendor/jstree/themes/default/style.min.css' %}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 {% endblock %}
 
 {% block extra_js %}
