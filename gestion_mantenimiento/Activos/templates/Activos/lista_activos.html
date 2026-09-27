@@ -1247,27 +1247,36 @@ Lista de Activos - Gestión de Activos y Equipos
         color: #1e293b;
     }
 
+    /* Cada nodo - fila con chevron + icono + texto ALINEADOS */
     #arbol-js.jstree-default .jstree-node {
         background: transparent !important;
         background-image: none !important;
         min-height: 36px;
         position: relative;
+        display: flex !important;
+        align-items: center;
+        flex-wrap: nowrap;
+        padding: 2px 0;
     }
 
     #arbol-js.jstree-default .jstree-anchor {
         height: 36px !important;
         line-height: 36px !important;
-        padding: 0 12px 0 4px !important;
-        margin: 2px 0;
+        padding: 0 12px 0 8px !important;
         border-radius: 8px;
         color: #334155 !important;
         font-weight: 500;
         transition: all 0.15s ease;
-        display: flex !important;
+        display: inline-flex !important;
         align-items: center;
         gap: 8px;
         background: transparent !important;
         border: 1px solid transparent;
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     #arbol-js.jstree-default .jstree-anchor:hover {
@@ -1287,9 +1296,11 @@ Lista de Activos - Gestión de Activos y Equipos
     #arbol-js.jstree-default .jstree-ocl {
         background-image: none !important;
         background-color: transparent !important;
-        width: 36px !important;
-        height: 36px !important;
-        line-height: 36px !important;
+        width: 32px !important;
+        min-width: 32px !important;
+        max-width: 32px !important;
+        height: 32px !important;
+        line-height: 32px !important;
         text-align: center;
         border-radius: 8px;
         transition: all 0.15s ease;
@@ -1298,6 +1309,10 @@ Lista de Activos - Gestión de Activos y Equipos
         justify-content: center;
         position: relative;
         cursor: pointer;
+        float: none !important;
+        margin-right: 4px;
+        flex-shrink: 0;
+        vertical-align: middle;
     }
 
     #arbol-js.jstree-default .jstree-closed > .jstree-ocl {
@@ -1307,7 +1322,7 @@ Lista de Activos - Gestión de Activos y Equipos
 
     #arbol-js.jstree-default .jstree-closed > .jstree-ocl::before {
         content: '+';
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 700;
         color: #4687F1;
         line-height: 1;
@@ -1320,7 +1335,7 @@ Lista de Activos - Gestión de Activos y Equipos
 
     #arbol-js.jstree-default .jstree-open > .jstree-ocl::before {
         content: '−';
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 700;
         color: #2563eb;
         line-height: 1;
@@ -1329,7 +1344,6 @@ Lista de Activos - Gestión de Activos y Equipos
     #arbol-js.jstree-default .jstree-ocl:hover {
         background-color: #dbeafe !important;
         border-color: #93c5fd !important;
-        transform: scale(1.05);
     }
 
     #arbol-js.jstree-default .jstree-leaf > .jstree-ocl {
@@ -1354,6 +1368,23 @@ Lista de Activos - Gestión de Activos y Equipos
         justify-content: center;
         flex-shrink: 0;
         position: relative;
+    }
+
+    #arbol-js.jstree-default .jstree-children {
+        padding-left: 20px !important;
+        margin-left: 8px;
+        border-left: 1px dashed #cbd5e1;
+    }
+
+    #arbol-js.jstree-default li.jstree-node > .jstree-wholerow,
+    #arbol-js.jstree-default .jstree-wholerow {
+        display: none !important;
+    }
+
+    #arbol-js.jstree-default .jstree-ocl,
+    #arbol-js.jstree-default .jstree-icon,
+    #arbol-js.jstree-default .jstree-anchor {
+        float: none !important;
     }
 
     #arbol-js.jstree-default .jstree-icon.jstree-themeicon.fa-building::before,
