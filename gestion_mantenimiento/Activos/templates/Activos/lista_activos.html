@@ -1227,6 +1227,143 @@ Lista de Activos - Gestión de Activos y Equipos
         font-weight: bold;
         border-radius: 2px;
     }
+
+    /* FASE D.8 — Modernización del árbol jsTree */
+    #arbol-js.jstree-default {
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        font-size: 14px;
+        line-height: 1.6;
+        min-width: 100%;
+    }
+
+    #arbol-js.jstree-default .jstree-anchor {
+        height: auto;
+        min-height: 32px;
+        line-height: 32px;
+        padding: 0 8px;
+        border-radius: 6px;
+        color: #1f2937;
+        font-weight: 500;
+        transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+    }
+
+    #arbol-js.jstree-default .jstree-anchor:hover {
+        background-color: #eef4ff;
+        color: #1e40af;
+    }
+
+    #arbol-js.jstree-default .jstree-clicked,
+    #arbol-js.jstree-default .jstree-anchor.jstree-clicked {
+        background-color: #dbeafe !important;
+        color: #1e3a8a !important;
+        font-weight: 600;
+        box-shadow: inset 3px 0 0 0 #2563eb;
+    }
+
+    #arbol-js.jstree-default .jstree-ocl {
+        width: 32px;
+        height: 32px;
+        line-height: 32px;
+        text-align: center;
+        background-image: none;
+        background-position: center;
+        background-repeat: no-repeat;
+        position: relative;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: background-color 0.15s ease, transform 0.15s ease;
+    }
+
+    #arbol-js.jstree-default .jstree-closed > .jstree-ocl::before {
+        content: '▶';
+        font-size: 10px;
+        color: #6b7280;
+        display: block;
+        line-height: 32px;
+        text-align: center;
+        transition: transform 0.2s ease;
+    }
+
+    #arbol-js.jstree-default .jstree-open > .jstree-ocl::before {
+        content: '▼';
+        font-size: 10px;
+        color: #2563eb;
+        display: block;
+        line-height: 32px;
+        text-align: center;
+        transition: transform 0.2s ease;
+    }
+
+    #arbol-js.jstree-default .jstree-ocl:hover {
+        background-color: #dbeafe;
+    }
+
+    #arbol-js.jstree-default .jstree-ocl:hover::before {
+        color: #1e40af;
+    }
+
+    #arbol-js.jstree-default .jstree-leaf > .jstree-ocl {
+        background: transparent;
+    }
+
+    #arbol-js.jstree-default .jstree-icon.jstree-themeicon {
+        background-image: none;
+        width: 20px;
+        height: 32px;
+        line-height: 32px;
+        margin-right: 6px;
+        text-align: center;
+    }
+
+    #arbol-js.jstree-default ul.jstree-children {
+        animation: jstree-fade-in 0.2s ease-in-out;
+    }
+
+    @keyframes jstree-fade-in {
+        from {
+            opacity: 0;
+            transform: translateY(-4px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    #arbol-js.jstree-default .jstree-children {
+        padding-left: 20px;
+    }
+
+    #arbol-js-container::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    #arbol-js-container::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+    }
+
+    #arbol-js-container::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+
+    #arbol-js-container::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+
+    @media (max-width: 900px) {
+        #arbol-js.jstree-default .jstree-anchor {
+            min-height: 36px;
+            line-height: 36px;
+        }
+
+        #arbol-js.jstree-default .jstree-ocl {
+            width: 36px;
+            height: 36px;
+            line-height: 36px;
+        }
+    }
 </style>
 
 {% block extra_css %}
