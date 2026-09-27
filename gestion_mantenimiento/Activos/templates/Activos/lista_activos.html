@@ -271,10 +271,6 @@ Lista de Activos - Gestión de Activos y Equipos
         min-height: 100vh;
     }
 
-        align-items: center;
-        justify-content: flex-end;
-    }
-
     .btn-accion-filtro {
         display: inline-flex;
         align-items: center;
@@ -867,15 +863,125 @@ Lista de Activos - Gestión de Activos y Equipos
         .arbol-panel-izquierdo,
         .arbol-panel-derecho {
             width: 100%;
+            min-width: 0;
+        }
+        .arbol-panel-izquierdo {
+            margin-bottom: 16px;
         }
         .arbol-panel-derecho {
             max-height: none;
+            flex: 1 1 auto;
+            padding: 16px;
+        }
+        #arbol-toolbar {
+            padding: 6px 8px;
+        }
+        #arbol-toolbar input[type="text"] {
+            font-size: 13px;
+            padding: 5px 8px;
+        }
+        .node-details-content {
+            flex-direction: column;
+            gap: 16px;
+        }
+        .node-details-image {
+            flex: 0 0 auto;
+            max-width: 200px;
+            margin: 0 auto;
+        }
+        .node-details-image img {
+            max-height: 200px;
+        }
+        .node-details-info strong {
+            min-width: 100px;
+            font-size: 13px;
+        }
+        .node-details-info p {
+            font-size: 13px;
+        }
+        .btn-action {
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+        .floating-button {
+            width: 48px;
+            height: 48px;
+            bottom: 16px;
+            right: 16px;
+        }
+        .floating-options {
+            bottom: 60px;
+            right: 0;
+            min-width: 220px;
+        }
+        .floating-option {
+            padding: 10px 14px;
+            font-size: 13px;
         }
         .modal-top-row {
             grid-template-columns: 1fr;
         }
         .image-upload-panel {
             justify-items: center;
+        }
+    }
+
+    @media (max-width: 600px) {
+        .arbol-panel-derecho {
+            padding: 12px;
+            border-radius: 8px;
+        }
+        #arbol-toolbar {
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        #arbol-search-input {
+            min-width: 100%;
+            margin-bottom: 4px;
+        }
+        #arbol-btn-expand,
+        #arbol-btn-collapse {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+        .node-details-image {
+            max-width: 150px;
+        }
+        .node-details-image img {
+            max-height: 150px;
+        }
+        .node-details-info strong {
+            display: block;
+            min-width: auto;
+            margin-bottom: 2px;
+        }
+        .node-details-info p {
+            padding: 8px 0;
+        }
+        .node-details-actions {
+            flex-direction: column;
+            gap: 8px;
+        }
+        .btn-action {
+            width: 100%;
+            justify-content: center;
+        }
+        .floating-button {
+            width: 44px;
+            height: 44px;
+            bottom: 12px;
+            right: 12px;
+        }
+        .floating-options {
+            bottom: 56px;
+            min-width: 200px;
+        }
+        .floating-option {
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+        .modal-top-row {
+            grid-template-columns: 1fr !important;
         }
     }
 
