@@ -1766,50 +1766,43 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         logger.info(f"   - Destinatarios: {recipient_list}")
         logger.info(f"   - Archivo: {pdf_filename} ({attachment_size_mb:.2f} MB)")
 
-        if len(pdf_bytes) <= 4 * 1024 * 1024:
-            email = EmailMultiAlternatives(
-                subject=subject,
-                body=text_content,
-                from_email=from_email,
-                to=recipient_list,
-                bcc=bcc_list
-            )
-            email.attach(pdf_filename, pdf_bytes, 'application/pdf')
-            logger.info("📎 PDF adjuntado al email")
+        drive_link = None
+        try:
+            drive_link = guardar_pdf_en_media(pdf_buffer, cierre_ot)
+            if drive_link:
+                logger.info("🔗 Link público para informe generado en Drive/storage: %s", drive_link)
+            else:
+                logger.warning("⚠️ No se pudo generar link público para el PDF. Se usará fallback local si existe.")
+        except Exception as drive_exc:
+            logger.warning("No se pudo preparar el enlace del PDF para el correo: %s", drive_exc)
+            drive_link = None
+
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=from_email,
+            to=recipient_list,
+            bcc=bcc_list
+        )
+
+        if drive_link:
+            link_block = f"<div style=\"background:#f5f5f5;padding:15px;border:1px solid #d1d5db;border-radius:6px;margin:20px 0;\"><p>El informe completo está disponible aquí: <a href=\"{drive_link}\">Descargar informe (PDF)</a></p></div>"
+            if '</body>' in html_content:
+                html_content = html_content.replace('</body>', f"{link_block}</body>")
+            else:
+                html_content += link_block
+            text_content += f"\n\nInforme disponible: {drive_link}\n"
         else:
-            logger.warning(
-                "⚠️ El PDF supera el umbral seguro para Brevo (%s MB). Se sube a Google Drive privado y el email envía un enlace interno de Django.",
-                round(attachment_size_mb, 2),
-            )
             try:
-                guardar_copia_pdf_envio(pdf_buffer, cierre_ot)
-            except Exception:
-                pass
+                email.attach(pdf_filename, pdf_bytes, 'application/pdf')
+                logger.info("📎 PDF adjuntado al email como fallback")
+            except Exception as attach_exc:
+                logger.warning("No se pudo adjuntar el PDF como fallback: %s", attach_exc)
 
-            try:
-                registro_drive = _crear_o_actualizar_informe_drive_archivo(cierre_ot, pdf_bytes, pdf_filename)
-                download_url = _build_private_download_url(registro_drive.download_token)
-                if download_url:
-                    download_block = f"<div style=\"background:#f5f5f5;padding:15px;border:1px solid #d1d5db;border-radius:6px;margin:20px 0;\"><p>El informe completo está disponible para descarga aquí: <a href=\"{download_url}\">Descargar informe (PDF)</a></p></div>"
-                    if '</body>' in html_content:
-                        html_content = html_content.replace('</body>', f"{download_block}</body>")
-                    else:
-                        html_content += download_block
-                    text_content += f"\n\nInforme disponible: {download_url}\n"
-                    logger.info("Link privado de descarga agregado al email: %s", download_url)
-                else:
-                    logger.warning('No se pudo construir el enlace interno privado para el email.')
-            except Exception as drive_exc:
-                logger.warning('No se pudo elevar el PDF a Drive privado para el email: %s', drive_exc)
-                download_url = None
-
-            email = EmailMultiAlternatives(
-                subject=subject,
-                body=text_content,
-                from_email=from_email,
-                to=recipient_list,
-                bcc=bcc_list
-            )
+        admin_email = getattr(settings, 'EMAIL_ADMIN_TECNICOS', 'admintecnicos@thermovoltc.com')
+        if admin_email and admin_email not in recipient_list:
+            email.cc = list(getattr(email, 'cc', []) or []) + [admin_email]
+            logger.info("📧 CC agregado a admin técnico: %s", admin_email)
 
         # Agregar versión HTML con el contenido final, incluyendo posible enlace.
         email.attach_alternative(html_content, "text/html")
