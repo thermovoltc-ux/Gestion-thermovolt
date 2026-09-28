@@ -1185,19 +1185,47 @@ Lista de Activos - Gestión de Activos y Equipos
         padding-right: 90px !important;
     }
 
-    #arbol-js .jstree-anchor .node-actions {
+    /* Botones de acción: SOLO desktop con hover */
+    #arbol-js.jstree-default .node-actions {
         display: none;
         position: absolute;
-        right: 8px;
+        right: 4px;
         top: 50%;
         transform: translateY(-50%);
+        z-index: 10;
         gap: 4px;
-        z-index: 20;
+        background: rgba(255, 255, 255, 0.98);
+        padding: 2px 4px;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12);
     }
 
-    #arbol-js .jstree-anchor:hover .node-actions,
-    #arbol-js .jstree-anchor:focus-within .node-actions {
-        display: inline-flex;
+    @media (hover: hover) and (min-width: 900px) {
+        #arbol-js.jstree-default .jstree-anchor:hover .node-actions {
+            display: flex;
+        }
+    }
+
+    @media (max-width: 900px) {
+        #arbol-js.jstree-default .node-actions,
+        #arbol-js.jstree-default .node-actions button,
+        #arbol-js.jstree-default .btn-add-equipo,
+        #arbol-js.jstree-default .btn-add-sub,
+        #arbol-js.jstree-default .btn-add-sub-equipo {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            width: 0 !important;
+            height: 0 !important;
+            overflow: hidden !important;
+        }
+    }
+
+    @media (hover: none) {
+        #arbol-js.jstree-default .node-actions,
+        #arbol-js.jstree-default .node-actions button {
+            display: none !important;
+        }
     }
 
     #arbol-js .node-action-btn {
@@ -1479,24 +1507,41 @@ Lista de Activos - Gestión de Activos y Equipos
             font-size: 14px !important;
         }
 
+        #arbol-js.jstree-default .jstree-children {
+            padding-left: 12px !important;
+            margin-left: 0 !important;
+            border-left: none !important;
+        }
+
         #arbol-js.jstree-default .jstree-anchor {
             height: 40px !important;
             line-height: 40px !important;
-            font-size: 15px;
-            max-width: calc(100% - 12px) !important;
-            padding-right: 8px !important;
+            max-width: 100% !important;
+            padding: 0 6px 0 4px !important;
+            font-size: 13px !important;
+            gap: 4px !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
             box-sizing: border-box !important;
         }
 
         #arbol-js.jstree-default .jstree-ocl {
-            width: 26px !important;
-            min-width: 26px !important;
-            height: 26px !important;
-            line-height: 26px !important;
+            margin-right: 2px !important;
+            width: 24px !important;
+            min-width: 24px !important;
+            max-width: 24px !important;
         }
 
-        #arbol-js.jstree-default .jstree-children {
-            padding-left: 12px !important;
+        #arbol-js.jstree-default .jstree-icon.jstree-themeicon {
+            width: 16px !important;
+            min-width: 16px !important;
+            margin-right: 4px !important;
+        }
+
+        #arbol-js.jstree-default .jstree-icon.jstree-themeicon::before {
+            width: 14px !important;
+            height: 14px !important;
         }
     }
 
@@ -1893,6 +1938,161 @@ Lista de Activos - Gestión de Activos y Equipos
             $actions.appendTo($content);
             $panel.append($content);
         });
+
+        // ============================================
+        // Mobile: Long press → menú contextual
+        // ============================================
+        (function() {
+            var $arbol = jQuery('#arbol-js');
+            var LONG_PRESS_MS = 500;
+            var touchTimer = null;
+            var longPressTriggered = false;
+
+            var isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            if (!isTouch) return;
+
+            function onTouchStart(e) {
+                var $anchor = jQuery(e.target).closest('.jstree-anchor');
+                if (!$anchor.length) return;
+
+                longPressTriggered = false;
+
+                touchTimer = setTimeout(function() {
+                    longPressTriggered = true;
+                    if (navigator.vibrate) navigator.vibrate(30);
+
+                    var inst = $arbol.jstree(true);
+                    var nodeId = $anchor.attr('id');
+                    if (!nodeId) return;
+
+                    nodeId = nodeId.replace('_anchor', '');
+                    var node = inst.get_node(nodeId);
+                    if (!node) return;
+
+                    var original = node.original || {};
+                    var a = original.a_attr || {};
+                    var tipo = a['data-tipo'];
+                    var id = a['data-id'];
+                    var nombre = a['data-nombre'] || node.text;
+
+                    mostrarMenuMobile(tipo, id, nombre, e.touches[0].clientX, e.touches[0].clientY);
+                }, LONG_PRESS_MS);
+            }
+
+            function onTouchEnd(e) {
+                if (touchTimer) {
+                    clearTimeout(touchTimer);
+                    touchTimer = null;
+                }
+                if (longPressTriggered) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }
+
+            function onTouchMove() {
+                if (touchTimer) {
+                    clearTimeout(touchTimer);
+                    touchTimer = null;
+                }
+            }
+
+            function mostrarMenuMobile(tipo, id, nombre, x, y) {
+                jQuery('#menu-contextual-mobile').remove();
+
+                var opciones = [];
+
+                if (tipo === 'ubicacion') {
+                    opciones.push({
+                        label: '🏢 Crear Equipo',
+                        action: function() {
+                            if (typeof abrirModalCrearHijo === 'function') {
+                                abrirModalCrearHijo(id, 'ubicacion', nombre);
+                            }
+                        }
+                    });
+                    opciones.push({
+                        label: '📁 Crear Sub-Ubicación',
+                        action: function() {
+                            if (typeof abrirModalCrearSubUbicacion === 'function') {
+                                abrirModalCrearSubUbicacion(id, nombre);
+                            }
+                        }
+                    });
+                } else if (tipo === 'equipo') {
+                    opciones.push({
+                        label: '⚙️ Crear Sub-Equipo',
+                        action: function() {
+                            if (typeof abrirModalCrearHijo === 'function') {
+                                abrirModalCrearHijo(id, 'equipo', nombre);
+                            }
+                        }
+                    });
+                }
+
+                opciones.push({
+                    label: '✏️ Editar',
+                    action: function() {
+                        if (typeof abrirEditarNodo === 'function') {
+                            abrirEditarNodo(tipo, id);
+                        }
+                    }
+                });
+
+                var html = '<div id="menu-contextual-mobile" style="' +
+                    'position: fixed;' +
+                    'left: ' + Math.min(x, window.innerWidth - 220) + 'px;' +
+                    'top: ' + Math.min(y, window.innerHeight - 200) + 'px;' +
+                    'background: white;' +
+                    'border-radius: 12px;' +
+                    'box-shadow: 0 4px 20px rgba(0,0,0,0.2);' +
+                    'padding: 6px;' +
+                    'z-index: 100000;' +
+                    'min-width: 200px;' +
+                    'font-family: system-ui, sans-serif;' +
+                    '">';
+
+                opciones.forEach(function(op, idx) {
+                    html += '<button type="button" data-opcion="' + idx + '" style="' +
+                        'display: block;' +
+                        'width: 100%;' +
+                        'padding: 12px 16px;' +
+                        'border: none;' +
+                        'background: transparent;' +
+                        'text-align: left;' +
+                        'font-size: 15px;' +
+                        'font-family: inherit;' +
+                        'cursor: pointer;' +
+                        'border-radius: 8px;' +
+                        'color: #1e293b;' +
+                        '">' + op.label + '</button>';
+                });
+
+                html += '</div>';
+                jQuery('body').append(html);
+
+                jQuery('#menu-contextual-mobile button').on('click', function() {
+                    var idx = parseInt(jQuery(this).attr('data-opcion'), 10);
+                    var opcion = opciones[idx];
+                    jQuery('#menu-contextual-mobile').remove();
+                    if (opcion && typeof opcion.action === 'function') {
+                        opcion.action();
+                    }
+                });
+
+                setTimeout(function() {
+                    jQuery(document).one('touchstart click', function(ev) {
+                        if (!jQuery(ev.target).closest('#menu-contextual-mobile').length) {
+                            jQuery('#menu-contextual-mobile').remove();
+                        }
+                    });
+                }, 100);
+            }
+
+            $arbol.on('touchstart', '.jstree-anchor', onTouchStart);
+            $arbol.on('touchend', '.jstree-anchor', onTouchEnd);
+            $arbol.on('touchmove', '.jstree-anchor', onTouchMove);
+        })();
 
         // ===== C.4.1: Búsqueda + Expandir/Colapsar =====
         jQuery(function() {
