@@ -1275,9 +1275,10 @@ Lista de Activos - Gestión de Activos y Equipos
     }
 
     #arbol-js.jstree-default .jstree-anchor {
+        position: relative !important;
         display: inline-flex !important;
-        align-items: center;
-        gap: 6px;
+        align-items: center !important;
+        gap: 4px !important;
         height: 34px !important;
         line-height: 34px !important;
         padding: 0 10px 0 6px !important;
@@ -1288,11 +1289,11 @@ Lista de Activos - Gestión de Activos y Equipos
         transition: all 0.15s ease;
         background: transparent !important;
         border: 1px solid transparent;
-        vertical-align: middle;
-        max-width: calc(100% - 40px);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        vertical-align: middle !important;
+        max-width: calc(100% - 40px) !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
     }
 
     #arbol-js.jstree-default .jstree-anchor:hover {
@@ -1309,25 +1310,25 @@ Lista de Activos - Gestión de Activos y Equipos
     }
 
     #arbol-js.jstree-default .jstree-ocl {
-        background-image: none !important;
-        background-color: transparent !important;
-        width: 28px !important;
-        min-width: 28px !important;
-        max-width: 28px !important;
-        height: 28px !important;
-        line-height: 28px !important;
-        text-align: center;
-        border-radius: 6px;
-        transition: all 0.15s ease;
+        position: static !important;
+        float: none !important;
         display: inline-flex !important;
         align-items: center;
         justify-content: center;
-        position: relative;
+        width: 26px !important;
+        min-width: 26px !important;
+        max-width: 26px !important;
+        height: 26px !important;
+        line-height: 26px !important;
+        margin: 0 4px 0 0 !important;
+        flex-shrink: 0 !important;
+        vertical-align: middle !important;
+        text-align: center;
+        border-radius: 6px;
+        transition: all 0.15s ease;
         cursor: pointer;
-        float: none !important;
-        margin: 3px 2px 3px 0;
-        flex-shrink: 0;
-        vertical-align: middle;
+        background-image: none !important;
+        background-color: transparent !important;
     }
 
     #arbol-js.jstree-default .jstree-closed > .jstree-ocl {
@@ -1378,18 +1379,26 @@ Lista de Activos - Gestión de Activos y Equipos
     }
 
     #arbol-js.jstree-default .jstree-icon.jstree-themeicon {
-        background-image: none !important;
-        background-color: transparent !important;
-        width: 20px !important;
-        min-width: 20px !important;
-        height: 34px !important;
-        line-height: 34px !important;
-        margin: 0 !important;
+        position: static !important;
+        float: none !important;
         display: inline-flex !important;
         align-items: center;
         justify-content: center;
-        flex-shrink: 0;
-        vertical-align: middle;
+        width: 18px !important;
+        min-width: 18px !important;
+        height: 18px !important;
+        margin: 0 6px 0 0 !important;
+        flex-shrink: 0 !important;
+        vertical-align: middle !important;
+        background: none !important;
+        background-image: none !important;
+        background-color: transparent !important;
+    }
+
+    #arbol-js.jstree-default .jstree-icon.jstree-themeicon.fa-folder::before,
+    #arbol-js.jstree-default .jstree-icon.jstree-themeicon[class*="folder"]::before {
+        content: '' !important;
+        background-image: none !important;
     }
 
     #arbol-js.jstree-default .jstree-icon.jstree-themeicon::before {
@@ -1455,21 +1464,46 @@ Lista de Activos - Gestión de Activos y Equipos
     }
 
     @media (max-width: 900px) {
+        #arbol-js.jstree-default {
+            font-size: 14px !important;
+        }
+
         #arbol-js.jstree-default .jstree-anchor {
             height: 40px !important;
             line-height: 40px !important;
             font-size: 15px;
+            max-width: calc(100% - 36px) !important;
         }
 
         #arbol-js.jstree-default .jstree-ocl {
-            width: 34px !important;
-            min-width: 34px !important;
-            height: 34px !important;
-            line-height: 34px !important;
+            width: 26px !important;
+            min-width: 26px !important;
+            height: 26px !important;
+            line-height: 26px !important;
         }
 
         #arbol-js.jstree-default .jstree-children {
             padding-left: 12px !important;
+        }
+    }
+
+    @media (max-width: 600px) {
+        #arbol-js.jstree-default {
+            font-size: 13px !important;
+        }
+
+        #arbol-js.jstree-default .jstree-anchor {
+            max-width: calc(100% - 36px) !important;
+        }
+
+        .floating-button-container {
+            z-index: 9999 !important;
+        }
+
+        .arbol-panel-izquierdo {
+            background: white !important;
+            position: relative;
+            z-index: 1;
         }
     }
 </style>

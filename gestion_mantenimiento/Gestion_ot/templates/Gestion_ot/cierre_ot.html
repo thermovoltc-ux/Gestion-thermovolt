@@ -6,6 +6,57 @@
 
 {% block content %}
 <link rel="stylesheet" href="{% static 'dist/cierre_ot.bundle.css' %}">
+<style>
+@media (max-width: 900px) {
+    .cierre-ot-form-container {
+        padding: 16px !important;
+        margin: 10px auto !important;
+    }
+
+    .fila {
+        display: block !important;
+        width: 100% !important;
+        flex-direction: column !important;
+        gap: 16px !important;
+    }
+
+    .columna {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 1 1 100% !important;
+        margin-bottom: 16px !important;
+    }
+
+    .cierre-ot-form-section {
+        padding: 18px !important;
+    }
+
+    .cierre-ot-form-group {
+        margin-bottom: 14px !important;
+    }
+
+    .cierre-ot-form-group label {
+        display: block !important;
+        margin-bottom: 6px !important;
+        height: auto !important;
+        line-height: 1.4 !important;
+    }
+
+    input,
+    textarea,
+    select {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .cierre-ot-btn {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+}
+</style>
 <div class="cierre-ot-form-container">
     <h1 style="display: flex; align-items: center; gap: 12px;">
         Cierre de OT - {{ ot.solicitud.consecutivo }}
