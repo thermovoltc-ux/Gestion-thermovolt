@@ -131,5 +131,14 @@ ls -la static/ 2>/dev/null || echo "Directory static/ does not exist"
 echo "STARTUP: collecting static files"
 python manage.py collectstatic --noinput --clear --verbosity=2
 
+echo "STARTUP: iniciando worker de informes"
+(
+  while true; do
+    python manage.py procesar_informes_pendientes --ttl-minutes 60 --limit 5 2>&1 | tee -a /app/worker_informes.log
+    sleep 30
+  done
+) &
+
+echo "STARTUP: worker de informes iniciado en background"
 echo "STARTUP: launching gunicorn"
 exec gunicorn gestion_mantenimiento.wsgi --bind 0.0.0.0:$PORT --workers 1 --threads 2
