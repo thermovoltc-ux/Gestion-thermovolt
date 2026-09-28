@@ -1302,11 +1302,22 @@ Lista de Activos - Gestión de Activos y Equipos
         color: #1e40af !important;
     }
 
+    #arbol-js.jstree-default .jstree-anchor::before,
+    #arbol-js.jstree-default .jstree-anchor::after,
+    #arbol-js.jstree-default .jstree-anchor.jstree-clicked::before,
+    #arbol-js.jstree-default .jstree-anchor.jstree-clicked::after {
+        content: none !important;
+        display: none !important;
+    }
+
     #arbol-js.jstree-default .jstree-anchor.jstree-clicked {
         background-color: #dbeafe !important;
         border-color: #93c5fd !important;
         color: #1e3a8a !important;
         font-weight: 600;
+        overflow: hidden !important;
+        max-width: calc(100% - 20px) !important;
+        padding-right: 4px !important;
     }
 
     #arbol-js.jstree-default .jstree-ocl {
@@ -1472,7 +1483,9 @@ Lista de Activos - Gestión de Activos y Equipos
             height: 40px !important;
             line-height: 40px !important;
             font-size: 15px;
-            max-width: calc(100% - 36px) !important;
+            max-width: calc(100% - 12px) !important;
+            padding-right: 8px !important;
+            box-sizing: border-box !important;
         }
 
         #arbol-js.jstree-default .jstree-ocl {
