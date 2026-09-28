@@ -1528,7 +1528,12 @@ def _crear_o_actualizar_informe_drive_archivo(cierre_ot, pdf_bytes, filename, pd
 
 
 def guardar_pdf_en_media(pdf_buffer, cierre_ot):
-    """Compatibilidad: conserva el comportamiento anterior de guardar copia local y publicar una URL cuando el storage lo permite."""
+    """Guarda el PDF en Drive cuando esté configurado y usa fallback local si falla.
+
+    La intención es que el flujo no dependa del tamaño del archivo ni de una
+    rama condicional especial; siempre se intenta subir a Drive y, si falla,
+    se conserva una copia local para poder continuar con el envío.
+    """
     timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
     filename = f"informe_ot_{cierre_ot.orden_trabajo.solicitud.consecutivo}_{timestamp}.pdf"
     relative_path = os.path.join('email_copies', 'informes', filename)
@@ -1537,6 +1542,7 @@ def guardar_pdf_en_media(pdf_buffer, cierre_ot):
 
     drive_folder_id = os.environ.get('GOOGLE_DRIVE_FOLDER_ID', '').strip()
     drive_credentials = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON') or os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON_PATH') or os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+
     if drive_folder_id and drive_credentials:
         try:
             public_url = subir_pdf_a_drive(pdf_bytes, filename, folder_id=drive_folder_id)
@@ -1544,6 +1550,10 @@ def guardar_pdf_en_media(pdf_buffer, cierre_ot):
             return public_url
         except Exception as drive_exc:
             logger.warning("No se pudo guardar el PDF en Google Drive: %s", drive_exc)
+    else:
+        logger.warning(
+            "No hay GOOGLE_DRIVE_FOLDER_ID/credenciales configuradas para Drive; se usará fallback local."
+        )
 
     try:
         content = ContentFile(pdf_bytes)
