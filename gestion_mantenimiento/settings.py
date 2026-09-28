@@ -332,6 +332,7 @@ ANYMAIL = {
 # Email addresses
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@thermovolt.com')
 EMAIL_ADICIONAL = os.environ.get('EMAIL_ADICIONAL', 'thermovoltc@gmail.com')
+EMAIL_ADMIN_TECNICOS = os.environ.get('EMAIL_ADMIN_TECNICOS', 'admintecnicos@thermovoltc.com')
 
 # Legacy config (for reference only)
 SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
