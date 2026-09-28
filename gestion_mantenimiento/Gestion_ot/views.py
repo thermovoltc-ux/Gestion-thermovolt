@@ -1729,7 +1729,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
                 <div style="padding: 30px 20px;">
                     <p style="margin-top: 0;">Cordial saludo,</p>
                     
-                    <p>Adjunto se encuentra el informe de los trabajos realizados en <strong>{cliente_nombre}</strong>.</p>
+                    <p>El informe de los trabajos realizados en <strong>{cliente_nombre}</strong> queda disponible en Google Drive.</p>
                     
                     <!-- Info Box -->
                     <div style="background-color: #f5f5f5; border-left: 4px solid #2c5aa0; padding: 15px; margin: 20px 0; border-radius: 4px;">
@@ -1740,7 +1740,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
                         <p style="margin: 5px 0;"><strong>Documento:</strong> {pdf_filename}</p>
                     </div>
                     
-                    <p>El archivo PDF adjunto contiene todos los detalles de la intervención realizada, incluyendo descripción del trabajo, materiales utilizados y confirmación de recepción.</p>
+                    <p>El documento completo puede descargarse desde el enlace del Drive incluido en este correo.</p>
                     
                     <p>Si tiene preguntas o necesita aclaraciones adicionales, no dude en contactarnos.</p>
                 </div>
@@ -1758,7 +1758,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         """
         
         # Crear email con versión texto y HTML
-        text_content = f"Cordial saludo,\n\nAdjunto se encuentra el informe de los trabajos realizados en {cliente_nombre}.\n\nOT-{consecutivo}\nEquipo: {equipo_nombre}\nCliente: {cliente_nombre}\nFecha: {fecha_str}\n\nThermovolt Servicios"
+        text_content = f"Cordial saludo,\n\nEl informe de los trabajos realizados en {cliente_nombre} queda disponible en Google Drive.\n\nOT-{consecutivo}\nEquipo: {equipo_nombre}\nCliente: {cliente_nombre}\nFecha: {fecha_str}\n\nThermovolt Servicios"
 
         pdf_bytes = pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else bytes(pdf_buffer)
         attachment_size_mb = len(pdf_bytes) / (1024 * 1024)
@@ -1798,11 +1798,6 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
                 logger.info("📎 PDF adjuntado al email como fallback")
             except Exception as attach_exc:
                 logger.warning("No se pudo adjuntar el PDF como fallback: %s", attach_exc)
-
-        admin_email = getattr(settings, 'EMAIL_ADMIN_TECNICOS', 'admintecnicos@thermovoltc.com')
-        if admin_email and admin_email not in recipient_list:
-            email.cc = list(getattr(email, 'cc', []) or []) + [admin_email]
-            logger.info("📧 CC agregado a admin técnico: %s", admin_email)
 
         # Agregar versión HTML con el contenido final, incluyendo posible enlace.
         email.attach_alternative(html_content, "text/html")
