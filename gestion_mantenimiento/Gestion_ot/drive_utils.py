@@ -137,7 +137,7 @@ def descargar_archivo_privado_drive(file_id: str):
 
 
 def subir_pdf_a_drive(pdf_bytes: bytes, filename: str, folder_id: Optional[str] = None) -> str:
-    """Sube un PDF a Google Drive usando una cuenta de servicio y devuelve un enlace público."""
+    """Sube un PDF a Google Drive como público y devuelve un enlace de descarga directa."""
     if MediaIoBaseUpload is None or MediaIoBaseDownload is None:
         raise RuntimeError('La librería de Google Drive no está instalada en este entorno para subir el archivo.')
 
@@ -165,21 +165,37 @@ def subir_pdf_a_drive(pdf_bytes: bytes, filename: str, folder_id: Optional[str] 
     if not file_id:
         raise RuntimeError('No se pudo obtener el ID del archivo subido a Drive.')
 
+    try:
+        drive_service.permissions().create(
+            fileId=file_id,
+            body={
+                'type': 'anyone',
+                'role': 'reader',
+                'allowFileDiscovery': False,
+            },
+            fields='id',
+            supportsAllDrives=True,
+            supportsTeamDrives=True,
+        ).execute()
+        logger = __import__('logging').getLogger(__name__)
+        logger.info("Permiso 'anyone with link' aplicado a archivo Drive %s", file_id)
+    except Exception as exc:
+        logger = __import__('logging').getLogger(__name__)
+        logger.warning("No se pudo hacer público el archivo de Drive %s: %s", file_id, exc)
+
     info = drive_service.files().get(
         fileId=file_id,
-        fields='webViewLink, webContentLink',
+        fields='webViewLink,webContentLink',
         supportsAllDrives=True,
         supportsTeamDrives=True,
     ).execute()
 
-    # Preferir la URL de contenido directo porque webViewLink apunta a la página
-    # HTML de visualización del archivo, no necesariamente al blob del archivo.
     direct_download_url = info.get('webContentLink')
     if direct_download_url:
-        return direct_download_url
+        return f"{direct_download_url}&confirm=t"
 
     view_url = info.get('webViewLink')
     if view_url:
-        return view_url
+        return f"{view_url}&confirm=t"
 
-    return f'https://drive.google.com/uc?export=download&id={file_id}'
+    return f'https://drive.google.com/uc?export=download&id={file_id}&confirm=t'
