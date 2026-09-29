@@ -1821,7 +1821,8 @@ Lista de Activos - Gestión de Activos y Equipos
                 valorActual: a['data-valor-actual'] || '',
                 direccion: a['data-direccion'] || '',
                 pais: a['data-pais'] || '',
-                ciudad: a['data-ciudad'] || ''
+                ciudad: a['data-ciudad'] || '',
+                co: a['data-co'] || ''
             };
             console.log('[jsTree] nodoSeleccionado actualizado:', nodoSeleccionado);
 
@@ -2249,6 +2250,21 @@ Lista de Activos - Gestión de Activos y Equipos
         parentDisplay.style.display = selectedName ? 'block' : 'none';
     }
 
+    function seleccionarPadreUbicacion(parentId, parentName) {
+        const select = document.getElementById('parent-ubicacion-select');
+        if (!select) return;
+
+        const value = parentId ? String(parentId) : '';
+        if (value && !Array.from(select.options).some(option => option.value === value)) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = parentName || value;
+            select.appendChild(option);
+        }
+        select.value = value;
+        actualizarDisplayPadreUbicacion(parentName || '');
+    }
+
     function actualizarUbicacionSeleccionada() {
         const buscador = document.getElementById('ubicacion-busqueda');
         const hidden = document.getElementById('ubicacion-hijo');
@@ -2444,8 +2460,7 @@ Lista de Activos - Gestión de Activos y Equipos
         const advancedSection = modal.querySelector('details.modal-advanced-section');
         const form = modal.querySelector('form');
         const submitButton = form.querySelector('button[type="submit"]');
-        const centroInput = document.getElementById('centro-operaciones-ubicacion');
-        const selectedCo = '{{ selected_co|default:"" }}';
+        const centroInput = document.getElementById('co-ubicacion');
 
         title.textContent = 'Crear Nueva Ubicación';
         if (form) {
@@ -2456,7 +2471,7 @@ Lista de Activos - Gestión de Activos y Equipos
         if (parentSelect) parentSelect.value = '';
         actualizarDisplayPadreUbicacion();
         if (centroInput) {
-            centroInput.value = selectedCo || '';
+            centroInput.value = '';
         }
         if (submitButton) submitButton.textContent = 'Crear Ubicación';
         if (advancedSection) {
@@ -2467,7 +2482,6 @@ Lista de Activos - Gestión de Activos y Equipos
 
     function abrirModalCrearSubUbicacion(parentId, parentName) {
         const modal = document.getElementById('modal-crear-ubicacion');
-        const parentSelect = document.getElementById('parent-ubicacion-select');
         const title = modal.querySelector('.modal-arbol-header h2');
         const advancedSection = modal.querySelector('details.modal-advanced-section');
         const form = modal.querySelector('form');
@@ -2480,11 +2494,10 @@ Lista de Activos - Gestión de Activos y Equipos
             form.reset();
         }
         cargarOpcionesUbicacionPadre(null);
-        if (parentSelect) parentSelect.value = String(parentId);
-        actualizarDisplayPadreUbicacion(parentName);
+        seleccionarPadreUbicacion(parentId, parentName);
         title.textContent = `Crear Sub-Ubicación dentro de ${parentName}`;
         if (centroInput) {
-            centroInput.value = selectedCo || '';
+            centroInput.value = '';
         }
         if (submitButton) submitButton.textContent = 'Crear Ubicación';
         if (advancedSection) {
@@ -2648,18 +2661,16 @@ Lista de Activos - Gestión de Activos y Equipos
         const modal = document.getElementById('modal-crear-ubicacion');
         const form = modal.querySelector('form');
         const title = modal.querySelector('.modal-arbol-header h2');
-        const parentSelect = document.getElementById('parent-ubicacion-select');
         const advancedSection = modal.querySelector('details.modal-advanced-section');
         const submitButton = form.querySelector('button[type="submit"]');
-        const centroInput = document.getElementById('centro-operaciones-ubicacion');
+        const centroInput = document.getElementById('co-ubicacion');
 
         form.action = `/Activos/editar_ubicacion/${id}/`;
         if (submitButton) submitButton.textContent = 'Actualizar Ubicación';
         title.textContent = `Editar Ubicación: ${nodoSeleccionado.nombre}`;
         cargarOpcionesUbicacionPadre(id);
         const parentId = nodoSeleccionado.parentId || '';
-        if (parentSelect) parentSelect.value = parentId;
-        actualizarDisplayPadreUbicacion(nodoSeleccionado.parentNombre || '');
+        seleccionarPadreUbicacion(parentId, nodoSeleccionado.parentNombre || '');
 
         form.querySelector('input[name="nombre"]').value = nodoSeleccionado.nombre || '';
         form.querySelector('input[name="codigo"]').value = nodoSeleccionado.codigo || '';
@@ -2668,7 +2679,7 @@ Lista de Activos - Gestión de Activos y Equipos
         form.querySelector('input[name="pais"]').value = nodoSeleccionado.pais || '';
         form.querySelector('input[name="ciudad"]').value = nodoSeleccionado.ciudad || '';
         if (centroInput) {
-            centroInput.value = '';
+            centroInput.value = nodoSeleccionado.co || '';
         }
 
         if (advancedSection) {
