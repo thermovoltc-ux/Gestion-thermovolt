@@ -2,10 +2,12 @@
 Middleware para redirigir 127.0.0.1 a localhost para Google OAuth
 y registrar providers de OAuth en la primera solicitud
 """
+from django.conf import settings
 from django.contrib.sites.models import Site
 from allauth.socialaccount.models import SocialApp
 import os
 import sys
+from urllib.parse import urlparse
 
 
 class LocalhostMiddleware:
@@ -15,7 +17,7 @@ class LocalhostMiddleware:
 
     def __call__(self, request):
         # Si el request viene de 127.0.0.1, reemplazar con localhost
-        if request.META.get('HTTP_HOST', '').startswith('127.0.0.1'):
+        if settings.DEBUG and request.META.get('HTTP_HOST', '').startswith('127.0.0.1'):
             request.META['HTTP_HOST'] = 'localhost:8000'
         
         # Inicializar OAuth apps en la primera solicitud
@@ -29,12 +31,25 @@ class LocalhostMiddleware:
     def _initialize_oauth_apps(self):
         """Registra los providers de OAuth en la base de datos"""
         try:
-            # Asegurar que el Site existe y tiene el dominio correcto
+            # Asegurar que el Site existe, sin reemplazar el dominio de producción.
             site, _ = Site.objects.get_or_create(id=1)
-            if site.domain != 'localhost:8000':
+
+            if settings.DEBUG and site.domain != 'localhost:8000':
                 site.domain = 'localhost:8000'
                 site.name = 'Gestión de Mantenimiento'
                 site.save()
+            elif not settings.DEBUG:
+                production_domain = (
+                    os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+                    or os.environ.get('SITE_DOMAIN', '')
+                ).strip()
+                if '://' in production_domain:
+                    production_domain = urlparse(production_domain).netloc
+                production_domain = production_domain.split('/', 1)[0]
+                if production_domain and production_domain not in {'localhost', '127.0.0.1'} and site.domain != production_domain:
+                    site.domain = production_domain
+                    site.name = 'Gestión de Mantenimiento'
+                    site.save()
             
             # Registrar Google OAuth
             google_client_id = os.environ.get('GOOGLE_CLIENT_ID', '')
