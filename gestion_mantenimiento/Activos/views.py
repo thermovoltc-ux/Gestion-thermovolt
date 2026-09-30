@@ -2,6 +2,7 @@ import os
 import re
 import zipfile
 from urllib.request import urlopen
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.utils.text import slugify
@@ -49,6 +50,7 @@ def _cliente_actual(user):
     return perfil.cliente
 
 
+@login_required
 def crear_ubicacion(request):
     if request.method == 'POST':
         form = UbicacionForm(request.POST, request.FILES, user=request.user)
@@ -66,6 +68,7 @@ def crear_ubicacion(request):
     }
     return render(request, 'Activos/crear_ubicacion.html', context)
 
+@login_required
 def editar_ubicacion(request, ubicacion_id):
     ubicacion = Ubicacion.objects.filter(id=ubicacion_id).first()
     if not ubicacion:
@@ -88,6 +91,7 @@ def editar_ubicacion(request, ubicacion_id):
     }
     return render(request, 'Activos/crear_ubicacion.html', context)
 
+@login_required
 def crear_equipo(request):
     if request.method == 'POST':
         form = EquipoForm(request.POST, request.FILES, user=request.user)
@@ -105,6 +109,7 @@ def crear_equipo(request):
     }
     return render(request, 'Activos/crear_equipo.html', context)
 
+@login_required
 def editar_equipo(request, equipo_id):
     equipo = Equipo.objects.filter(id=equipo_id).first()
     if not equipo:
@@ -127,6 +132,7 @@ def editar_equipo(request, equipo_id):
     }
     return render(request, 'Activos/crear_equipo.html', context)
 
+@login_required
 def crear_equipo_dinamico(request):
     """Crea un equipo hijo dinámicamente desde el árbol"""
     if request.method == 'POST':
@@ -297,6 +303,7 @@ def _serialize_ubicacion_node(ubicacion, scope_ids=None):
     return node
 
 
+@login_required
 def api_arbol_json(request):
     """Endpoint preparatorio para jsTree: expone el árbol de ubicaciones y equipos en JSON."""
     tipo_cuenta = request.session.get('tipo_cuenta')
@@ -342,6 +349,7 @@ def api_arbol_json(request):
     return JsonResponse({'data': data})
 
 
+@login_required
 def lista_activos(request):
     tipo_cuenta = request.session.get('tipo_cuenta')
     scope_ids = set()
@@ -571,6 +579,7 @@ def _build_hoja_vida_pdf_bytes(equipo, request=None):
     return buffer
 
 
+@login_required
 def hoja_vida_equipo(request, equipo_id):
     """Genera y devuelve una Hoja de Vida (PDF) para un `Equipo` con su historial de OTs."""
     equipo = Equipo.objects.filter(id=equipo_id).first()
@@ -592,6 +601,7 @@ def _collect_ubicacion_descendants(ubicacion):
     return ids
 
 
+@login_required
 def descargar_hojas_vida_ubicacion(request, ubicacion_id):
     """Genera un ZIP con todas las hojas de vida de los equipos bajo una ubicación y sus sububicaciones."""
     ubicacion = Ubicacion.objects.filter(id=ubicacion_id).first()
