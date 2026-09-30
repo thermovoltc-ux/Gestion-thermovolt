@@ -1,6 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, FileResponse, Http404, StreamingHttpResponse
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 import json
 from django.db import models, transaction, IntegrityError
@@ -662,7 +661,6 @@ def gestion_ot(request):
 
 
 # Vista para actualizar el estado de una solicitud
-@csrf_exempt
 @require_POST
 @login_required
 def actualizar_estado_solicitud(request):
@@ -766,7 +764,6 @@ def actualizar_estado_solicitud(request):
     return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
 
 # Vista para asignar un técnico a un preventivo y crear una solicitud/OT vinculada
-@csrf_exempt
 @require_POST
 @login_required
 def asignar_tarea_preventiva(request, tarea_id):
