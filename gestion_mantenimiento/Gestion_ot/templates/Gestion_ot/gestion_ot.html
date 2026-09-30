@@ -316,12 +316,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
                 {% if solicitud.estado.nombre == 'solicitado' %}
                     <div class="kanban-card" id="card-{{ solicitud.consecutivo }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, '{{ solicitud.consecutivo }}')"
                     data-numero-activo="{{ solicitud.consecutivo }}"
-                    data-pdv="{{ solicitud.PDV }}"
+                    data-pdv="{{ solicitud.ubicacion_nombre }}"
                     data-descripcion="{{ solicitud.descripcion_problema }}"
                     data-fecha-creacion="{{ solicitud.fecha_creacion }}"
                     data-estado="{{ solicitud.estado.nombre }}">
                     <h3>Solicitud 00{{ solicitud.consecutivo }}</h3>
-                    <h4>Ubicacion: {{ solicitud.PDV }}</h4>
+                    <h4>Ubicacion: {{ solicitud.ubicacion_nombre }}</h4>
                     <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
                     <small>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
                     </div>
@@ -357,12 +357,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
                 {% if solicitud.estado.nombre == 'en proceso' %}
                     <div class="kanban-card" id="card-{{ solicitud.consecutivo }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, '{{ solicitud.consecutivo }}')"
                     data-numero-activo="{{ solicitud.consecutivo }}"
-                    data-pdv="{{ solicitud.PDV }}"
+                    data-pdv="{{ solicitud.ubicacion_nombre }}"
                     data-descripcion="{{ solicitud.descripcion_problema }}"
                     data-fecha-creacion="{{ solicitud.fecha_creacion }}"
                     data-estado="{{ solicitud.estado.nombre }}">
                     <h3>Solicitud 00{{ solicitud.consecutivo }}</h3>
-                    <h4>Ubicacion: {{ solicitud.PDV }}</h4>
+                    <h4>Ubicacion: {{ solicitud.ubicacion_nombre }}</h4>
                     <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
                     <small>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
                     </div>
@@ -398,12 +398,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
                 {% if solicitud.estado.nombre == 'en revision' %}
                     <div class="kanban-card" id="card-{{ solicitud.consecutivo }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, '{{ solicitud.consecutivo }}')"
                          data-numero-activo="{{ solicitud.consecutivo }}"
-                         data-pdv="{{ solicitud.PDV }}"
+                         data-pdv="{{ solicitud.ubicacion_nombre }}"
                          data-descripcion="{{ solicitud.descripcion_problema }}"
                          data-fecha-creacion="{{ solicitud.fecha_creacion }}"
                          data-estado="{{ solicitud.estado.nombre }}">
                         <h3>Solicitud 00{{ solicitud.consecutivo }}</h3>
-                        <h4>Ubicacion: {{ solicitud.PDV }}</h4>
+                        <h4>Ubicacion: {{ solicitud.ubicacion_nombre }}</h4>
                         <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
                         <small>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
                     </div>
@@ -419,12 +419,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
                 {% if solicitud.estado.nombre == 'finalizada' %}
                     <div class="kanban-card" id="card-{{ solicitud.consecutivo }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, '{{ solicitud.consecutivo }}')"
                          data-numero-activo="{{ solicitud.consecutivo }}"
-                         data-pdv="{{ solicitud.PDV }}"
+                         data-pdv="{{ solicitud.ubicacion_nombre }}"
                          data-descripcion="{{ solicitud.descripcion_problema }}"
                          data-fecha-creacion="{{ solicitud.fecha_creacion }}"
                          data-estado="{{ solicitud.estado.nombre }}">
                         <h3>Solicitud 00{{ solicitud.consecutivo }}</h3>
-                        <h4>Ubicacion: {{ solicitud.PDV }}</h4>
+                        <h4>Ubicacion: {{ solicitud.ubicacion_nombre }}</h4>
                         <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
                         <small>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
                     </div>
@@ -465,7 +465,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
             <tr class="ver-solicitud" data-consecutivo="{{ solicitud.consecutivo }}">
                 <td data-label="Consecutivo">{{ solicitud.consecutivo }}</td>
                 <td data-label="Creado por">{{ solicitud.creado_por }}</td>
-                <td data-label="Ubicación">{{ solicitud.PDV }}</td>
+                <td data-label="Ubicación">{{ solicitud.ubicacion_nombre }}</td>
                 <td data-label="Descripción">{{ solicitud.descripcion_problema|slice:":50" }}...</td>
                 <td data-label="Fecha de Creación">{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</td>
                 <td data-label="Estado">{{ solicitud.estado.nombre }}</td>

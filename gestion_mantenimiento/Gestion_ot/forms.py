@@ -2,13 +2,7 @@ from django import forms
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.forms import inlineformset_factory
-from .models import GestionOt, OrdenTrabajo, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad
-
-# Formulario para GestionOt
-class GestionOtForm(forms.ModelForm):
-    class Meta:
-        model = GestionOt
-        fields = ['solicitud', 'tecnico']
+from .models import OrdenTrabajo, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad
 
 # Formulario para OrdenTrabajo
 class OrdenTrabajoForm(forms.ModelForm):

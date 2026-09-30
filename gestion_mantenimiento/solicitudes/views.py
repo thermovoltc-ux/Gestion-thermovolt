@@ -69,8 +69,6 @@ def crear_solicitud(request):
 
                 if ubicacion_seleccionada:
                     form.instance.ubicacion = ubicacion_seleccionada
-                    form.instance.PDV = ubicacion_seleccionada.nombre
-                    form.instance.co = ubicacion_seleccionada.codigo
 
             nueva_solicitud = form.save(commit=False)
 
@@ -114,9 +112,9 @@ def enviar_correo_solicitud(solicitud):
     message = f"""
     Se ha creado una nueva solicitud de mantenimiento.
     
-    CO: {solicitud.co}
+    CO: {solicitud.ubicacion_co}
     Creado por: {solicitud.creado_por}
-    PDV: {solicitud.PDV}
+    PDV: {solicitud.ubicacion_nombre}
     Equipo: {solicitud.equipo}
     Descripción solicitud: {solicitud.descripcion_problema}
     Solicitado por: {solicitud.solicitado_por}

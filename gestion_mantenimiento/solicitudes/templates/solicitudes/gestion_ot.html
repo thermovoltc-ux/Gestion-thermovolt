@@ -159,7 +159,7 @@
         {% for solicitud in solicitudes %}
             <div class="kanban-card" id="card-{{ solicitud.numero_activo }}" draggable="true" ondragstart="drag(event)">
                 <h3>Solicitud 00{{ solicitud.numero_activo }}</h3>
-                <h4>PDV: {{ solicitud.PDV }}</h4>
+                <h4>PDV: {{ solicitud.ubicacion_nombre }}</h4>
                 <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
                 <small>{{ solicitud.fecha_creacion }}</small>
             </div>
@@ -170,7 +170,7 @@
         {% for solicitud in solicitudes %}
         <div class="kanban-card" id="card-{{ solicitud.numero_activo }}" draggable="true" ondragstart="drag(event)">
             <h3>Solicitud 00{{ solicitud.numero_activo }}</h3>
-            <h4>PDV: {{ solicitud.PDV }}</h4>
+            <h4>PDV: {{ solicitud.ubicacion_nombre }}</h4>
             <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
             <small>{{ solicitud.fecha_creacion }}</small>
         </div>

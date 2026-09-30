@@ -15,8 +15,8 @@ import os
 from django.contrib import messages
 import os
 import smtplib
-from .models import OrdenTrabajo, Estado, GestionOt, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad, InformeDriveArchivo, ProcesoInforme
-from .forms import GestionOtForm, OrdenTrabajoForm, CierreOtForm, ImagenCierreOtForm, ImagenAntesForm, ImagenDespuesForm, CierreOtActividadFormSet
+from .models import OrdenTrabajo, Estado, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad, InformeDriveArchivo, ProcesoInforme
+from .forms import OrdenTrabajoForm, CierreOtForm, ImagenCierreOtForm, ImagenAntesForm, ImagenDespuesForm, CierreOtActividadFormSet
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.users.access import obtener_scope_ubicacion_ids
 import logging
@@ -564,7 +564,7 @@ def gestion_ot(request):
             )
             solicitudes_pendientes = Solicitud.objects.filter(
                 Q(ubicacion_id__in=scope_ids) | Q(equipo__ubicacion_id__in=scope_ids),
-                gestionot__isnull=True,
+                orden_trabajo__isnull=True,
             )
             tareas_mantenimiento = TareaMantenimiento.objects.filter(
                 plan__equipo__ubicacion_id__in=scope_ids,
@@ -572,7 +572,7 @@ def gestion_ot(request):
             ).select_related('plan', 'actividad', 'tecnico').order_by('fecha_programada')
     else:
         ordenes_trabajo = OrdenTrabajo.objects.all()
-        solicitudes_pendientes = Solicitud.objects.filter(gestionot__isnull=True)
+        solicitudes_pendientes = Solicitud.objects.filter(orden_trabajo__isnull=True)
         tareas_mantenimiento = TareaMantenimiento.objects.filter(
             estado__in=['pendiente', 'en_progreso']
         ).select_related('plan', 'actividad', 'tecnico').order_by('fecha_programada')
@@ -585,7 +585,14 @@ def gestion_ot(request):
     filtro_estado = request.GET.get('estado')
     filtro_atrasadas = request.GET.get('atrasadas')
 
-    pdvs = Solicitud.objects.values_list('PDV', flat=True).distinct()
+    pdvs = sorted(
+        {
+            (solicitud.ubicacion.nombre if solicitud.ubicacion and solicitud.ubicacion.nombre else solicitud.PDV)
+            for solicitud in Solicitud.objects.select_related('ubicacion').all()
+            if (solicitud.ubicacion and solicitud.ubicacion.nombre) or solicitud.PDV
+        },
+        key=lambda value: (value or '').lower()
+    )
 
     default_month_filter = False
     if not filtro_fecha_inicio and not filtro_fecha_fin:
@@ -629,7 +636,9 @@ def gestion_ot(request):
             )
             tareas_mantenimiento = tareas_mantenimiento.filter(fecha_programada__range=[filtro_fecha_inicio, filtro_fecha_fin])
     if filtro_pdv:
-        solicitudes_pendientes = solicitudes_pendientes.filter(PDV=filtro_pdv)
+        solicitudes_pendientes = solicitudes_pendientes.filter(
+            models.Q(ubicacion__nombre=filtro_pdv) | models.Q(PDV=filtro_pdv)
+        )
 
     filter_label = None
     if filtro_estado:
@@ -643,7 +652,7 @@ def gestion_ot(request):
         tareas_mantenimiento = tareas_mantenimiento.filter(fecha_programada__lt=timezone.now().date())
         filter_label = 'Tareas con atraso'
 
-    form = GestionOtForm()
+    form = OrdenTrabajoForm()
     return render(request, 'Gestion_ot/gestion_ot.html', {
         'form': form,
         'ordenes_trabajo': ordenes_trabajo,
@@ -733,18 +742,9 @@ def actualizar_estado_solicitud(request):
             orden_trabajo.save()
             created = False
         else:
-            fallback_tecnico = None
-            gestion_ot = GestionOt.objects.filter(solicitud=solicitud).first()
-            if gestion_ot and gestion_ot.tecnico:
-                fallback_tecnico = gestion_ot.tecnico
-            else:
-                cierre_ot = CierreOt.objects.filter(orden_trabajo__solicitud=solicitud).first()
-                if cierre_ot and cierre_ot.nombre_tecnico:
-                    fallback_tecnico = cierre_ot.nombre_tecnico
-
             orden_trabajo = OrdenTrabajo.objects.create(
                 solicitud=solicitud,
-                tecnico_asignado=tecnico or fallback_tecnico or '',
+                tecnico_asignado=tecnico or '',
                 estado=nuevo_estado,
                 fecha_actividad=fecha_dt
             )
@@ -795,7 +795,6 @@ def asignar_tarea_preventiva(request, tarea_id):
             equipo=equipo,
             fecha_creacion=timezone.now(),
             estado=estado_obj,
-            PDV=ubicacion.nombre if ubicacion else equipo.nombre,
             solicitado_por=request.user.username,
             prioridad='media',
             ubicacion=ubicacion
@@ -1086,7 +1085,12 @@ def cierre_ot(request, ot_id):
 @login_required
 def detalles_solicitud(request, consecutivo):
     solicitud = get_object_or_404(Solicitud.objects.select_related('equipo__ubicacion'), consecutivo=consecutivo)
-    ordenes_trabajo = solicitud.ordenes_trabajo.all()
+    orden_trabajo = None
+    try:
+        orden_trabajo = solicitud.orden_trabajo
+    except OrdenTrabajo.DoesNotExist:
+        orden_trabajo = None
+
     logger.info(f"[DETALLES_SOLICITUD] consecutivo={solicitud.consecutivo} equipo_obj={solicitud.equipo} equipo_id={getattr(solicitud.equipo, 'id', None)} display_label={getattr(solicitud.equipo, 'display_label', None)}")
     # Construir label del equipo: intentar display_label, sino construir manualmente
     equipo_label = 'Sin equipo asignado'
@@ -1111,20 +1115,20 @@ def detalles_solicitud(request, consecutivo):
     
     data = {
         'consecutivo': solicitud.consecutivo,
-        'pdv': solicitud.PDV,
+        'pdv': solicitud.ubicacion_nombre,
         'descripcion': solicitud.descripcion_problema,
         'fecha_creacion': solicitud.fecha_creacion,
         'estado': solicitud.estado.nombre,
         'equipo': equipo_label,
         'ordenes_trabajo': []
     }
-    for ot in ordenes_trabajo:
+    if orden_trabajo:
         try:
-            cierre_ot = CierreOt.objects.get(orden_trabajo=ot)
+            cierre_ot = CierreOt.objects.get(orden_trabajo=orden_trabajo)
             data['ordenes_trabajo'].append({
-                'tecnico_asignado': ot.tecnico_asignado,
-                'estado__nombre': ot.estado.nombre,
-                'fecha_actividad': ot.fecha_actividad,
+                'tecnico_asignado': orden_trabajo.tecnico_asignado,
+                'estado__nombre': orden_trabajo.estado.nombre,
+                'fecha_actividad': orden_trabajo.fecha_actividad,
                 'causa_falla': cierre_ot.causa_falla,
                 'correo_tecnico': cierre_ot.correo_tecnico,
                 'descripcion_falla': cierre_ot.descripcion_falla,
@@ -1140,10 +1144,9 @@ def detalles_solicitud(request, consecutivo):
             })
         except CierreOt.DoesNotExist:
             data['ordenes_trabajo'].append({
-                'tecnico_asignado': ot.tecnico_asignado,
-                'estado__nombre': ot.estado.nombre,
-                'fecha_actividad': ot.fecha_actividad,
-                # Otros campos de OrdenTrabajo que sean necesarios
+                'tecnico_asignado': orden_trabajo.tecnico_asignado,
+                'estado__nombre': orden_trabajo.estado.nombre,
+                'fecha_actividad': orden_trabajo.fecha_actividad,
             })
     
     return JsonResponse(data, encoder=CustomDjangoJSONEncoder)
@@ -1196,7 +1199,7 @@ def generar_pdf_reportlab(cierre_ot):
     data = {
         'OT': str(solicitud.consecutivo),
         'Equipo': getattr(solicitud.equipo, 'nombre', '') if hasattr(solicitud, 'equipo') else '',
-        'Cliente': solicitud.PDV,
+        'Cliente': solicitud.ubicacion_nombre,
         'Fecha': cierre_ot.fecha_inicio_actividad.strftime('%d/%m/%Y') if cierre_ot.fecha_inicio_actividad else '',
         'Tipo de Mantenimiento': cierre_ot.tipo_mantenimiento or '',
         'Tipo de Intervención': cierre_ot.tipo_intervencion or '',
@@ -1628,7 +1631,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     equipo_nombre = solicitud.equipo.nombre if solicitud.equipo else "N/A"
     
     # Usar PDV como nombre del cliente
-    cliente_nombre = solicitud.PDV if solicitud.PDV else "N/A"
+    cliente_nombre = solicitud.ubicacion_nombre or "N/A"
     
     fecha_str = cierre_ot.fecha_inicio_actividad.strftime('%d/%m/%Y') if cierre_ot.fecha_inicio_actividad else datetime.datetime.now().strftime('%d/%m/%Y')
     
@@ -1649,7 +1652,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
     # Try to resolve client/PDV email
     pdv_name = None
     try:
-        pdv_name = solicitud.PDV or (solicitud.equipo.ubicacion.nombre if solicitud.equipo and solicitud.equipo.ubicacion else None)
+        pdv_name = solicitud.ubicacion_nombre or (solicitud.equipo.ubicacion.nombre if solicitud.equipo and solicitud.equipo.ubicacion else None)
     except Exception:
         pdv_name = None
 

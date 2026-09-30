@@ -26,14 +26,29 @@ class Solicitud(models.Model):
 
     ubicacion = models.ForeignKey('Activos.Ubicacion', on_delete=models.CASCADE, null=True, blank=True)  # Referencia al modelo Ubicacion
 
+    @property
+    def ubicacion_nombre(self):
+        if self.ubicacion and self.ubicacion.nombre:
+            return self.ubicacion.nombre
+        return self.PDV or ''
+
+    @property
+    def ubicacion_co(self):
+        if self.ubicacion:
+            return self.ubicacion.co or self.ubicacion.codigo or ''
+        return self.co or ''
+
     def save(self, *args, **kwargs):
         if self.fecha_creacion and timezone.is_naive(self.fecha_creacion):
             self.fecha_creacion = timezone.make_aware(self.fecha_creacion, timezone.get_current_timezone())
         
-        # Asignar el nombre y el código de la ubicación a los campos PDV y co
+        # Fuente de verdad: Ubicacion. Los campos PDV/co quedan como compatibilidad
+        # legacy y solo se completan si aún estaban vacíos.
         if self.ubicacion:
-            self.PDV = self.ubicacion.nombre
-            self.co = self.ubicacion.codigo
+            if not self.PDV:
+                self.PDV = self.ubicacion.nombre
+            if not self.co:
+                self.co = self.ubicacion.co or self.ubicacion.codigo
 
         if self._state.adding and not self.consecutivo:
             ultimo_consecutivo = Solicitud.objects.aggregate(models.Max('consecutivo'))['consecutivo__max'] or 0

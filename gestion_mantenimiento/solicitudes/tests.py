@@ -38,3 +38,27 @@ class SolicitudConsecutivoTests(TestCase):
         )
 
         self.assertEqual(solicitud.consecutivo, 12)
+
+    def test_usa_ubicacion_como_fuente_de_verdad_para_pdv_y_co(self):
+        self.ubicacion.co = 'CO-99'
+        self.ubicacion.save()
+
+        solicitud = Solicitud.objects.create(
+            creado_por='tester',
+            descripcion_problema='cuarta',
+            equipo=self.equipo,
+            ubicacion=self.ubicacion,
+            estado=self.estado,
+            PDV='PDV legacy',
+            co='CO legacy',
+        )
+
+        self.assertEqual(solicitud.ubicacion_nombre, 'Ubicación prueba')
+        self.assertEqual(solicitud.ubicacion_co, 'CO-99')
+
+        solicitud.PDV = 'PDV legacy actualizada'
+        solicitud.co = 'CO legacy actualizada'
+        solicitud.save()
+
+        self.assertEqual(solicitud.ubicacion_nombre, 'Ubicación prueba')
+        self.assertEqual(solicitud.ubicacion_co, 'CO-99')

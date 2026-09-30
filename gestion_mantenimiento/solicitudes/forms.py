@@ -10,7 +10,7 @@ class SolicitudForm(forms.ModelForm):
         model = Solicitud
         fields = [
             'consecutivo', 'creado_por', 'descripcion_problema', 'email_solicitante', 
-            'PDV', 'fecha_creacion', 'equipo', 'co', 'solicitado_por', 'enviar_email', 'prioridad'
+            'fecha_creacion', 'equipo', 'solicitado_por', 'enviar_email', 'prioridad'
         ]
         widgets = {
             'fecha_creacion': forms.DateTimeInput(attrs={'type': 'datetime-local'}),

@@ -169,7 +169,7 @@ def generar_pdf_desde_plantilla(cierre_ot, plantilla_path=None):
             solicitud = cierre_ot.orden_trabajo.solicitud
             numero_ot = str(solicitud.consecutivo) if solicitud else 'N/A'
             equipo_nombre = solicitud.equipo.nombre if solicitud.equipo else "N/A"
-            cliente_nombre = solicitud.ubicacion.nombre if solicitud.ubicacion else solicitud.PDV or "N/A"
+            cliente_nombre = solicitud.ubicacion_nombre or (solicitud.ubicacion.nombre if solicitud.ubicacion else "N/A")
             fecha_formato = cierre_ot.fecha_inicio_actividad.strftime('%d/%m/%Y') if cierre_ot.fecha_inicio_actividad else datetime.now().strftime('%d/%m/%Y')
         except Exception as e:
             logger.error(f"Error extrayendo datos: {e}")

@@ -20,19 +20,9 @@ class Estado(models.Model):
         return self.nombre
 
 
-# Modelo de GestionOt
-class GestionOt(models.Model):
-    solicitud = models.ForeignKey('solicitudes.Solicitud', on_delete=models.CASCADE)
-    tecnico = models.CharField(max_length=100)
-    fecha_asignacion = models.DateField(auto_now_add=True)
-
-    def __str__(self):
-        return f"GestionOt {self.solicitud}"
-    
-
 # Modelo de OrdenTrabajo
 class OrdenTrabajo(models.Model):
-    solicitud = models.ForeignKey('solicitudes.Solicitud', on_delete=models.CASCADE, related_name='ordenes_trabajo', default=1)
+    solicitud = models.OneToOneField('solicitudes.Solicitud', on_delete=models.CASCADE, related_name='orden_trabajo', default=1)
     tecnico_asignado = models.CharField(max_length=100)
     fecha_actividad = models.DateTimeField(blank=True, null=True)
     estado = models.ForeignKey(Estado, on_delete=models.SET_NULL, null=True, default=1)  # Referencia al modelo Estado
@@ -50,11 +40,6 @@ class OrdenTrabajo(models.Model):
                 return self.cierreot.nombre_tecnico
         except CierreOt.DoesNotExist:
             pass
-        gestion_ot = getattr(self.solicitud, 'gestionot_set', None)
-        if gestion_ot is not None:
-            first_gestion = gestion_ot.first()
-            if first_gestion and first_gestion.tecnico:
-                return first_gestion.tecnico
         return ''
 
 class CierreOt(models.Model):
