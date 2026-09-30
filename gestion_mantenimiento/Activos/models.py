@@ -28,7 +28,7 @@ class UnidadNegocio(models.Model):
 class Ubicacion(models.Model):
     id = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=100, null=False, blank=False)
-    codigo = models.CharField(max_length=20, null=False, blank=False)
+    codigo = models.CharField(max_length=20, null=False, blank=False, unique=True)
     co = models.CharField(max_length=100, null=True, blank=True)
     descripcion = models.TextField(null=True, blank=True)
     direccion = models.CharField(max_length=255, null=True, blank=True)
@@ -90,7 +90,7 @@ class Item(MPTTModel):
 class Equipo(models.Model):
     id = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=100, null=False, blank=False)
-    codigo = models.CharField(max_length=20, null=False, blank=False)
+    codigo = models.CharField(max_length=20, null=False, blank=False, unique=True)
     fabricante = models.CharField(max_length=100, null=True, blank=True)
     modelo = models.CharField(max_length=100, null=True, blank=True)
     serie = models.CharField(max_length=100, null=True, blank=True)
