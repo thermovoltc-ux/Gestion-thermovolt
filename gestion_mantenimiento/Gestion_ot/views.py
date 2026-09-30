@@ -561,7 +561,9 @@ def gestion_ot(request):
         else:
             ordenes_trabajo = OrdenTrabajo.objects.filter(
                 Q(solicitud__ubicacion_id__in=scope_ids) | Q(solicitud__equipo__ubicacion_id__in=scope_ids)
-            )
+            ).select_related(
+                'solicitud__equipo', 'solicitud__ubicacion', 'estado'
+            ).order_by('-fecha_actividad', '-id')
             solicitudes_pendientes = Solicitud.objects.filter(
                 Q(ubicacion_id__in=scope_ids) | Q(equipo__ubicacion_id__in=scope_ids),
                 orden_trabajo__isnull=True,
@@ -571,7 +573,9 @@ def gestion_ot(request):
                 estado__in=['pendiente', 'en_progreso'],
             ).select_related('plan', 'actividad', 'tecnico').order_by('fecha_programada')
     else:
-        ordenes_trabajo = OrdenTrabajo.objects.all()
+        ordenes_trabajo = OrdenTrabajo.objects.select_related(
+            'solicitud__equipo', 'solicitud__ubicacion', 'estado'
+        ).order_by('-fecha_actividad', '-id')
         solicitudes_pendientes = Solicitud.objects.filter(orden_trabajo__isnull=True)
         tareas_mantenimiento = TareaMantenimiento.objects.filter(
             estado__in=['pendiente', 'en_progreso']

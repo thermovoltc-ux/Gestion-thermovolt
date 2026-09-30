@@ -353,18 +353,18 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     <div class="kanban-column" id="ot_en_proceso" ondrop="drop(event)" ondragover="allowDrop(event)">
         <h2>OT en Proceso</h2>
         <div class="kanban-content">
-            {% for solicitud in solicitudes %}
-                {% if solicitud.estado.nombre == 'en proceso' %}
-                    <div class="kanban-card" id="card-{{ solicitud.consecutivo }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, '{{ solicitud.consecutivo }}')"
-                    data-numero-activo="{{ solicitud.consecutivo }}"
-                    data-pdv="{{ solicitud.ubicacion_nombre }}"
-                    data-descripcion="{{ solicitud.descripcion_problema }}"
-                    data-fecha-creacion="{{ solicitud.fecha_creacion }}"
-                    data-estado="{{ solicitud.estado.nombre }}">
-                    <h3>Solicitud 00{{ solicitud.consecutivo }}</h3>
-                    <h4>Ubicacion: {{ solicitud.ubicacion_nombre }}</h4>
-                    <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
-                    <small>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
+            {% for ot in ordenes_trabajo %}
+                {% if ot.estado.nombre == 'en proceso' %}
+                    <div class="kanban-card" id="card-{{ ot.solicitud.consecutivo }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, '{{ ot.solicitud.consecutivo }}')"
+                    data-numero-activo="{{ ot.solicitud.consecutivo }}"
+                    data-pdv="{{ ot.solicitud.ubicacion_nombre }}"
+                    data-descripcion="{{ ot.solicitud.descripcion_problema }}"
+                    data-fecha-creacion="{{ ot.solicitud.fecha_creacion }}"
+                    data-estado="{{ ot.estado.nombre }}">
+                    <h3>Solicitud 00{{ ot.solicitud.consecutivo }}</h3>
+                    <h4>Ubicacion: {{ ot.solicitud.ubicacion_nombre }}</h4>
+                    <p>{{ ot.solicitud.descripcion_problema|slice:":50" }}...</p>
+                    <small>{{ ot.solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
                     </div>
                 {% endif %}
             {% endfor %}
@@ -394,18 +394,18 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     <div class="kanban-column" id="ot_en_revision" ondrop="drop(event)" ondragover="allowDrop(event)">
         <h2>OT en Revisión</h2>
         <div class="kanban-content">
-            {% for solicitud in solicitudes %}
-                {% if solicitud.estado.nombre == 'en revision' %}
-                    <div class="kanban-card" id="card-{{ solicitud.consecutivo }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, '{{ solicitud.consecutivo }}')"
-                         data-numero-activo="{{ solicitud.consecutivo }}"
-                         data-pdv="{{ solicitud.ubicacion_nombre }}"
-                         data-descripcion="{{ solicitud.descripcion_problema }}"
-                         data-fecha-creacion="{{ solicitud.fecha_creacion }}"
-                         data-estado="{{ solicitud.estado.nombre }}">
-                        <h3>Solicitud 00{{ solicitud.consecutivo }}</h3>
-                        <h4>Ubicacion: {{ solicitud.ubicacion_nombre }}</h4>
-                        <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
-                        <small>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
+            {% for ot in ordenes_trabajo %}
+                {% if ot.estado.nombre == 'en revision' %}
+                    <div class="kanban-card" id="card-{{ ot.solicitud.consecutivo }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, '{{ ot.solicitud.consecutivo }}')"
+                         data-numero-activo="{{ ot.solicitud.consecutivo }}"
+                         data-pdv="{{ ot.solicitud.ubicacion_nombre }}"
+                         data-descripcion="{{ ot.solicitud.descripcion_problema }}"
+                         data-fecha-creacion="{{ ot.solicitud.fecha_creacion }}"
+                         data-estado="{{ ot.estado.nombre }}">
+                        <h3>Solicitud 00{{ ot.solicitud.consecutivo }}</h3>
+                        <h4>Ubicacion: {{ ot.solicitud.ubicacion_nombre }}</h4>
+                        <p>{{ ot.solicitud.descripcion_problema|slice:":50" }}...</p>
+                        <small>{{ ot.solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
                     </div>
                 {% endif %}
             {% endfor %}
@@ -415,18 +415,18 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     <div class="kanban-column" id="ot_finalizada" ondrop="drop(event)" ondragover="allowDrop(event)">
         <h2>OT Finalizada</h2>
         <div class="kanban-content">
-            {% for solicitud in solicitudes %}
-                {% if solicitud.estado.nombre == 'finalizada' %}
-                    <div class="kanban-card" id="card-{{ solicitud.consecutivo }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, '{{ solicitud.consecutivo }}')"
-                         data-numero-activo="{{ solicitud.consecutivo }}"
-                         data-pdv="{{ solicitud.ubicacion_nombre }}"
-                         data-descripcion="{{ solicitud.descripcion_problema }}"
-                         data-fecha-creacion="{{ solicitud.fecha_creacion }}"
-                         data-estado="{{ solicitud.estado.nombre }}">
-                        <h3>Solicitud 00{{ solicitud.consecutivo }}</h3>
-                        <h4>Ubicacion: {{ solicitud.ubicacion_nombre }}</h4>
-                        <p>{{ solicitud.descripcion_problema|slice:":50" }}...</p>
-                        <small>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
+            {% for ot in ordenes_trabajo %}
+                {% if ot.estado.nombre == 'finalizada' %}
+                    <div class="kanban-card" id="card-{{ ot.solicitud.consecutivo }}" draggable="true" ondragstart="drag(event)" onmousedown="startClick(event)" onmouseup="endClick(event, '{{ ot.solicitud.consecutivo }}')"
+                         data-numero-activo="{{ ot.solicitud.consecutivo }}"
+                         data-pdv="{{ ot.solicitud.ubicacion_nombre }}"
+                         data-descripcion="{{ ot.solicitud.descripcion_problema }}"
+                         data-fecha-creacion="{{ ot.solicitud.fecha_creacion }}"
+                         data-estado="{{ ot.estado.nombre }}">
+                        <h3>Solicitud 00{{ ot.solicitud.consecutivo }}</h3>
+                        <h4>Ubicacion: {{ ot.solicitud.ubicacion_nombre }}</h4>
+                        <p>{{ ot.solicitud.descripcion_problema|slice:":50" }}...</p>
+                        <small>{{ ot.solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
                     </div>
                 {% endif %}
             {% endfor %}
