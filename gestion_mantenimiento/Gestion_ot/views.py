@@ -463,7 +463,10 @@ def _procesar_proceso_informe(operation_id):
             if not _validar_pdf(pdf_buffer):
                 proceso.set_state(ProcesoInforme.ERROR, 'PDF inválido después de generar', last_error='La salida no parece un PDF válido.')
                 return
+            drive_link, stored_path = guardar_pdf_en_media(pdf_buffer, cierre_ot)
+            proceso.pdf_path = drive_link or stored_path or ''
             proceso.pdf_size_bytes = len(pdf_buffer.getvalue())
+            proceso.save(update_fields=['pdf_path', 'pdf_size_bytes'])
             proceso.set_state(ProcesoInforme.PDF_LISTO, 'PDF listo')
 
         if enviar_email:
@@ -473,7 +476,7 @@ def _procesar_proceso_informe(operation_id):
                 return
             proceso.set_state(ProcesoInforme.ENVIANDO, 'Enviando correo')
             try:
-                enviado = enviar_pdf_por_email(pdf_buffer, cierre_ot)
+                enviado = enviar_pdf_por_email(pdf_buffer, cierre_ot, drive_link)
             except Exception as exc:
                 proceso.set_state(ProcesoInforme.PDF_LISTO, f'Error enviando email: {exc}', last_error=str(exc))
                 logger.error('[INFORME] operation=%s fallo envío: %s', operation_id, exc)
@@ -1567,7 +1570,7 @@ def guardar_pdf_en_media(pdf_buffer, cierre_ot):
         try:
             public_url = subir_pdf_a_drive(pdf_bytes, filename, folder_id=drive_folder_id)
             logger.info("PDF guardado en Google Drive: %s", public_url)
-            return public_url
+            return public_url, public_url
         except Exception as drive_exc:
             logger.warning("No se pudo guardar el PDF en Google Drive: %s", drive_exc)
     else:
@@ -1581,7 +1584,7 @@ def guardar_pdf_en_media(pdf_buffer, cierre_ot):
         url = default_storage.url(saved_name)
         public_url = _build_media_url(url)
         logger.info("PDF guardado en storage: %s -> URL: %s", saved_name, public_url)
-        return public_url
+        return public_url, saved_name
     except Exception as exc:
         logger.warning("No se pudo guardar el PDF en storage: %s", exc)
 
@@ -1594,12 +1597,12 @@ def guardar_pdf_en_media(pdf_buffer, cierre_ot):
 
         public_url = _build_download_url(filename)
         logger.info("PDF guardado localmente en MEDIA_ROOT: %s -> URL de descarga: %s", local_path, public_url)
-        return public_url
+        return public_url, local_path
     except Exception as exc2:
         logger.warning("No se pudo guardar el PDF localmente en MEDIA_ROOT: %s", exc2)
 
     logger.error("No fue posible generar una URL pública para el PDF.")
-    return None
+    return None, None
 
 
 def descargar_informe_token(request, token):
@@ -1642,7 +1645,7 @@ def descargar_informe_pdf(request, filename):
         raise Http404("No se pudo abrir el archivo")
 
 
-def enviar_pdf_por_email(pdf_buffer, cierre_ot):
+def enviar_pdf_por_email(pdf_buffer, cierre_ot, drive_link):
     """Envía el PDF por email usando Brevo API con formato HTML presentable."""
     from django.core.mail import EmailMultiAlternatives
     
@@ -1774,18 +1777,8 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         logger.info(f"   - Destinatarios: {recipient_list}")
         logger.info(f"   - Archivo: {pdf_filename} ({attachment_size_mb:.2f} MB)")
 
-        drive_link = None
-        try:
-            drive_link = guardar_pdf_en_media(pdf_buffer, cierre_ot)
-            if drive_link:
-                logger.info("🔗 Link público para informe generado en Drive/storage: %s", drive_link)
-            else:
-                logger.warning("⚠️ No se pudo generar link público para el PDF. Se usará fallback local si existe.")
-        except Exception as drive_exc:
-            logger.warning("No se pudo preparar el enlace del PDF para el correo: %s", drive_exc)
-            drive_link = None
-
         if drive_link:
+            logger.info("🔗 Link público para informe generado en Drive/storage: %s", drive_link)
             link_block = f"<div style=\"background:#f5f5f5;padding:15px;border:1px solid #d1d5db;border-radius:6px;margin:20px 0;\"><p>El informe completo está disponible aquí: <a href=\"{drive_link}\">Descargar informe (PDF)</a></p></div>"
             html_content = html_content.replace('<!-- LINK_INFORME -->', link_block)
             text_content += f"\nDescargar informe: {drive_link}\n\nThermovolt Servicios"

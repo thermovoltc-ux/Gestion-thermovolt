@@ -65,10 +65,8 @@ class EnviarPdfPorEmailTests(TestCase):
         self.pdf_buffer = BytesIO(b'%PDF-test')
 
     def _send_with_link(self, drive_link):
-        with patch.object(views, 'guardar_copia_pdf_envio'), patch.object(
-            views, 'guardar_pdf_en_media', return_value=drive_link
-        ):
-            return views.enviar_pdf_por_email(self.pdf_buffer, self.cierre_ot)
+        with patch.object(views, 'guardar_copia_pdf_envio'):
+            return views.enviar_pdf_por_email(self.pdf_buffer, self.cierre_ot, drive_link)
 
     def test_sends_link_in_plain_text_and_html_without_bcc_or_attachment(self):
         self.assertTrue(self._send_with_link('https://reports.example/informe.pdf'))
@@ -150,3 +148,58 @@ class ProcesoInformeRetryTests(TestCase):
             call_command('procesar_informes_pendientes', stdout=StringIO(), stderr=StringIO())
 
         procesar.assert_called_once_with(reintentable.operation_id)
+
+
+class ProcesoInformePersistenciaTests(TestCase):
+    def setUp(self):
+        ubicacion = Ubicacion.objects.create(nombre='Ubicación persistencia', codigo='UBI-PERSIST')
+        equipo = Equipo.objects.create(nombre='Equipo persistencia', codigo='EQ-PERSIST', ubicacion=ubicacion)
+        estado, _ = Estado.objects.get_or_create(nombre='solicitado')
+        solicitud = Solicitud.objects.create(
+            creado_por='tester',
+            descripcion_problema='Prueba persistencia PDF',
+            equipo=equipo,
+            ubicacion=ubicacion,
+            estado=estado,
+        )
+        orden = OrdenTrabajo.objects.create(
+            solicitud=solicitud,
+            tecnico_asignado='Técnico persistencia',
+            estado=estado,
+        )
+        self.cierre_ot = CierreOt.objects.create(orden_trabajo=orden)
+        self.proceso = ProcesoInforme.objects.create(cierre_ot=self.cierre_ot)
+
+    def test_pdf_path_and_size_are_persisted_before_sending(self):
+        pdf_buffer = BytesIO(b'%PDF-1.4\n' + b'x' * 1024 + b'\n%%EOF')
+        with patch.object(views, '_validar_firmas', return_value=(True, 'OK')), patch.object(
+            views, '_validar_imagenes', return_value=(True, 0, 0, 'OK')
+        ), patch.object(views, 'generar_pdf_informe', return_value=pdf_buffer), patch.object(
+            views, 'guardar_pdf_en_media', return_value=(
+                'https://reports.example/ot-42.pdf', 'email_copies/informes/ot-42.pdf'
+            )
+        ), patch.object(views, 'enviar_pdf_por_email', return_value=True) as enviar_email:
+            views._procesar_proceso_informe(self.proceso.operation_id)
+
+        self.proceso.refresh_from_db()
+        self.assertEqual(self.proceso.pdf_path, 'https://reports.example/ot-42.pdf')
+        self.assertEqual(self.proceso.pdf_size_bytes, len(pdf_buffer.getvalue()))
+        self.assertEqual(self.proceso.estado, ProcesoInforme.ENVIADO)
+        enviar_email.assert_called_once_with(
+            pdf_buffer, self.cierre_ot, 'https://reports.example/ot-42.pdf'
+        )
+
+    def test_local_storage_path_is_persisted_when_public_url_is_unavailable(self):
+        pdf_buffer = BytesIO(b'%PDF-1.4\n' + b'x' * 1024 + b'\n%%EOF')
+        local_path = '/app/media/email_copies/informes/ot-42.pdf'
+        with patch.object(views, '_validar_firmas', return_value=(True, 'OK')), patch.object(
+            views, '_validar_imagenes', return_value=(True, 0, 0, 'OK')
+        ), patch.object(views, 'generar_pdf_informe', return_value=pdf_buffer), patch.object(
+            views, 'guardar_pdf_en_media', return_value=(None, local_path)
+        ), patch.object(views, 'enviar_pdf_por_email', return_value=True) as enviar_email:
+            views._procesar_proceso_informe(self.proceso.operation_id)
+
+        self.proceso.refresh_from_db()
+        self.assertEqual(self.proceso.pdf_path, local_path)
+        self.assertEqual(self.proceso.pdf_size_bytes, len(pdf_buffer.getvalue()))
+        enviar_email.assert_called_once_with(pdf_buffer, self.cierre_ot, None)
