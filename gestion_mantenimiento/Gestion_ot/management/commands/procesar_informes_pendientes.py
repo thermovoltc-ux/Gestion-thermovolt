@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import Q
 from datetime import timedelta
 
 from gestion_mantenimiento.Gestion_ot.models import ProcesoInforme
@@ -20,9 +21,12 @@ class Command(BaseCommand):
         now = timezone.now()
         cutoff = now - timedelta(minutes=ttl_minutes)
 
-        self.stdout.write(f"Buscando procesos pendientes (ACTIVE_STATES) hasta {limit} (ttl={ttl_minutes}m)")
+        self.stdout.write(f"Buscando procesos pendientes y errores reintentables hasta {limit} (ttl={ttl_minutes}m)")
 
-        qs = ProcesoInforme.objects.filter(estado__in=list(ProcesoInforme.ACTIVE_STATES)).order_by('created_at')[:limit]
+        qs = ProcesoInforme.objects.filter(
+            Q(estado__in=list(ProcesoInforme.ACTIVE_STATES)) |
+            Q(estado=ProcesoInforme.ERROR, intentos__lt=informe_views.MAX_INTENTOS_PROCESO_INFORME)
+        ).order_by('created_at')[:limit]
 
         for proceso in qs:
             # Si fue iniciado recientemente y no supera el TTL, saltar

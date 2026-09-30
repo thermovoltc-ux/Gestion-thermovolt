@@ -145,6 +145,7 @@ class ProcesoInforme(models.Model):
     operation_id = models.CharField(max_length=64, unique=True, db_index=True, default=uuid.uuid4)
     cierre_ot = models.ForeignKey(CierreOt, on_delete=models.CASCADE, related_name='procesos_informe')
     estado = models.CharField(max_length=32, choices=ESTADO_CHOICES, default=PENDIENTE, db_index=True)
+    intentos = models.PositiveIntegerField(default=0, help_text='Cantidad de intentos de procesamiento')
     mensaje = models.CharField(max_length=255, blank=True, default='Pendiente')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

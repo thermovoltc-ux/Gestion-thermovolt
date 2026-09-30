@@ -397,15 +397,31 @@ def _guardar_imagenes_del_post(cierre_ot, request, proceso):
     return total_imagenes
 
 
+MAX_INTENTOS_PROCESO_INFORME = 4
+
+
 def _procesar_proceso_informe(operation_id):
     try:
-        proceso = ProcesoInforme.objects.select_related('cierre_ot__orden_trabajo__solicitud').get(operation_id=operation_id)
+        with transaction.atomic():
+            proceso = ProcesoInforme.objects.select_related(
+                'cierre_ot__orden_trabajo__solicitud'
+            ).select_for_update().get(operation_id=operation_id)
+            if proceso.email_enviado or proceso.estado == ProcesoInforme.ENVIADO:
+                logger.info('[INFORME] operation=%s ya enviado, no se procesará de nuevo', operation_id)
+                return
+            if proceso.intentos >= MAX_INTENTOS_PROCESO_INFORME:
+                if proceso.estado != ProcesoInforme.ERROR:
+                    proceso.set_state(
+                        ProcesoInforme.ERROR,
+                        'Se alcanzó el máximo de intentos de procesamiento',
+                        last_error='Se alcanzó el máximo de intentos de procesamiento',
+                    )
+                logger.warning('[INFORME] operation=%s alcanzó el límite de intentos', operation_id)
+                return
+            proceso.intentos += 1
+            proceso.save(update_fields=['intentos'])
     except ProcesoInforme.DoesNotExist:
         logger.error('[INFORME] operation=%s no encontrado en background', operation_id)
-        return
-
-    if proceso.email_enviado:
-        logger.info('[INFORME] operation=%s ya enviado, no se procesará de nuevo', operation_id)
         return
 
     cierre_ot = proceso.cierre_ot

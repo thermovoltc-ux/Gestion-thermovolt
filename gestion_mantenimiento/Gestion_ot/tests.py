@@ -1,14 +1,16 @@
 from datetime import datetime, timezone as datetime_timezone
 from io import BytesIO
+from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.db import IntegrityError
 from django.core import mail
+from django.core.management import call_command
 from django.test import TestCase, override_settings
 
 from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
-from gestion_mantenimiento.Gestion_ot.models import Estado, OrdenTrabajo
+from gestion_mantenimiento.Gestion_ot.models import CierreOt, Estado, OrdenTrabajo, ProcesoInforme
 from gestion_mantenimiento.Gestion_ot import views
 from gestion_mantenimiento.solicitudes.models import Solicitud
 
@@ -91,3 +93,60 @@ class EnviarPdfPorEmailTests(TestCase):
             mimetype == 'text/html' and 'El informe no está disponible por el momento' in content
             for content, mimetype in message.alternatives
         ))
+
+
+class ProcesoInformeRetryTests(TestCase):
+    def setUp(self):
+        ubicacion = Ubicacion.objects.create(nombre='Ubicación retry', codigo='UBI-RETRY')
+        equipo = Equipo.objects.create(nombre='Equipo retry', codigo='EQ-RETRY', ubicacion=ubicacion)
+        estado, _ = Estado.objects.get_or_create(nombre='solicitado')
+        solicitud = Solicitud.objects.create(
+            creado_por='tester',
+            descripcion_problema='Prueba retry',
+            equipo=equipo,
+            ubicacion=ubicacion,
+            estado=estado,
+        )
+        orden = OrdenTrabajo.objects.create(
+            solicitud=solicitud,
+            tecnico_asignado='Técnico retry',
+            estado=estado,
+        )
+        self.cierre_ot = CierreOt.objects.create(orden_trabajo=orden)
+
+    def crear_proceso(self, operation_id, intentos):
+        return ProcesoInforme.objects.create(
+            operation_id=operation_id,
+            cierre_ot=self.cierre_ot,
+            estado=ProcesoInforme.ERROR,
+            intentos=intentos,
+        )
+
+    def test_processing_increments_attempt_and_records_validation_error(self):
+        proceso = self.crear_proceso('retry-validation', 0)
+
+        with patch.object(views, '_validar_firmas', return_value=(False, 'Falta una firma')):
+            views._procesar_proceso_informe(proceso.operation_id)
+
+        proceso.refresh_from_db()
+        self.assertEqual(proceso.intentos, 1)
+        self.assertEqual(proceso.estado, ProcesoInforme.ERROR)
+
+    def test_processing_stops_at_four_attempts(self):
+        proceso = self.crear_proceso('retry-limit', 4)
+
+        with patch.object(views, '_validar_firmas') as validar_firmas:
+            views._procesar_proceso_informe(proceso.operation_id)
+
+        proceso.refresh_from_db()
+        self.assertEqual(proceso.intentos, 4)
+        validar_firmas.assert_not_called()
+
+    def test_worker_selects_only_errors_below_attempt_limit(self):
+        reintentable = self.crear_proceso('retry-eligible', 0)
+        self.crear_proceso('retry-exhausted', 4)
+
+        with patch.object(views, '_procesar_proceso_informe') as procesar:
+            call_command('procesar_informes_pendientes', stdout=StringIO(), stderr=StringIO())
+
+        procesar.assert_called_once_with(reintentable.operation_id)
