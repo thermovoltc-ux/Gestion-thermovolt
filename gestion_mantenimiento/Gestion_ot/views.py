@@ -1700,17 +1700,6 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         if e and e not in recipient_list:
             recipient_list.append(e)
     
-    bcc_list = []
-    copy_address = getattr(settings, 'EMAIL_ADICIONAL', None)
-    if copy_address:
-        if isinstance(copy_address, str):
-            copy_addresses = [email.strip() for email in copy_address.split(',') if email.strip()]
-        else:
-            copy_addresses = list(copy_address)
-        for email in copy_addresses:
-            if email and email not in recipient_list:
-                bcc_list.append(email)
-
     if not recipient_list:
         logger.warning("No hay destinatarios principales para enviar el email")
         return False
@@ -1744,7 +1733,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
                         <p style="margin: 5px 0;"><strong>Documento:</strong> {pdf_filename}</p>
                     </div>
                     
-                    <p>El documento completo puede descargarse desde el enlace del Drive incluido en este correo.</p>
+                    <!-- LINK_INFORME -->
                     
                     <p>Si tiene preguntas o necesita aclaraciones adicionales, no dude en contactarnos.</p>
                 </div>
@@ -1761,8 +1750,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
         </html>
         """
         
-        # Crear email con versión texto y HTML
-        text_content = f"Cordial saludo,\n\nEl informe de los trabajos realizados en {cliente_nombre} queda disponible en Google Drive.\n\nOT-{consecutivo}\nEquipo: {equipo_nombre}\nCliente: {cliente_nombre}\nFecha: {fecha_str}\n\nThermovolt Servicios"
+        text_content = f"Cordial saludo,\n\nInforme de Mantenimiento OT-{consecutivo}\nEquipo: {equipo_nombre}\nCliente: {cliente_nombre}\nFecha: {fecha_str}\n"
 
         pdf_bytes = pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else bytes(pdf_buffer)
         attachment_size_mb = len(pdf_bytes) / (1024 * 1024)
@@ -1781,27 +1769,21 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot):
             logger.warning("No se pudo preparar el enlace del PDF para el correo: %s", drive_exc)
             drive_link = None
 
+        if drive_link:
+            link_block = f"<div style=\"background:#f5f5f5;padding:15px;border:1px solid #d1d5db;border-radius:6px;margin:20px 0;\"><p>El informe completo está disponible aquí: <a href=\"{drive_link}\">Descargar informe (PDF)</a></p></div>"
+            html_content = html_content.replace('<!-- LINK_INFORME -->', link_block)
+            text_content += f"\nDescargar informe: {drive_link}\n\nThermovolt Servicios"
+        else:
+            unavailable_message = 'El informe no está disponible por el momento. Por favor contacte al administrador.'
+            html_content = html_content.replace('<!-- LINK_INFORME -->', f'<p>{unavailable_message}</p>')
+            text_content += f"\n{unavailable_message}\n\nThermovolt Servicios"
+
         email = EmailMultiAlternatives(
             subject=subject,
             body=text_content,
             from_email=from_email,
             to=recipient_list,
-            bcc=bcc_list
         )
-
-        if drive_link:
-            link_block = f"<div style=\"background:#f5f5f5;padding:15px;border:1px solid #d1d5db;border-radius:6px;margin:20px 0;\"><p>El informe completo está disponible aquí: <a href=\"{drive_link}\">Descargar informe (PDF)</a></p></div>"
-            if '</body>' in html_content:
-                html_content = html_content.replace('</body>', f"{link_block}</body>")
-            else:
-                html_content += link_block
-            text_content += f"\n\nInforme disponible: {drive_link}\n"
-        else:
-            try:
-                email.attach(pdf_filename, pdf_bytes, 'application/pdf')
-                logger.info("📎 PDF adjuntado al email como fallback")
-            except Exception as attach_exc:
-                logger.warning("No se pudo adjuntar el PDF como fallback: %s", attach_exc)
 
         # Agregar versión HTML con el contenido final, incluyendo posible enlace.
         email.attach_alternative(html_content, "text/html")
