@@ -87,15 +87,20 @@ Lista de Activos - Gestión de Activos y Equipos
             <input type="hidden" id="parent-id" name="parent_id">
             <input type="hidden" id="parent-type" name="parent_type">
 
-            <div class="form-group-modal" id="parent-equipo-display" style="display:none;">
-                <label>Parent</label>
-                <input type="text" id="parent-equipo-nombre" disabled>
-            </div>
-
-            <div class="form-group-modal" id="parent-equipo-selector">
+            <div class="form-group-modal" id="parent-equipo-selector" style="display:none;">
                 <label for="parent-equipo">Equipo padre (opcional)</label>
                 <select id="parent-equipo" name="parent">
                     <option value="">— Sin equipo padre —</option>
+                </select>
+            </div>
+
+            <div class="form-group-modal">
+                <label for="ubicacion-select">Ubicación</label>
+                <select id="ubicacion-select" name="ubicacion" class="select-modal" required>
+                    <option value="">— Seleccionar ubicación —</option>
+                    {% for ubicacion in ubicaciones_all %}
+                        <option value="{{ ubicacion.id }}">{{ ubicacion.nombre }}{% if ubicacion.codigo %} ({{ ubicacion.codigo }}){% endif %}</option>
+                    {% endfor %}
                 </select>
             </div>
 
@@ -121,16 +126,6 @@ Lista de Activos - Gestión de Activos y Equipos
                     <div class="form-group-modal">
                         <label>Código</label>
                         <input type="text" id="codigo-hijo" name="codigo" required placeholder="Ej: MOL-001">
-                    </div>
-                    <div class="form-group-modal">
-                        <label>Ubicación</label>
-                        <input type="text" id="ubicacion-busqueda" name="ubicacion_busqueda" list="ubicaciones-list" placeholder="Buscar ubicación..." autocomplete="off">
-                        <datalist id="ubicaciones-list">
-                            {% for ubicacion in ubicaciones_all %}
-                                <option value="{{ ubicacion.nombre }}{% if ubicacion.codigo %} ({{ ubicacion.codigo }}){% endif %}"></option>
-                            {% endfor %}
-                        </datalist>
-                        <input type="hidden" id="ubicacion-hijo" name="ubicacion">
                     </div>
                     <div class="form-group-modal">
                         <label>Descripción</label>
@@ -2175,10 +2170,6 @@ Lista de Activos - Gestión de Activos y Equipos
         {% endfor %}
     ];
 
-    function matchUbicacionLabel(label) {
-        return ubicacionesData.find(item => item.label === label);
-    }
-
     function getNodeAttributes(node) {
         return (node && node.original && node.original.a_attr) || (node && node.a_attr) || {};
     }
@@ -2267,14 +2258,6 @@ Lista de Activos - Gestión de Activos y Equipos
             select.appendChild(option);
         }
         select.value = value;
-    }
-
-    function actualizarUbicacionSeleccionada() {
-        const buscador = document.getElementById('ubicacion-busqueda');
-        const hidden = document.getElementById('ubicacion-hijo');
-        if (!buscador || !hidden) return;
-        const selected = matchUbicacionLabel(buscador.value.trim());
-        hidden.value = selected ? selected.id : '';
     }
 
     function toggleChildren(id) {
@@ -2380,11 +2363,8 @@ Lista de Activos - Gestión de Activos y Equipos
         const parentTypeInput = document.getElementById('parent-type');
         const parentSelector = document.getElementById('parent-equipo-selector');
         const parentSelect = document.getElementById('parent-equipo');
+        const ubicacionSelect = document.getElementById('ubicacion-select');
         const modalTitulo = document.getElementById('modal-titulo-crear');
-        const parentDisplay = document.getElementById('parent-equipo-display');
-        const parentNameInput = document.getElementById('parent-equipo-nombre');
-        const ubicacionSearch = document.getElementById('ubicacion-busqueda');
-        const ubicacionHidden = document.getElementById('ubicacion-hijo');
         const advancedSection = document.getElementById('advanced-equipo-section');
         const form = document.getElementById('form-crear-hijo');
         const submitButton = form.querySelector('button[type="submit"]');
@@ -2392,41 +2372,28 @@ Lista de Activos - Gestión de Activos y Equipos
         if (form) {
             form.reset();
         }
-        cargarOpcionesEquipoPadre(null);
-        if (parentSelector) parentSelector.style.display = 'block';
         parentIdInput.value = parentId || '';
         parentTypeInput.value = parentType || '';
-        if (parentSelect && parentType === 'equipo' && parentId) {
-            parentSelect.value = String(parentId);
-        }
         modalTitulo.textContent = parentName ? `Crear Equipo bajo ${parentName}` : 'Crear Equipo';
         form.action = '{% url "crear_equipo_dinamico" %}';
         if (submitButton) submitButton.textContent = 'Crear';
 
-        if (parentType && parentName) {
-            parentDisplay.style.display = 'block';
-            parentNameInput.value = parentName;
+        if (parentType === 'equipo') {
+            cargarOpcionesEquipoPadre(null);
+            if (parentSelector) parentSelector.style.display = 'block';
+            if (parentSelect && parentId) parentSelect.value = String(parentId);
         } else {
-            parentDisplay.style.display = 'none';
-            parentNameInput.value = '';
+            if (parentSelector) parentSelector.style.display = 'none';
+            if (parentSelect) parentSelect.value = '';
         }
 
-        if (ubicacionHidden) {
-            ubicacionHidden.value = '';
-        }
-        if (ubicacionSearch) {
-            ubicacionSearch.value = '';
-        }
-
+        let ubicacionId = '';
         if (parentType === 'ubicacion' && parentId) {
-            const found = ubicacionesData.find(item => item.id === String(parentId));
-            if (ubicacionHidden) {
-                ubicacionHidden.value = parentId;
-            }
-            if (ubicacionSearch && found) {
-                ubicacionSearch.value = found.label;
-            }
+            ubicacionId = parentId;
+        } else if (parentType === 'equipo' && nodoSeleccionado) {
+            ubicacionId = nodoSeleccionado.ubicacionId || '';
         }
+        if (ubicacionSelect) ubicacionSelect.value = String(ubicacionId);
 
         const imagenInput = document.getElementById('imagen-hijo');
         if (imagenInput) {
@@ -2444,6 +2411,8 @@ Lista de Activos - Gestión de Activos y Equipos
     function cerrarModalCrearHijo() {
         const modal = document.getElementById('modal-crear-hijo');
         modal.classList.remove('open');
+        const parentSelector = document.getElementById('parent-equipo-selector');
+        if (parentSelector) parentSelector.style.display = 'none';
         const form = document.getElementById('form-crear-hijo');
         if (form) {
             form.reset();
@@ -2564,7 +2533,6 @@ Lista de Activos - Gestión de Activos y Equipos
 
     function crearHijoDinamico(event) {
         event.preventDefault();
-        actualizarUbicacionSeleccionada();
         const form = document.getElementById('form-crear-hijo');
         const parentSelect = document.getElementById('parent-equipo');
         const parentIdInput = document.getElementById('parent-id');
@@ -2576,6 +2544,7 @@ Lista de Activos - Gestión de Activos y Equipos
             parentIdInput.value = '';
             parentTypeInput.value = '';
         }
+        if (!form.reportValidity()) return;
         form.submit();
     }
 
@@ -2605,12 +2574,9 @@ Lista de Activos - Gestión de Activos y Equipos
         const modal = document.getElementById('modal-crear-hijo');
         const form = document.getElementById('form-crear-hijo');
         const modalTitulo = document.getElementById('modal-titulo-crear');
-        const parentDisplay = document.getElementById('parent-equipo-display');
-        const parentNameInput = document.getElementById('parent-equipo-nombre');
         const parentSelector = document.getElementById('parent-equipo-selector');
         const parentSelect = document.getElementById('parent-equipo');
-        const ubicacionSearch = document.getElementById('ubicacion-busqueda');
-        const ubicacionHidden = document.getElementById('ubicacion-hijo');
+        const ubicacionSelect = document.getElementById('ubicacion-select');
         const advancedSection = document.getElementById('advanced-equipo-section');
         const submitButton = form.querySelector('button[type="submit"]');
 
@@ -2618,21 +2584,22 @@ Lista de Activos - Gestión de Activos y Equipos
         if (submitButton) submitButton.textContent = 'Actualizar';
         modalTitulo.textContent = `Editar Equipo: ${nodoSeleccionado.nombre}`;
 
-        parentDisplay.style.display = 'none';
-        parentNameInput.value = '';
         cargarOpcionesEquipoPadre(id);
-        if (parentSelector) parentSelector.style.display = 'block';
-        if (parentSelect) parentSelect.value = nodoSeleccionado.parentId || '';
+        if (parentSelect) {
+            const currentParentId = nodoSeleccionado.parentId || '';
+            if (currentParentId && !Array.from(parentSelect.options).some(option => option.value === String(currentParentId))) {
+                const option = document.createElement('option');
+                option.value = String(currentParentId);
+                option.textContent = nodoSeleccionado.parentNombre || `Equipo ${currentParentId}`;
+                parentSelect.appendChild(option);
+            }
+            parentSelect.value = String(currentParentId);
+        }
+        if (parentSelector) parentSelector.style.display = 'none';
 
         document.getElementById('nombre-hijo').value = nodoSeleccionado.nombre || '';
         document.getElementById('codigo-hijo').value = nodoSeleccionado.codigo || '';
-        if (ubicacionHidden) {
-            ubicacionHidden.value = nodoSeleccionado.ubicacionId || '';
-        }
-        if (ubicacionSearch) {
-            const found = ubicacionesData.find(item => item.id === String(nodoSeleccionado.ubicacionId));
-            ubicacionSearch.value = found ? found.label : '';
-        }
+        if (ubicacionSelect) ubicacionSelect.value = nodoSeleccionado.ubicacionId || '';
         document.getElementById('descripcion-hijo').value = nodoSeleccionado.descripcion || '';
         document.getElementById('fabricante-hijo').value = nodoSeleccionado.fabricante || '';
         document.getElementById('modelo-hijo').value = nodoSeleccionado.modelo || '';
