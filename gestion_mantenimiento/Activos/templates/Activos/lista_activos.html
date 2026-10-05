@@ -253,6 +253,45 @@ Lista de Activos - Gestión de Activos y Equipos
     </div>
 </div>
 
+<div id="modal-eliminar" class="modal-arbol">
+    <div class="modal-arbol-content" style="max-width: 600px;">
+        <div class="modal-arbol-header" style="background-color: #dc3545;">
+            <h2>Confirmar eliminación</h2>
+            <button class="modal-arbol-close" type="button" onclick="cerrarModalEliminar()" aria-label="Cerrar">&times;</button>
+        </div>
+        <div style="padding: 24px;">
+            <p style="font-size: 16px; margin-bottom: 16px;">
+                ¿Confirmás la eliminación permanente de <strong id="eliminar-nombre"></strong>?
+            </p>
+            <div style="background: #f8d7da; border-left: 4px solid #dc3545; padding: 16px; margin-bottom: 20px; border-radius: 4px;">
+                <p style="margin: 0 0 10px; color: #721c24; font-weight: 700; font-size: 15px;">
+                    ADVERTENCIA: esta acción es IRREVERSIBLE
+                </p>
+                <p style="margin: 0 0 8px; color: #721c24; font-size: 13px; line-height: 1.6;">
+                    Se borrará el registro seleccionado y, según sus relaciones, también pueden borrarse:
+                </p>
+                <ul style="margin: 0; padding-left: 20px; color: #721c24; font-size: 13px; line-height: 1.7;">
+                    <li>Subequipos, equipos asociados y sub-ubicaciones</li>
+                    <li>Áreas, centros de costo, activos e ítems relacionados</li>
+                    <li>Solicitudes, órdenes de trabajo y cierres</li>
+                    <li>Firmas, imágenes, actividades, informes y planes de mantenimiento</li>
+                </ul>
+                <p style="margin: 10px 0 0; color: #721c24; font-size: 13px; line-height: 1.6;">
+                    Los archivos físicos o de Drive podrían quedar sin referencia; no se eliminan automáticamente.
+                    Esta acción no se puede deshacer.
+                </p>
+            </div>
+            <form id="form-eliminar" method="post">
+                {% csrf_token %}
+                <div class="modal-arbol-buttons">
+                    <button type="button" class="btn-modal-cancel" onclick="cerrarModalEliminar()">Cancelar</button>
+                    <button type="submit" class="btn-modal-success" style="background-color: #dc3545;">Sí, eliminar definitivamente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <div class="floating-button-container">
     <a href="#" class="floating-button" onclick="toggleOptions()">
         <span><ion-icon name="add-outline" class="icon-large"></ion-icon></span>
@@ -2013,6 +2052,10 @@ Lista de Activos - Gestión de Activos y Equipos
                 }
             });
 
+            addButton('🗑 Eliminar', '#dc3545', function() {
+                abrirModalEliminar(tipo, id, nombre);
+            });
+
             $actions.appendTo($content);
             $panel.append($content);
         });
@@ -2734,16 +2777,40 @@ Lista de Activos - Gestión de Activos y Equipos
         window.location.href = `/Gestion_ot/listar_ot/?${params.toString()}`;
     }
 
+    function abrirModalEliminar(tipo, id, nombre) {
+        if (tipo !== 'equipo' && tipo !== 'ubicacion') return;
+
+        const modal = document.getElementById('modal-eliminar');
+        const form = document.getElementById('form-eliminar');
+        const nombreSpan = document.getElementById('eliminar-nombre');
+        if (!modal || !form || !nombreSpan) return;
+
+        nombreSpan.textContent = nombre || '';
+        form.action = tipo === 'equipo'
+            ? `/Activos/eliminar_equipo/${id}/`
+            : `/Activos/eliminar_ubicacion/${id}/`;
+        modal.classList.add('open');
+    }
+
+    function cerrarModalEliminar() {
+        const modal = document.getElementById('modal-eliminar');
+        if (modal) modal.classList.remove('open');
+    }
+
     // Cerrar modales al hacer click fuera
     document.addEventListener('click', function(event) {
         const modalHijo = document.getElementById('modal-crear-hijo');
         const modalUbicacion = document.getElementById('modal-crear-ubicacion');
+        const modalEliminar = document.getElementById('modal-eliminar');
         
         if (event.target === modalHijo) {
             cerrarModalCrearHijo();
         }
         if (event.target === modalUbicacion) {
             cerrarModalCrearUbicacion();
+        }
+        if (event.target === modalEliminar) {
+            cerrarModalEliminar();
         }
     });
 
