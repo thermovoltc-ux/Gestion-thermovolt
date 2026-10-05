@@ -290,13 +290,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
             <input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtro_fecha_fin|date:'Y-m-d' }}">
         </div>
         <div class="filter-form-group">
-            <label for="pdv">PDV:</label>
-            <select id="pdv" name="pdv">
-                <option value="">Seleccione PDV</option>
-                {% for pdv in pdvs %}
-                    {% if pdv %}
-                        <option value="{{ pdv }}" {% if pdv == filtro_pdv %}selected{% endif %}>{{ pdv }}</option>
-                    {% endif %}
+            <label for="ubicacion_id">Ubicación:</label>
+            <select id="ubicacion_id" name="ubicacion_id">
+                <option value="">Seleccione Ubicación</option>
+                {% for ubicacion_id_option, ubicacion_nombre in ubicaciones %}
+                    <option value="{{ ubicacion_id_option }}" {% if ubicacion_id_option == filtro_ubicacion_id %}selected{% endif %}>{{ ubicacion_nombre }}</option>
                 {% endfor %}
             </select>
         </div>

@@ -7,7 +7,10 @@ from unittest.mock import patch
 from django.db import IntegrityError
 from django.core import mail
 from django.core.management import call_command
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
+from django.urls import reverse
+from django.utils import timezone
+from dateutil.relativedelta import relativedelta
 
 from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
 from gestion_mantenimiento.Gestion_ot.models import CierreOt, Estado, OrdenTrabajo, ProcesoInforme
@@ -91,6 +94,80 @@ class EnviarPdfPorEmailTests(TestCase):
             mimetype == 'text/html' and 'El informe no está disponible por el momento' in content
             for content, mimetype in message.alternatives
         ))
+
+
+class GestionOtFilterRegressionTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = self._create_user('tester', 'contraseña123')
+        self.client.force_login(self.user)
+        self.ubicacion_a = Ubicacion.objects.create(nombre='Ubicación A', codigo='UBI-A')
+        self.ubicacion_b = Ubicacion.objects.create(nombre='Ubicación B', codigo='UBI-B')
+        self.equipo_a = Equipo.objects.create(nombre='Equipo A', codigo='EQ-A', ubicacion=self.ubicacion_a)
+        self.equipo_b = Equipo.objects.create(nombre='Equipo B', codigo='EQ-B', ubicacion=self.ubicacion_b)
+        self.estado_solicitado, _ = Estado.objects.get_or_create(nombre='solicitado')
+        self.estado_finalizada, _ = Estado.objects.get_or_create(nombre='finalizada')
+
+        self.ot_actual = self._crear_ot(
+            'Actual',
+            self.ubicacion_a,
+            self.equipo_a,
+            self.estado_solicitado,
+            timezone.now(),
+        )
+        self.ot_pasada = self._crear_ot(
+            'Pasada',
+            self.ubicacion_a,
+            self.equipo_a,
+            self.estado_solicitado,
+            timezone.now() - relativedelta(months=2),
+        )
+        self.ot_otra_ubicacion = self._crear_ot(
+            'Otra',
+            self.ubicacion_b,
+            self.equipo_b,
+            self.estado_solicitado,
+            timezone.now(),
+        )
+        self.ot_finalizada = self._crear_ot(
+            'Finalizada',
+            self.ubicacion_a,
+            self.equipo_a,
+            self.estado_finalizada,
+            timezone.now() - relativedelta(months=2),
+        )
+
+    def _create_user(self, username, password):
+        from django.contrib.auth import get_user_model
+        return get_user_model().objects.create_user(username=username, password=password)
+
+    def _crear_ot(self, descripcion, ubicacion, equipo, estado, fecha_creacion):
+        solicitud = Solicitud.objects.create(
+            creado_por='tester',
+            descripcion_problema=descripcion,
+            equipo=equipo,
+            ubicacion=ubicacion,
+            estado=estado,
+            fecha_creacion=fecha_creacion,
+        )
+        return OrdenTrabajo.objects.create(
+            solicitud=solicitud,
+            tecnico_asignado='Tecnico filtro',
+            estado=estado,
+            fecha_actividad=fecha_creacion,
+        )
+
+    def test_kanban_filters_by_ubicacion_and_keeps_older_unresolved_ots_by_default(self):
+        response = self.client.get(reverse('gestion_ot'), {'ubicacion_id': self.ubicacion_a.id})
+
+        self.assertEqual(response.status_code, 200)
+        ordenes = list(response.context['ordenes_trabajo'])
+        self.assertCountEqual(
+            [ot.solicitud.consecutivo for ot in ordenes],
+            [self.ot_actual.solicitud.consecutivo, self.ot_pasada.solicitud.consecutivo],
+        )
+        self.assertNotIn(self.ot_otra_ubicacion.solicitud.consecutivo, [ot.solicitud.consecutivo for ot in ordenes])
+        self.assertNotIn(self.ot_finalizada.solicitud.consecutivo, [ot.solicitud.consecutivo for ot in ordenes])
 
 
 class ProcesoInformeRetryTests(TestCase):

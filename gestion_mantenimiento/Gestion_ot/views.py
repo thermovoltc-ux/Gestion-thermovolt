@@ -604,18 +604,28 @@ def gestion_ot(request):
     # Filtros
     filtro_fecha_inicio = request.GET.get('fecha_inicio')
     filtro_fecha_fin = request.GET.get('fecha_fin')
-    filtro_pdv = request.GET.get('pdv')
+    filtro_ubicacion_id = request.GET.get('ubicacion_id') or request.GET.get('ubicacion')
     filtro_estado = request.GET.get('estado')
     filtro_atrasadas = request.GET.get('atrasadas')
 
-    pdvs = sorted(
-        {
-            (solicitud.ubicacion.nombre if solicitud.ubicacion and solicitud.ubicacion.nombre else solicitud.PDV)
-            for solicitud in Solicitud.objects.select_related('ubicacion').all()
-            if (solicitud.ubicacion and solicitud.ubicacion.nombre) or solicitud.PDV
-        },
-        key=lambda value: (value or '').lower()
-    )
+    from gestion_mantenimiento.Activos.models import Ubicacion
+
+    def get_descendant_ids(ubicacion):
+        ids = [ubicacion.id]
+        for child in ubicacion.children.all():
+            ids.extend(get_descendant_ids(child))
+        return ids
+
+    ubicaciones = list(Ubicacion.objects.order_by('nombre').values_list('id', 'nombre'))
+    filtro_ubicacion_ids = None
+    try:
+        if filtro_ubicacion_id:
+            filtro_ubicacion_id = int(filtro_ubicacion_id)
+            ubicacion = Ubicacion.objects.filter(id=filtro_ubicacion_id).first()
+            if ubicacion:
+                filtro_ubicacion_ids = get_descendant_ids(ubicacion)
+    except (TypeError, ValueError):
+        filtro_ubicacion_id = None
 
     default_month_filter = False
     if not filtro_fecha_inicio and not filtro_fecha_fin:
@@ -648,6 +658,11 @@ def gestion_ot(request):
                 (models.Q(fecha_creacion__lt=filtro_fecha_inicio) & ~models.Q(estado__nombre='finalizada')) |
                 models.Q(fecha_creacion__isnull=True)
             )
+            ordenes_trabajo = ordenes_trabajo.filter(
+                models.Q(solicitud__fecha_creacion__range=[filtro_fecha_inicio, filtro_fecha_fin]) |
+                (models.Q(solicitud__fecha_creacion__lt=filtro_fecha_inicio) & ~models.Q(estado__nombre='finalizada')) |
+                models.Q(solicitud__fecha_creacion__isnull=True)
+            )
             tareas_mantenimiento = tareas_mantenimiento.filter(
                 models.Q(fecha_programada__range=[filtro_fecha_inicio, filtro_fecha_fin]) |
                 models.Q(fecha_programada__lt=filtro_fecha_inicio)
@@ -657,10 +672,22 @@ def gestion_ot(request):
                 models.Q(fecha_creacion__range=[filtro_fecha_inicio, filtro_fecha_fin]) |
                 models.Q(fecha_creacion__isnull=True)
             )
+            ordenes_trabajo = ordenes_trabajo.filter(
+                models.Q(solicitud__fecha_creacion__range=[filtro_fecha_inicio, filtro_fecha_fin]) |
+                models.Q(solicitud__fecha_creacion__isnull=True)
+            )
             tareas_mantenimiento = tareas_mantenimiento.filter(fecha_programada__range=[filtro_fecha_inicio, filtro_fecha_fin])
-    if filtro_pdv:
+    if filtro_ubicacion_ids:
+        ordenes_trabajo = ordenes_trabajo.filter(
+            models.Q(solicitud__ubicacion_id__in=filtro_ubicacion_ids) |
+            models.Q(solicitud__equipo__ubicacion_id__in=filtro_ubicacion_ids)
+        )
         solicitudes_pendientes = solicitudes_pendientes.filter(
-            models.Q(ubicacion__nombre=filtro_pdv) | models.Q(PDV=filtro_pdv)
+            models.Q(ubicacion_id__in=filtro_ubicacion_ids) |
+            models.Q(equipo__ubicacion_id__in=filtro_ubicacion_ids)
+        )
+        tareas_mantenimiento = tareas_mantenimiento.filter(
+            plan__equipo__ubicacion_id__in=filtro_ubicacion_ids
         )
 
     filter_label = None
@@ -681,10 +708,10 @@ def gestion_ot(request):
         'ordenes_trabajo': ordenes_trabajo,
         'solicitudes': solicitudes_pendientes,
         'tareas_mantenimiento': tareas_mantenimiento,
-        'pdvs': pdvs,
+        'ubicaciones': ubicaciones,
         'filtro_fecha_inicio': filtro_fecha_inicio,
         'filtro_fecha_fin': filtro_fecha_fin,
-        'filtro_pdv': filtro_pdv,
+        'filtro_ubicacion_id': filtro_ubicacion_id,
         'filtro_estado': filtro_estado,
         'filtro_atrasadas': filtro_atrasadas,
         'filter_label': filter_label,
@@ -850,7 +877,7 @@ def asignar_tarea_preventiva(request, tarea_id):
 @login_required
 def listar_ot(request):
     equipo_id = request.GET.get('equipo_id')
-    ubicacion_id = request.GET.get('ubicacion_id')
+    ubicacion_id = request.GET.get('ubicacion_id') or request.GET.get('ubicacion')
 
     tipo_cuenta = request.session.get('tipo_cuenta')
     if tipo_cuenta == 'administrador':
@@ -892,7 +919,10 @@ def listar_ot(request):
         ubicacion = Ubicacion.objects.filter(id=ubicacion_id).first()
         if ubicacion:
             ubicacion_ids = get_descendant_ids(ubicacion)
-            ots = ots.filter(solicitud__equipo__ubicacion_id__in=ubicacion_ids)
+            ots = ots.filter(
+                Q(solicitud__ubicacion_id__in=ubicacion_ids) |
+                Q(solicitud__equipo__ubicacion_id__in=ubicacion_ids)
+            )
             filter_label = f'Historial de OT para Ubicación {ubicacion.nombre} (ID {ubicacion.id})'
         else:
             filter_label = f'Historial de OT para Ubicación ID {ubicacion_id}'
