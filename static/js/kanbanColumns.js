@@ -267,12 +267,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     window.toggleFilterSidebar = toggleFilterSidebar;
 
-    function applyFilter() {
-        const filterButton = document.querySelector('.filter-button');
-        filterButton.classList.add('filter-applied');
-        localStorage.setItem('filterApplied', 'true');
-    }
-
     function clearFilter() {
         const filterButton = document.querySelector('.filter-button');
         filterButton.classList.remove('filter-applied');
@@ -280,10 +274,16 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function handleFilterFormSubmit(event) {
-        event.preventDefault();
-        const filterForm = document.getElementById('filter-form');
-        const formData = new FormData(filterForm);
+        if (event && typeof event.preventDefault === 'function') {
+            event.preventDefault();
+        }
 
+        const filterForm = event && event.currentTarget
+            ? event.currentTarget
+            : document.getElementById('filter-form');
+        if (!filterForm) return;
+
+        const formData = new FormData(filterForm);
         const params = new URLSearchParams();
         for (const [key, value] of formData.entries()) {
             if (value) {
@@ -291,14 +291,14 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        const url = `${filterForm.action}?${params.toString()}`;
+        localStorage.setItem('filterApplied', 'true');
+        if (filterButton) {
+            filterButton.classList.add('filter-applied');
+        }
 
-        fetch(url, {
-            method: 'GET',
-        })
-        .then(response => response.text())
-        .then(data => applyFilter())
-        .catch(error => console.error('Error al aplicar los filtros:', error));
+        const url = new URL(filterForm.action || window.location.pathname, window.location.href);
+        url.search = params.toString();
+        window.location.href = url.toString();
     }
 
     const filterButton = document.querySelector('.filter-button');
@@ -340,34 +340,8 @@ document.addEventListener('DOMContentLoaded', function () {
         filterIndicator.style.display = 'none';
     }
 
-    function applyFilter(event) {
-        event.preventDefault();
-
-        const fechaInicio = document.querySelector('input[name="fecha_inicio"]').value;
-        const fechaFin = document.querySelector('input[name="fecha_fin"]').value;
-        const pdv = document.querySelector('select[name="pdv"]').value;
-
-        let url = `${baseUrl}?`;
-        if (fechaInicio) url += `fecha_inicio=${fechaInicio}&`;
-        if (fechaFin) url += `fecha_fin=${fechaFin}&`;
-        if (pdv) url += `pdv=${pdv}&`;
-        url = url.slice(0, -1);
-
-        if (fechaInicio || fechaFin || pdv) {
-            showFilterIndicator();
-        } else {
-            hideFilterIndicator();
-        }
-
-        window.location.href = url;
-    }
-
-    if (filterForm) {
-        filterForm.addEventListener('submit', applyFilter);
-    }
-
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('fecha_inicio') || urlParams.has('fecha_fin') || urlParams.has('pdv')) {
+    if (urlParams.has('fecha_inicio') || urlParams.has('fecha_fin') || urlParams.has('ubicacion_id') || urlParams.has('ubicacion')) {
         showFilterIndicator();
     } else {
         hideFilterIndicator();
