@@ -341,19 +341,25 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function applyFilter(event) {
-        event.preventDefault();
+        if (event && typeof event.preventDefault === 'function') {
+            event.preventDefault();
+        }
 
-        const fechaInicio = document.querySelector('input[name="fecha_inicio"]').value;
-        const fechaFin = document.querySelector('input[name="fecha_fin"]').value;
-        const pdv = document.querySelector('select[name="pdv"]').value;
+        const fechaInicioInput = document.querySelector('input[name="fecha_inicio"]');
+        const fechaFinInput = document.querySelector('input[name="fecha_fin"]');
+        const ubicacionSelect = document.querySelector('select[name="ubicacion_id"], select[name="ubicacion"]');
+
+        const fechaInicio = fechaInicioInput ? fechaInicioInput.value : '';
+        const fechaFin = fechaFinInput ? fechaFinInput.value : '';
+        const ubicacion = ubicacionSelect ? ubicacionSelect.value : '';
 
         let url = `${baseUrl}?`;
-        if (fechaInicio) url += `fecha_inicio=${fechaInicio}&`;
-        if (fechaFin) url += `fecha_fin=${fechaFin}&`;
-        if (pdv) url += `pdv=${pdv}&`;
+        if (fechaInicio) url += `fecha_inicio=${encodeURIComponent(fechaInicio)}&`;
+        if (fechaFin) url += `fecha_fin=${encodeURIComponent(fechaFin)}&`;
+        if (ubicacion) url += `ubicacion_id=${encodeURIComponent(ubicacion)}&`;
         url = url.slice(0, -1);
 
-        if (fechaInicio || fechaFin || pdv) {
+        if (fechaInicio || fechaFin || ubicacion) {
             showFilterIndicator();
         } else {
             hideFilterIndicator();
@@ -367,7 +373,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('fecha_inicio') || urlParams.has('fecha_fin') || urlParams.has('pdv')) {
+    if (urlParams.has('fecha_inicio') || urlParams.has('fecha_fin') || urlParams.has('ubicacion_id') || urlParams.has('ubicacion')) {
         showFilterIndicator();
     } else {
         hideFilterIndicator();
