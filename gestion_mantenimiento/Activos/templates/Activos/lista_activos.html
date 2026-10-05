@@ -14,9 +14,6 @@ Lista de Activos - Gestión de Activos y Equipos
         <div class="arbol-panel-izquierdo">
             <div class="arbol-header">
                 <h3>Estructura de Activos</h3>
-                <button class="btn-crear-raiz" onclick="abrirModalCrearUbicacion()" title="Crear nueva ubicación raíz">
-                    <ion-icon name="add-circle-outline"></ion-icon> Crear Ubicación
-                </button>
             </div>
             
             <div class="tree-view" id="tree-container" style="display: none;">
@@ -261,8 +258,8 @@ Lista de Activos - Gestión de Activos y Equipos
         <span><ion-icon name="add-outline" class="icon-large"></ion-icon></span>
     </a>
     <div id="floating-options" class="floating-options">
-        <a href="javascript:abrirModalCrearUbicacion()" class="floating-option">🏢 Crear Ubicación Raíz</a>
-        <a href="javascript:abrirModalCrearEquipo(null, null, null)" class="floating-option">⚙️ Crear Equipo Independiente</a>
+        <a href="javascript:cerrarMenuFlotante();abrirModalCrearUbicacion()" class="floating-option">🏢 Crear Ubicación Raíz</a>
+        <a href="javascript:cerrarMenuFlotante();abrirModalCrearEquipo(null, null, null)" class="floating-option">⚙️ Crear Equipo Independiente</a>
     </div>
 </div>
 
@@ -1137,6 +1134,10 @@ Lista de Activos - Gestión de Activos y Equipos
         bottom: 20px;
         right: 20px;
         z-index: 1100;
+    }
+
+    body:has(.modal-arbol.open) .floating-button-container {
+        display: none !important;
     }
 
     .floating-button {
@@ -2333,6 +2334,13 @@ Lista de Activos - Gestión de Activos y Equipos
         const options = document.getElementById('floating-options');
         if (options) {
             options.classList.toggle('open');
+        }
+    }
+
+    function cerrarMenuFlotante() {
+        const options = document.getElementById('floating-options');
+        if (options) {
+            options.classList.remove('open');
         }
     }
 
