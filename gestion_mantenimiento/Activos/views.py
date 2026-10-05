@@ -3,9 +3,11 @@ import re
 import zipfile
 from urllib.request import urlopen
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.utils.text import slugify
+from django.views.decorators.http import require_POST
 from .forms import UbicacionForm, EquipoForm
 from .models import Ubicacion, Equipo
 from gestion_mantenimiento.users.models import Cliente
@@ -48,6 +50,58 @@ def _cliente_actual(user):
     if perfil is None:
         return None
     return perfil.cliente
+
+
+def _validar_equipo_en_scope(equipo, scope_ids):
+    pendientes = [equipo]
+    visitados = set()
+
+    while pendientes:
+        actual = pendientes.pop()
+        if actual.pk in visitados:
+            continue
+        visitados.add(actual.pk)
+
+        if not actual.ubicacion_id or actual.ubicacion_id not in scope_ids:
+            raise Http404('El equipo o uno de sus subequipos está fuera de tu scope.')
+
+        pendientes.extend(actual.children.all())
+
+
+def _validar_scope_equipo_recursivo(request, equipo):
+    if request.session.get('tipo_cuenta') != 'administrador':
+        return
+
+    scope_ids = obtener_scope_ubicacion_ids(request)
+    if not scope_ids:
+        raise Http404('No tenés ubicaciones autorizadas.')
+
+    _validar_equipo_en_scope(equipo, scope_ids)
+
+
+def _validar_scope_ubicacion_recursivo(request, ubicacion):
+    if request.session.get('tipo_cuenta') != 'administrador':
+        return
+
+    scope_ids = obtener_scope_ubicacion_ids(request)
+    if not scope_ids:
+        raise Http404('No tenés ubicaciones autorizadas.')
+
+    pendientes = [ubicacion]
+    visitados = set()
+
+    while pendientes:
+        actual = pendientes.pop()
+        if actual.pk in visitados:
+            continue
+        visitados.add(actual.pk)
+
+        if actual.pk not in scope_ids:
+            raise Http404('La ubicación o una sub-ubicación está fuera de tu scope.')
+
+        for equipo in actual.equipos.all():
+            _validar_equipo_en_scope(equipo, scope_ids)
+        pendientes.extend(actual.children.all())
 
 
 @login_required
@@ -164,6 +218,40 @@ def crear_equipo_dinamico(request):
 
         return redirect('lista_activos')
 
+    return redirect('lista_activos')
+
+
+@login_required
+@require_POST
+def eliminar_equipo(request, equipo_id):
+    equipo = get_object_or_404(Equipo, id=equipo_id)
+    _validar_scope_equipo_recursivo(request, equipo)
+
+    nombre = equipo.nombre
+    equipo.delete()
+
+    messages.success(
+        request,
+        f'Equipo "{nombre}" eliminado definitivamente. '
+        'Los registros relacionados también se eliminaron en cascada.',
+    )
+    return redirect('lista_activos')
+
+
+@login_required
+@require_POST
+def eliminar_ubicacion(request, ubicacion_id):
+    ubicacion = get_object_or_404(Ubicacion, id=ubicacion_id)
+    _validar_scope_ubicacion_recursivo(request, ubicacion)
+
+    nombre = ubicacion.nombre
+    ubicacion.delete()
+
+    messages.success(
+        request,
+        f'Ubicación "{nombre}" eliminada definitivamente. '
+        'Los registros relacionados también se eliminaron en cascada.',
+    )
     return redirect('lista_activos')
 
 def _safe_node_value(value):
