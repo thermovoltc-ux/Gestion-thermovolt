@@ -1671,53 +1671,6 @@ tr:hover {
 }
 
 
- /* Estilos generales */
- .tree-view {
-  font-family: Arial, sans-serif;
-  margin-top: 20px;
-  padding-left: 10px;
-}
-
-/* Estilos para cada nodo */
-.tree-item {
-  margin: 10px 0;
-}
-
-/* Estilos para el nodo con nombre de ubicación */
-.tree-node {
-  cursor: pointer;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Estilos para los sub-elementos */
-.tree-children {
-  display: none; /* Oculto por defecto */
-  padding-left: 20px;
-  list-style-type: none;
-  margin: 5px 0;
-}
-
-.tree-sub-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 0;
-}
-
-/* Iconos para expandir y los elementos */
-.icon-folder {
-  font-size: 1.2em;
-  transition: transform 0.3s ease;
-}
-
-.icon-leaf {
-  font-size: 0.9em;
-  color: #4CAF50;
-}
-
 /* Botón para crear un nuevo activo */
 .create-button {
   display: inline-block;
@@ -1728,11 +1681,6 @@ tr:hover {
   text-decoration: none;
   border-radius: 4px;
   font-weight: bold;
-}
-
-/* Estilo para el ícono al abrir */
-.open .icon-folder {
-  transform: rotate(90deg);
 }
 
 /* ... Resto de tus estilos CSS ... */

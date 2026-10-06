@@ -16,12 +16,6 @@ Lista de Activos - Gestión de Activos y Equipos
                 <h3>Estructura de Activos</h3>
             </div>
             
-            <div class="tree-view" id="tree-container" style="display: none;">
-                {% for ubicacion in ubicaciones %}
-                    {% include 'Activos/ubicacion_node.html' with ubicacion=ubicacion %}
-                {% endfor %}
-            </div>
-
             {# NUEVO: Contenedor para jsTree, visible en la etapa 1 del switch #}
             <div id="arbol-js-container" style="display: block;">
                 <div id="arbol-toolbar" style="
@@ -374,15 +368,6 @@ Lista de Activos - Gestión de Activos y Equipos
         background-color: #1976D2;
     }
 
-    .tree-view {
-        flex: 1;
-        overflow-y: auto;
-        padding: 10px;
-        font-size: 0.95rem;
-        font-family: Heebo, Arial;
-        user-select: none;
-    }
-
     #arbol-js-container {
         display: flex !important;
         flex: 1 1 auto;
@@ -559,91 +544,6 @@ Lista de Activos - Gestión de Activos y Equipos
         background-color: #e0e0e0;
     }
 
-    .tree-item {
-        margin: 5px 0;
-    }
-
-    .tree-node {
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 10px;
-        border-radius: 4px;
-        transition: all 0.2s ease;
-        margin: 2px 0;
-    }
-
-    .tree-node:hover {
-        background-color: #f0f0f0;
-    }
-
-    .tree-node.selected {
-        background-color: #e3f2fd;
-        border-left: 3px solid #4687F1;
-    }
-
-    .tree-node-content {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex: 1;
-    }
-
-    .tree-node-actions {
-        display: none;
-        flex: 0 0 auto;
-        gap: 5px;
-    }
-
-    .tree-node:hover .tree-node-actions {
-        display: flex;
-    }
-
-    .tree-node-action-btn {
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: 4px;
-        color: #999;
-        transition: color 0.2s;
-        font-size: 1em;
-        opacity: 0.6;
-        transition: opacity 0.2s;
-    }
-
-    .tree-node-action-btn:hover {
-        color: #4687F1;
-        opacity: 1;
-    }
-
-    .toggle-icon {
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 24px;
-        height: 24px;
-        color: #4687F1;
-        transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
-        font-size: 1.1em;
-    }
-
-    .toggle-icon.open {
-        transform: none;
-    }
-
-    /* Evita que reglas globales de árbol afecten el icono de ubicación dentro de este árbol */
-    .tree-view .open .icon-folder {
-        transform: none !important;
-    }
-
-    .toggle-icon ion-icon {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
     .image-upload-card {
         display: flex;
         align-items: center;
@@ -693,37 +593,6 @@ Lista de Activos - Gestión de Activos y Equipos
     .form-group-modal input:disabled {
         background-color: #f3f3f3;
         color: #666;
-    }
-
-    .icon-folder {
-        font-size: 1.2em;
-        color: #FF9800;
-    }
-
-    .icon-leaf {
-        font-size: 1em;
-        color: #2196F3;
-    }
-
-    .toggle-icon[style*="visibility"] {
-        opacity: 0;
-    }
-
-    .tree-children {
-        display: none;
-        padding-left: 20px;
-        list-style-type: none;
-        margin: 0;
-    }
-
-    .tree-children.open {
-        display: block;
-    }
-
-    .tree-sub-item {
-        display: flex;
-        flex-direction: column;
-        margin: 2px 0;
     }
 
     /* Modales */
@@ -2360,25 +2229,6 @@ Lista de Activos - Gestión de Activos y Equipos
         select.value = value;
     }
 
-    function toggleChildren(id) {
-        const element = document.getElementById(id);
-        const toggleIcon = document.getElementById('toggle-icon-' + id);
-
-        if (element && toggleIcon) {
-            if (element.style.display === "none" || element.style.display === "") {
-                element.style.display = "block";
-                element.classList.add('open');
-                toggleIcon.classList.add('open');
-                toggleIcon.innerHTML = '<ion-icon name="remove-outline"></ion-icon>';
-            } else {
-                element.style.display = "none";
-                element.classList.remove('open');
-                toggleIcon.classList.remove('open');
-                toggleIcon.innerHTML = '<ion-icon name="add-outline"></ion-icon>';
-            }
-        }
-    }
-
     function toggleOptions() {
         const options = document.getElementById('floating-options');
         if (options) {
@@ -2391,77 +2241,6 @@ Lista de Activos - Gestión de Activos y Equipos
         if (options) {
             options.classList.remove('open');
         }
-    }
-
-    function seleccionarNodo(event, tipo, id, nombre, codigo = '', descripcion = '', ubicacionId = null, imagenUrl = '', fabricante = '', modelo = '', serie = '', prioridad = '', fechaAdq = '', horasUso = '', valorCompra = '', valorActual = '', direccion = '', pais = '', ciudad = '') {
-        event.stopPropagation();
-        
-        // Remover selección anterior
-        document.querySelectorAll('.tree-node').forEach(node => node.classList.remove('selected'));
-        
-        // Agregar selección al nodo actual
-        const nodoElement = event.currentTarget;
-        nodoElement.classList.add('selected');
-        
-        nodoSeleccionado = { tipo, id, nombre, codigo, descripcion, ubicacionId, imagenUrl, fabricante, modelo, serie, prioridad, fechaAdq, horasUso, valorCompra, valorActual, direccion, pais, ciudad };
-        mostrarDetallesNodo(tipo, id, nombre, codigo, descripcion, imagenUrl);
-    }
-
-    function mostrarDetallesNodo(tipo, id, nombre, codigo, descripcion, imagenUrl = '') {
-        const container = document.getElementById('node-details-container');
-        const tipoTexto = tipo === 'ubicacion' ? 'Ubicación' : 'Equipo';
-        const icono = tipo === 'ubicacion' ? 'location-outline' : 'cube-outline';
-        
-        let imageHtml = '';
-        if (imagenUrl) {
-            imageHtml = `
-                <div class="node-details-image">
-                    <img src="${imagenUrl}" alt="Imagen de ${tipoTexto}" />
-                </div>
-            `;
-        }
-        
-        let html = `
-            <div class="node-details">
-                <h2>
-                    <ion-icon name="${icono}"></ion-icon> ${tipoTexto}
-                </h2>
-                <div class="node-details-content">
-                    ${imageHtml}
-                    <div class="node-details-info">
-                        <p><strong>Nombre:</strong> ${nombre}</p>
-                        <p><strong>Código:</strong> ${codigo || 'N/A'}</p>
-                        <p><strong>Tipo:</strong> ${tipoTexto}</p>
-                        ${descripcion ? `<p><strong>Descripción:</strong> ${descripcion}</p>` : ''}
-                        <p><strong>ID:</strong> ${id}</p>
-                    </div>
-                </div>
-                <div class="node-details-actions">
-                    <button class="btn-action btn-action-primary" onclick="abrirModalCrearHijo(${id}, '${tipo}', '${nombre.replace(/'/g, "\\'")}');">
-                        <ion-icon name="add-circle-outline"></ion-icon> Agregar Equipo
-                    </button>
-                    ${tipo === 'ubicacion' ? `<button class="btn-action btn-action-primary" onclick="abrirModalCrearSubUbicacion(${id}, '${nombre}')">
-                        <ion-icon name="add-outline"></ion-icon> Agregar Sub-Ubicación
-                    </button>` : ''}
-                    <button class="btn-action btn-action-primary" onclick="abrirModalCrearPlan(${id}, '${nombre}')">
-                        <ion-icon name="calendar-outline"></ion-icon> Plan Mantenimiento
-                    </button>
-                    ${tipo === 'equipo' ? `<button class="btn-action btn-action-secondary" onclick="window.open('/Activos/hoja_vida/${id}/', '_blank')">
-                        <ion-icon name="document-text-outline"></ion-icon> Hoja de vida
-                    </button>` : ''}
-                    ${tipo === 'ubicacion' ? `<button class="btn-action btn-action-secondary" onclick="window.open('/Activos/zip_hojas_vida/${id}/', '_blank')">
-                        <ion-icon name="download-outline"></ion-icon> Descargar todas las HVs
-                    </button>` : ''}
-                    <button class="btn-action btn-action-secondary" onclick="abrirEditarNodo('${tipo}', ${id})">
-                        <ion-icon name="pencil-outline"></ion-icon> Editar
-                    </button>
-                    <button class="btn-action btn-action-secondary" onclick="verHistorial(${id}, '${tipo}')">
-                        <ion-icon name="history-outline"></ion-icon> Historial OT
-                    </button>
-                </div>
-            </div>
-        `;
-        container.innerHTML = html;
     }
 
     function abrirModalCrearHijo(parentId, parentType, parentName) {
