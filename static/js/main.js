@@ -1,7 +1,6 @@
 import './csrf.js';
 import './solicitudes.js';
 import './gestion_ot.js';
-import './CrearActivos.js';
 import './menuToggle.js';
 import './userManagement.js';
 
