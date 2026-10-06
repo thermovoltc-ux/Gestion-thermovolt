@@ -103,7 +103,40 @@ def crear_solicitud(request):
         else:
             logger.warning("Errores de validación en SolicitudForm: %s", form.errors)
     else:
-        form = SolicitudForm()
+        equipo_id = request.GET.get('equipo')
+        equipo = None
+        initial = {}
+        contexto_extra = {}
+
+        try:
+            equipo_id = int(equipo_id) if equipo_id else None
+        except (TypeError, ValueError):
+            equipo_id = None
+
+        if equipo_id is not None:
+            equipo = Equipo.objects.select_related('ubicacion').filter(id=equipo_id).first()
+
+        if equipo and request.session.get('tipo_cuenta') == 'administrador':
+            scope_ids = obtener_scope_ubicacion_ids(request)
+            if not scope_ids or not equipo.ubicacion_id or equipo.ubicacion_id not in scope_ids:
+                equipo = None
+
+        if equipo:
+            initial = {'equipo': equipo}
+            contexto_extra = {
+                'precarga_equipo': equipo,
+                'precarga_ubicacion': equipo.ubicacion,
+                'precarga_codigo': equipo.codigo,
+                'precarga_numero_serie': equipo.serie or '',
+                'precarga_nombre_equipo': equipo.nombre,
+            }
+
+        form = SolicitudForm(initial=initial)
+        return render(
+            request,
+            'solicitudes/crear_solicitud.html',
+            {'form': form, **contexto_extra},
+        )
 
     return render(request, 'solicitudes/crear_solicitud.html', {'form': form})
 
