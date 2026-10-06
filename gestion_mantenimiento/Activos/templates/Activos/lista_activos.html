@@ -2029,6 +2029,12 @@ Lista de Activos - Gestión de Activos y Equipos
             });
 
             if (tipo === 'equipo') {
+                addButton('📝 Crear Solicitud', '#0e7490', function() {
+                    window.location.href = '/solicitudes/crear/?equipo=' + id;
+                });
+            }
+
+            if (tipo === 'equipo') {
                 addButton('📄 Hoja de Vida', '#198754', function() {
                     window.open('/Activos/hoja_vida/' + id + '/', '_blank');
                 });

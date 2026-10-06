@@ -29,7 +29,7 @@
     {% endif %}
 
     <div class="form-group">
-        <input type="text" id="codigo" name="codigo" placeholder="">
+        <input type="text" id="codigo" name="codigo" value="{{ precarga_codigo|default:'' }}" placeholder="">
         <label for="codigo">Código del Equipo</label>
     </div>
     <div class="form-group">
@@ -37,18 +37,18 @@
         <label for="creado-por">Creado por</label>
     </div>
     <div class="form-group">
-        <input type="text" id="nombre_ubicacion" name="nombre_ubicacion" placeholder="" autocomplete="off" data-search-url="{% url 'buscar_ubicaciones' %}">
+        <input type="text" id="nombre_ubicacion" name="nombre_ubicacion" value="{{ precarga_ubicacion.nombre|default:'' }}" placeholder="" autocomplete="off" data-search-url="{% url 'buscar_ubicaciones' %}">
         <label for="nombre_ubicacion">Nombre de la Ubicación</label>
         <div id="ubicacion_test_status" style="display:none; margin-top:6px; color:#0f766e; font-size:13px; font-weight:600;">JS ACTIVO - buscando ubicación...</div>
         <div id="ubicacion_busqueda_results" style="display:none; position:absolute; left:0; top:calc(100% + 6px); z-index:9999; background:#fff; border:1px solid #d0d7de; border-radius:8px; box-shadow:0 8px 22px rgba(15, 23, 42, 0.12); max-height:220px; overflow-y:auto; width:100%; min-width:0;"></div>
-        <input type="hidden" id="ubicacion_id" name="ubicacion_id">
+        <input type="hidden" id="ubicacion_id" name="ubicacion_id" value="{{ precarga_ubicacion.id|default:'' }}">
     </div>
     <div class="form-group">
         <input type="text" id="centro_costo" name="centro_costo" placeholder="" readonly>
         <label for="centro_costo">Centro de Costos (Opcional)</label>
     </div>
     <div class="form-group">
-        <input type="text" id="nombre_equipo" name="nombre_equipo" placeholder="" autocomplete="off" data-search-url="{% url 'get_equipos_por_ubicacion' %}">
+        <input type="text" id="nombre_equipo" name="nombre_equipo" value="{{ precarga_nombre_equipo|default:'' }}" placeholder="" autocomplete="off" data-search-url="{% url 'get_equipos_por_ubicacion' %}">
         <label for="nombre_equipo">Nombre del Equipo</label>
         <div id="equipo_busqueda_results" style="display:none; position:absolute; left:0; top:calc(100% + 6px); z-index:9999; background:#fff; border:1px solid #d0d7de; border-radius:8px; box-shadow:0 8px 22px rgba(15, 23, 42, 0.12); max-height:220px; overflow-y:auto; width:100%; min-width:0;"></div>
     </div>
@@ -57,7 +57,7 @@
         {{ form.equipo }}
     </div>
     <div class="form-group">
-        <input type="text" id="numero_serie" name="numero_serie" placeholder="" readonly>
+        <input type="text" id="numero_serie" name="numero_serie" value="{{ precarga_numero_serie|default:'' }}" placeholder="" readonly>
         <label for="numero_serie">N° de activo</label>
     </div>
     <div class="form-group">
