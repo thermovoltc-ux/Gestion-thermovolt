@@ -3,8 +3,7 @@ Vistas para gestión de planes de mantenimiento preventivo
 """
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse
 from django.http import JsonResponse
 from django.utils import timezone
 from django.contrib.auth.models import User

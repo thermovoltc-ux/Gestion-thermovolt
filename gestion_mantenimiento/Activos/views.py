@@ -10,8 +10,7 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 from .forms import UbicacionForm, EquipoForm
 from .models import Ubicacion, Equipo
-from gestion_mantenimiento.users.models import Cliente
-from django.http import FileResponse, Http404, HttpResponseForbidden, JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.core.files.storage import default_storage
 from io import BytesIO
 from reportlab.lib.pagesizes import letter

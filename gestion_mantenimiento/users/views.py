@@ -1,12 +1,11 @@
 from django.shortcuts import render, redirect
-from django.contrib.auth import login as auth_login, authenticate, logout
+from django.contrib.auth import login as auth_login, logout
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.db.models import Q
 from django.http import JsonResponse
 from .forms import CustomUserCreationForm, CustomAuthenticationForm
 from django.contrib.auth.decorators import user_passes_test
-from django.contrib.auth.models import Group
 from allauth.socialaccount.models import SocialApp
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo, TareaMantenimiento
 from gestion_mantenimiento.solicitudes.models import Solicitud

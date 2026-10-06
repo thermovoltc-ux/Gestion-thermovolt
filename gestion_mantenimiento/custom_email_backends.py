@@ -6,7 +6,6 @@ Kept for reference and potential fallback use
 import os
 import logging
 from django.core.mail.backends.smtp import EmailBackend as BaseEmailBackend
-from django.core.mail.backends.console import EmailBackend as ConsoleBackend
 
 logger = logging.getLogger(__name__)
 

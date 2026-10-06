@@ -6,7 +6,6 @@ from django.conf import settings
 from django.contrib.sites.models import Site
 from allauth.socialaccount.models import SocialApp
 import os
-import sys
 from urllib.parse import urlparse
 
 
