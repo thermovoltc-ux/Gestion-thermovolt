@@ -38,20 +38,6 @@ def _normalizar_url_media(url):
     return url_str
 
 
-def _perfil_usuario_actual(user):
-    try:
-        return user.perfil_usuario
-    except Exception:
-        return None
-
-
-def _cliente_actual(user):
-    perfil = _perfil_usuario_actual(user)
-    if perfil is None:
-        return None
-    return perfil.cliente
-
-
 def _validar_equipo_en_scope(equipo, scope_ids):
     pendientes = [equipo]
     visitados = set()

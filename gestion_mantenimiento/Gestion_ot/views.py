@@ -16,7 +16,7 @@ from django.contrib import messages
 import os
 import smtplib
 from .models import OrdenTrabajo, Estado, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad, InformeDriveArchivo, ProcesoInforme
-from .forms import OrdenTrabajoForm, CierreOtForm, ImagenCierreOtForm, ImagenAntesForm, ImagenDespuesForm, CierreOtActividadFormSet
+from .forms import OrdenTrabajoForm, CierreOtForm, ImagenAntesForm, ImagenDespuesForm, CierreOtActividadFormSet
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.users.access import obtener_scope_ubicacion_ids
 import logging

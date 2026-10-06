@@ -92,11 +92,6 @@ CierreOtActividadFormSet = inlineformset_factory(
     can_delete=False
 )
 
-class ImagenCierreOtForm(forms.ModelForm):
-    class Meta:
-        model = ImagenCierreOt
-        fields = ['imagen', 'tipo', 'descripcion']
-
 class MultipleFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
