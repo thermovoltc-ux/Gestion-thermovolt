@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -10,7 +11,13 @@ from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
 from gestion_mantenimiento.Gestion_ot.models import Estado, OrdenTrabajo
 from gestion_mantenimiento.solicitudes.models import Solicitud
 
-from .models import RegistroAsistencia
+from .models import (
+    CalendarioTecnico,
+    ConfiguracionPago,
+    Descuento,
+    ReciboPago,
+    RegistroAsistencia,
+)
 
 
 class RegistroAsistenciaTests(TestCase):
@@ -226,6 +233,59 @@ class RegistroAsistenciaTests(TestCase):
             str(list(response.wsgi_request._messages)[0]),
             'Ya completaste el día.',
         )
+
+
+class ModelosNominaTests(TestCase):
+    """Tests básicos de los modelos de nómina."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='tecnico_test',
+            password='test',
+            email='tecnico@example.com',
+        )
+
+    def test_configuracion_pago_se_crea(self):
+        config = ConfiguracionPago.objects.create(
+            usuario=self.user,
+            tipo_pago='por_dia',
+            valor_dia=Decimal('122000.00'),
+        )
+
+        self.assertEqual(config.usuario.username, 'tecnico_test')
+        self.assertEqual(config.tipo_pago, 'por_dia')
+
+    def test_calendario_tecnico_crea_dia(self):
+        dia = CalendarioTecnico.objects.create(
+            usuario=self.user,
+            fecha=timezone.localdate(),
+            tipo='pico_placa',
+            horas_esperadas=Decimal('4.00'),
+        )
+
+        self.assertEqual(dia.tipo, 'pico_placa')
+
+    def test_descuento_se_crea(self):
+        desc = Descuento.objects.create(
+            usuario=self.user,
+            tipo='prestamo',
+            monto=Decimal('50000.00'),
+            fecha_aplicacion=timezone.localdate(),
+        )
+
+        self.assertEqual(desc.tipo, 'prestamo')
+
+    def test_recibo_pago_se_crea(self):
+        recibo = ReciboPago.objects.create(
+            usuario=self.user,
+            tipo_periodo='quincenal',
+            fecha_inicio=timezone.localdate(),
+            fecha_fin=timezone.localdate(),
+            bruto=Decimal('732000.00'),
+            neto=Decimal('732000.00'),
+        )
+
+        self.assertEqual(recibo.estado, 'borrador')
 
 
 class DashboardTecnicoTests(TestCase):
