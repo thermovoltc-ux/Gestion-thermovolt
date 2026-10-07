@@ -226,3 +226,76 @@ class RegistroAsistenciaTests(TestCase):
             str(list(response.wsgi_request._messages)[0]),
             'Ya completaste el día.',
         )
+
+
+class DashboardTecnicoTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='tecnico-dashboard-h3',
+            password='test-password',
+        )
+        self.user.groups.add(Group.objects.get_or_create(name='Tecnico')[0])
+        self.client.force_login(self.user)
+        self.client.session['tipo_cuenta'] = 'tecnico'
+        self.client.session.save()
+
+    def test_dashboard_muestra_resumen_semanal(self):
+        RegistroAsistencia.objects.create(
+            usuario=self.user,
+            fecha=timezone.localdate(),
+            hora_entrada=timezone.now() - timedelta(hours=4),
+            hora_salida=timezone.now(),
+        )
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('horas_semana', response.context)
+        self.assertGreaterEqual(response.context['horas_semana'], 4)
+        self.assertContains(response, 'Esta semana')
+
+    def test_dashboard_muestra_historial_asistencia(self):
+        RegistroAsistencia.objects.create(
+            usuario=self.user,
+            fecha=timezone.localdate(),
+            hora_entrada=timezone.now() - timedelta(hours=4),
+            hora_salida=timezone.now(),
+        )
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertIn('historial_asistencia', response.context)
+        self.assertGreaterEqual(len(response.context['historial_asistencia']), 1)
+        self.assertContains(response, 'Últimos 7 días')
+
+    def test_dashboard_muestra_agenda_de_hoy(self):
+        ubicacion = Ubicacion.objects.create(
+            nombre='Ubicación prueba',
+            codigo='UBI-H3',
+        )
+        equipo = Equipo.objects.create(
+            nombre='Equipo prueba',
+            codigo='EQ-H3',
+            ubicacion=ubicacion,
+        )
+        estado = Estado.objects.get_or_create(nombre='en proceso')[0]
+        solicitud = Solicitud.objects.create(
+            creado_por=self.user.username,
+            descripcion_problema='Agenda del técnico',
+            equipo=equipo,
+            ubicacion=ubicacion,
+            estado=estado,
+        )
+        OrdenTrabajo.objects.create(
+            solicitud= solicitud,
+            tecnico_asignado=self.user.username,
+            fecha_actividad=timezone.now(),
+            estado=estado,
+        )
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertIn('ots_hoy', response.context)
+        self.assertGreaterEqual(len(response.context['ots_hoy']), 1)
+        self.assertContains(response, 'Mi agenda de hoy')
+        self.assertContains(response, 'OT-')

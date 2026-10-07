@@ -73,6 +73,66 @@
 </div>
 {% endif %}
 
+{% if tipo_cuenta == 'tecnico' %}
+<section style="margin: 30px 0; padding: 24px; background:#ffffff; border:1px solid #e2e8f0; border-radius:18px; box-shadow:0 8px 24px rgba(15,23,42,0.05);">
+    <div class="cardHeader" style="margin-bottom:18px;">
+        <h2>Mi agenda de hoy</h2>
+        <span style="color:#64748b; font-size:0.9rem;">{{ ots_hoy|length }} órdenes</span>
+    </div>
+    {% if ots_hoy %}
+        <div style="display:grid; gap:12px;">
+            {% for ot in ots_hoy %}
+                <div style="display:flex; justify-content:space-between; gap:16px; padding:15px 16px; background:#f8fafc; border-radius:12px;">
+                    <div>
+                        <strong>{{ ot }}</strong>
+                        <div style="margin-top:4px; color:#64748b; font-size:0.9rem;">{{ ot.solicitud.descripcion_problema }}</div>
+                    </div>
+                    <span style="color:#475569; white-space:nowrap;">{{ ot.fecha_actividad|time:'H:i' }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p style="margin:0; color:#64748b;">No tienes órdenes de trabajo programadas para hoy.</p>
+    {% endif %}
+</section>
+
+<section style="margin: 30px 0; padding: 24px; background:#ffffff; border:1px solid #e2e8f0; border-radius:18px; box-shadow:0 8px 24px rgba(15,23,42,0.05);">
+    <div class="cardHeader" style="margin-bottom:18px;">
+        <h2>Esta semana</h2>
+        <span style="color:#64748b; font-size:0.9rem;">Resumen de horas</span>
+    </div>
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:14px;">
+        <div style="padding:18px; background:#eef2ff; border-radius:14px;">
+            <p style="margin:0; color:#475569;">Horas trabajadas</p>
+            <p style="margin:8px 0 0; font-size:2rem; font-weight:700; color:#3730a3;">{{ horas_semana|floatformat:1 }} h</p>
+        </div>
+        <div style="padding:18px; background:#ecfdf5; border-radius:14px;">
+            <p style="margin:0; color:#475569;">Registros</p>
+            <p style="margin:8px 0 0; font-size:2rem; font-weight:700; color:#047857;">{{ historial_asistencia|length }}</p>
+        </div>
+    </div>
+</section>
+
+<section style="margin: 30px 0; padding: 24px; background:#ffffff; border:1px solid #e2e8f0; border-radius:18px; box-shadow:0 8px 24px rgba(15,23,42,0.05);">
+    <div class="cardHeader" style="margin-bottom:18px;">
+        <h2>Últimos 7 días</h2>
+        <span style="color:#64748b; font-size:0.9rem;">Historial de asistencia</span>
+    </div>
+    {% if historial_asistencia %}
+        <div style="display:grid; gap:10px;">
+            {% for registro in historial_asistencia %}
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:14px; padding:13px 15px; border:1px solid #e2e8f0; border-radius:12px;">
+                    <span>{{ registro.fecha|date:'d/m/Y' }}</span>
+                    <span style="color:#475569;">{{ registro.horas_trabajadas|default:'Sin registro' }} h</span>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p style="margin:0; color:#64748b;">No hay registros de asistencia en los últimos 7 días.</p>
+    {% endif %}
+</section>
+{% endif %}
+
 <div class="cardBox">
     {% if tipo_cuenta == 'tecnico' %}
         <a href="{% url 'lista_solicitudes' %}" class="card" style="display:flex; text-decoration:none; color:inherit;">

@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth import login as auth_login, logout
@@ -188,6 +190,21 @@ def dashboard(request):
     planificadas_pct = int((tareas_planificadas / total_tareas) * 100) if total_tareas else 0
     no_planificadas_pct = 100 - planificadas_pct if total_tareas else 0
 
+    week_start = today - timedelta(days=6)
+    ots_hoy = ots_base.filter(
+        fecha_actividad__date=today,
+    ).select_related('solicitud').order_by('fecha_actividad', 'solicitud__consecutivo')
+    registros_semana = RegistroAsistencia.objects.filter(
+        usuario=request.user,
+        fecha__gte=week_start,
+        fecha__lte=today,
+    ).order_by('fecha', '-hora_entrada')
+    horas_semana = sum(
+        registro.horas_trabajadas or 0
+        for registro in registros_semana
+    )
+    historial_asistencia = list(registros_semana[:7])
+
     context = {
         'solicitudes_solicitadas': solicitudes_solicitadas,
         'ot_en_proceso': ot_en_proceso,
@@ -208,6 +225,9 @@ def dashboard(request):
         'planificadas_pct': planificadas_pct,
         'no_planificadas_pct': no_planificadas_pct,
         'tipo_cuenta': tipo_cuenta,
+        'ots_hoy': list(ots_hoy),
+        'horas_semana': horas_semana,
+        'historial_asistencia': historial_asistencia,
     }
 
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
