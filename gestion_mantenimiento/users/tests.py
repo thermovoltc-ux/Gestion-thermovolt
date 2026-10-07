@@ -6,6 +6,10 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
+from gestion_mantenimiento.Gestion_ot.models import Estado, OrdenTrabajo
+from gestion_mantenimiento.solicitudes.models import Solicitud
+
 from .models import RegistroAsistencia
 
 
@@ -52,8 +56,35 @@ class RegistroAsistenciaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'asistencia-card')
         self.assertContains(response, 'Marcar entrada')
-        self.assertContains(response, 'Marcar salida')
+        self.assertNotContains(response, 'Marcar salida')
         self.assertContains(response, 'Registro de Asistencia')
+
+    def test_dashboard_muestra_solo_la_accion_correspondiente_al_estado(self):
+        user = get_user_model().objects.create_user(
+            username='tecnico-h2-estados',
+            password='test-password',
+        )
+        user.groups.add(Group.objects.get_or_create(name='Tecnico')[0])
+        self.client.force_login(user)
+        self.client.session['tipo_cuenta'] = 'tecnico'
+        self.client.session.save()
+
+        RegistroAsistencia.objects.create(
+            usuario=user,
+            fecha=timezone.localdate(),
+            hora_entrada=timezone.now() - timedelta(hours=1),
+        )
+        response = self.client.get(reverse('dashboard'))
+        self.assertContains(response, 'Marcar salida')
+        self.assertNotContains(response, 'Marcar entrada')
+
+        RegistroAsistencia.objects.filter(usuario=user).update(
+            hora_salida=timezone.now(),
+        )
+        response = self.client.get(reverse('dashboard'))
+        self.assertContains(response, 'Jornada completa')
+        self.assertNotContains(response, 'Marcar entrada')
+        self.assertNotContains(response, 'Marcar salida')
 
     def test_marcar_entrada_crea_registro_y_redirige_al_calendario(self):
         user = get_user_model().objects.create_user(
@@ -75,7 +106,7 @@ class RegistroAsistenciaTests(TestCase):
         self.assertIsNone(registro.hora_salida)
         self.assertRedirects(
             response,
-            f"{reverse('listar_ot')}?vista=calendario",
+            f"{reverse('listar_ot')}?vista=calendario&tecnico={user.username}",
         )
 
     def test_marcar_salida_completa_el_dia(self):
@@ -106,8 +137,64 @@ class RegistroAsistenciaTests(TestCase):
         self.assertEqual(registro.horas_trabajadas, 8.0)
         self.assertRedirects(
             response,
-            f"{reverse('listar_ot')}?vista=calendario",
+            f"{reverse('listar_ot')}?vista=calendario&tecnico={user.username}",
         )
+
+    def test_calendario_filtra_ots_por_tecnico(self):
+        user = get_user_model().objects.create_user(
+            username='Hiller01',
+            password='test-password',
+        )
+        user.groups.add(Group.objects.get_or_create(name='Tecnico')[0])
+        self.client.force_login(user)
+        self.client.session['tipo_cuenta'] = 'tecnico'
+        self.client.session.save()
+
+        ubicacion = Ubicacion.objects.create(
+            nombre='Ubicación prueba',
+            codigo='UBI-01',
+        )
+        equipo = Equipo.objects.create(
+            nombre='Equipo prueba',
+            codigo='EQ-01',
+            ubicacion=ubicacion,
+        )
+        estado = Estado.objects.get_or_create(nombre='solicitado')[0]
+        solicitud_hiller = Solicitud.objects.create(
+            creado_por=user.username,
+            descripcion_problema='OT de Hiller01',
+            equipo=equipo,
+            ubicacion=ubicacion,
+            estado=estado,
+        )
+        solicitud_otero = Solicitud.objects.create(
+            creado_por=user.username,
+            descripcion_problema='OT de otro técnico',
+            equipo=equipo,
+            ubicacion=ubicacion,
+            estado=estado,
+        )
+        OrdenTrabajo.objects.create(
+            solicitud= solicitud_hiller,
+            tecnico_asignado='Hiller01',
+            fecha_actividad=timezone.now(),
+            estado=estado,
+        )
+        OrdenTrabajo.objects.create(
+            solicitud= solicitud_otero,
+            tecnico_asignado='Otro Tecnico',
+            fecha_actividad=timezone.now(),
+            estado=estado,
+        )
+
+        response = self.client.get(
+            reverse('listar_ot'),
+            {'vista': 'calendario', 'tecnico': 'Hiller01'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['ots'].count(), 1)
+        self.assertEqual(response.context['ots'].first().tecnico_asignado, 'Hiller01')
 
     def test_dia_completado_muestra_mensaje(self):
         user = get_user_model().objects.create_user(
@@ -133,7 +220,7 @@ class RegistroAsistenciaTests(TestCase):
 
         self.assertRedirects(
             response,
-            f"{reverse('listar_ot')}?vista=calendario",
+            f"{reverse('listar_ot')}?vista=calendario&tecnico={user.username}",
         )
         self.assertEqual(
             str(list(response.wsgi_request._messages)[0]),

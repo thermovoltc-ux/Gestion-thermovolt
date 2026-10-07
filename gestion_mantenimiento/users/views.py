@@ -236,6 +236,7 @@ def dashboard(request):
     context.update({
         'registro_asistencia': registro_asistencia,
         'asistencia_estado': asistencia_estado,
+        'estado_asistencia': asistencia_estado,
     })
 
     return render(request, 'users/dashboard.html', context)
@@ -259,7 +260,9 @@ def marcar_asistencia(request):
         fecha=fecha_actual,
     )
 
-    calendar_url = f"{reverse('listar_ot')}?vista=calendario"
+    calendar_url = (
+        f"{reverse('listar_ot')}?tecnico={request.user.username}&vista=calendario"
+    )
 
     if registro.hora_entrada and registro.hora_salida:
         messages.success(request, 'Ya completaste el día.')

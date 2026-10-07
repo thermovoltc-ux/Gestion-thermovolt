@@ -878,6 +878,7 @@ def asignar_tarea_preventiva(request, tarea_id):
 def listar_ot(request):
     equipo_id = request.GET.get('equipo_id')
     ubicacion_id = request.GET.get('ubicacion_id') or request.GET.get('ubicacion')
+    tecnico_filtro = request.GET.get('tecnico', '').strip()
 
     tipo_cuenta = request.session.get('tipo_cuenta')
     if tipo_cuenta == 'administrador':
@@ -892,6 +893,9 @@ def listar_ot(request):
         ots = OrdenTrabajo.objects.all()
     else:
         ots = OrdenTrabajo.objects.filter(tecnico_asignado=request.user.username)
+
+    if tecnico_filtro:
+        ots = ots.filter(tecnico_asignado__iexact=tecnico_filtro)
 
     # Ordenar de mayor a menor consecutivo de la solicitud
     ots = ots.order_by('-solicitud__consecutivo')

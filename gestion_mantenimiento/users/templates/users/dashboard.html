@@ -17,26 +17,58 @@
 </div>
 
 {% if tipo_cuenta == 'tecnico' %}
-<div class="asistencia-card cardBox" style="margin-bottom: 30px;">
-    <div class="cardHeader">
-        <div>
-            <p style="margin:0 0 4px; color:#2563eb; font-size:0.85rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;">Registro de Asistencia</p>
-            <h2 style="margin:0;">Control de jornada</h2>
+<div class="asistencia-card" style="
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 28px;
+    color: white;
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+">
+    <div style="flex: 1; min-width: 260px;">
+        <div style="display:inline-block; background:rgba(255,255,255,0.2); padding:4px 12px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:0.5px; margin-bottom:12px;">
+            Registro de Asistencia
         </div>
-        <span style="color:#475569; font-size:0.9rem;">Estado: {{ asistencia_estado|title }}</span>
+        <h2 style="margin:0 0 8px; font-size:24px; font-weight:700;">Control de jornada</h2>
+        <p style="margin:0; opacity:0.9; font-size:14px; line-height:1.5;">
+            {% if asistencia_estado == 'completa' %}
+                Jornada completa registrada.
+            {% elif asistencia_estado == 'entrada' %}
+                Entrada registrada a las <strong>{{ registro_asistencia.hora_entrada|time:"H:i" }}</strong>.
+            {% else %}
+                Aún no has marcado tu entrada hoy.
+            {% endif %}
+        </p>
     </div>
-    <p style="margin:14px 0 0; color:#64748b;">Registra la entrada y salida de tu jornada para mantener el seguimiento del técnico.</p>
-    <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:20px;">
-        <form method="post" action="{% url 'marcar_asistencia' %}">
-            {% csrf_token %}
-            <input type="hidden" name="accion" value="entrada">
-            <button type="submit" class="btn">Marcar entrada</button>
-        </form>
-        <form method="post" action="{% url 'marcar_asistencia' %}">
-            {% csrf_token %}
-            <input type="hidden" name="accion" value="salida">
-            <button type="submit" class="btn">Marcar salida</button>
-        </form>
+    <div style="flex-shrink:0;">
+        {% if asistencia_estado == 'sin_registro' or asistencia_estado == 'sin_entrada' %}
+            <form method="post" action="{% url 'marcar_asistencia' %}">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="entrada">
+                <button type="submit" style="background:#10b981; color:white; border:none; border-radius:10px; padding:14px 24px; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(16,185,129,0.4);">
+                    ⏰ Marcar entrada
+                </button>
+            </form>
+        {% elif asistencia_estado == 'entrada' %}
+            <form method="post" action="{% url 'marcar_asistencia' %}">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="salida">
+                <button type="submit" style="background:#ef4444; color:white; border:none; border-radius:10px; padding:14px 24px; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(239,68,68,0.4);">
+                    🚪 Marcar salida
+                </button>
+            </form>
+        {% else %}
+            <div style="background:rgba(255,255,255,0.2); padding:14px 20px; border-radius:10px; font-size:14px; line-height:1.6;">
+                <div>✓ Entrada: <strong>{{ registro_asistencia.hora_entrada|time:"H:i" }}</strong></div>
+                <div>✓ Salida: <strong>{{ registro_asistencia.hora_salida|time:"H:i" }}</strong></div>
+                <div style="margin-top:4px;">Total: <strong>{{ registro_asistencia.horas_trabajadas }} h</strong></div>
+            </div>
+        {% endif %}
     </div>
 </div>
 {% endif %}
