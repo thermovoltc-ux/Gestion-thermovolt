@@ -12,6 +12,13 @@ from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
 from gestion_mantenimiento.users.access import obtener_cliente_actual, obtener_scope_ubicacion_ids
 
+TIPO_CUENTA_A_GRUPO = {
+    'jefe_de_area': 'Admin',
+    'administrador': 'Cliente',
+    'tecnico': 'Tecnico',
+}
+
+
 def register(request):
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST)
@@ -49,12 +56,14 @@ def custom_login(request):
                 return redirect('dashboard')
 
             # Validar que el usuario pertenece al grupo seleccionado
-            if tipo_cuenta == 'jefe_de_area' and not user.groups.filter(name='Admin').exists():
-                form.add_error('tipo_cuenta', 'No perteneces al grupo Jefe de Área.')
-            elif tipo_cuenta == 'administrador' and not user.groups.filter(name='Cliente').exists():
-                form.add_error('tipo_cuenta', 'No perteneces al grupo Administrador.')
-            elif tipo_cuenta == 'tecnico' and not user.groups.filter(name='Tecnico').exists():
-                form.add_error('tipo_cuenta', 'No perteneces al grupo Técnico.')
+            grupo_esperado = TIPO_CUENTA_A_GRUPO.get(tipo_cuenta)
+            if not grupo_esperado:
+                form.add_error('tipo_cuenta', 'Tipo de cuenta inválido.')
+            elif not user.groups.filter(name=grupo_esperado).exists():
+                form.add_error(
+                    'tipo_cuenta',
+                    f'No perteneces al grupo {grupo_esperado}.',
+                )
             else:
                 auth_login(request, user)
                 request.session['tipo_cuenta'] = tipo_cuenta
