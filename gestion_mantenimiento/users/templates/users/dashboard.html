@@ -16,6 +16,27 @@
     </div>
 </div>
 
+{% if tipo_cuenta == 'tecnico' %}
+<div class="cardBox" style="margin-bottom: 30px;">
+    <div class="cardHeader">
+        <h2>Registro de asistencia</h2>
+        <span style="color:#475569; font-size:0.9rem;">Estado: {{ asistencia_estado|title }}</span>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:20px;">
+        <form method="post" action="{% url 'marcar_asistencia' %}">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="entrada">
+            <button type="submit" class="btn">Marcar entrada</button>
+        </form>
+        <form method="post" action="{% url 'marcar_asistencia' %}">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="salida">
+            <button type="submit" class="btn">Marcar salida</button>
+        </form>
+    </div>
+</div>
+{% endif %}
+
 <div class="cardBox">
     {% if tipo_cuenta == 'tecnico' %}
         <a href="{% url 'lista_solicitudes' %}" class="card" style="display:flex; text-decoration:none; color:inherit;">

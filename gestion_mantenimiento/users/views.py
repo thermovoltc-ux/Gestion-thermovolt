@@ -1,9 +1,11 @@
 from django.shortcuts import render, redirect
+from django.contrib import messages
 from django.contrib.auth import login as auth_login, logout
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.db.models import Q
 from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 from .forms import CustomUserCreationForm, CustomAuthenticationForm
 from django.contrib.auth.decorators import user_passes_test
 from allauth.socialaccount.models import SocialApp
@@ -11,6 +13,7 @@ from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo, TareaMantenimi
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
 from gestion_mantenimiento.users.access import obtener_cliente_actual, obtener_scope_ubicacion_ids
+from .models import RegistroAsistencia
 
 TIPO_CUENTA_A_GRUPO = {
     'jefe_de_area': 'Admin',
@@ -82,7 +85,7 @@ def custom_login(request):
 
 @login_required
 def dashboard(request):
-    today = timezone.now().date()
+    today = timezone.localdate()
     equipo_id = request.GET.get('equipo_id')
     ubicacion_id = request.GET.get('ubicacion_id')
 
@@ -215,7 +218,66 @@ def dashboard(request):
             'no_planificadas_pct': no_planificadas_pct,
         })
 
+    registro_asistencia = RegistroAsistencia.objects.filter(
+        usuario=request.user,
+        fecha=today,
+    ).first()
+    if registro_asistencia:
+        if registro_asistencia.hora_entrada and registro_asistencia.hora_salida:
+            asistencia_estado = 'completa'
+        elif registro_asistencia.hora_entrada:
+            asistencia_estado = 'entrada'
+        else:
+            asistencia_estado = 'sin_entrada'
+    else:
+        asistencia_estado = 'sin_registro'
+
+    context.update({
+        'registro_asistencia': registro_asistencia,
+        'asistencia_estado': asistencia_estado,
+    })
+
     return render(request, 'users/dashboard.html', context)
+
+
+@require_POST
+@login_required
+def marcar_asistencia(request):
+    if not request.user.groups.filter(name='Tecnico').exists():
+        messages.error(request, 'Solo los usuarios del equipo Técnico pueden marcar asistencia.')
+        return redirect('dashboard')
+
+    accion = request.POST.get('accion')
+    if accion not in {'entrada', 'salida'}:
+        messages.error(request, 'La acción de asistencia no es válida.')
+        return redirect('dashboard')
+
+    fecha_actual = timezone.localdate()
+    registro, _ = RegistroAsistencia.objects.get_or_create(
+        usuario=request.user,
+        fecha=fecha_actual,
+    )
+
+    if registro.hora_entrada and registro.hora_salida:
+        messages.success(request, 'Ya completaste el día.')
+        return redirect('listar_ot')
+
+    if accion == 'entrada':
+        if registro.hora_entrada is None:
+            registro.hora_entrada = timezone.now()
+            registro.save()
+            messages.success(request, 'Entrada registrada correctamente.')
+        else:
+            messages.info(request, 'La entrada de hoy ya fue registrada.')
+    elif registro.hora_entrada is None:
+        messages.error(request, 'Primero debes registrar la entrada del día.')
+    else:
+        registro.hora_salida = timezone.now()
+        registro.save()
+        messages.success(request, 'Salida registrada correctamente.')
+
+    return redirect('listar_ot')
+
 
 def logout_view(request):
     logout(request)
