@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -286,6 +286,92 @@ class ModelosNominaTests(TestCase):
         )
 
         self.assertEqual(recibo.estado, 'borrador')
+
+
+class MotorNominaTests(TestCase):
+    """Tests del motor de cálculo de nómina."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='tecnico_nomina',
+            password='test',
+        )
+        self.config = ConfiguracionPago.objects.create(
+            usuario=self.user,
+            tipo_pago='por_dia',
+            valor_dia=Decimal('122000.00'),
+            valor_hora_normal=Decimal('15000.00'),
+            valor_hora_extra=Decimal('18750.00'),
+            horas_semana_estandar=42,
+        )
+
+    def test_calculo_periodo_vacio(self):
+        from gestion_mantenimiento.users.nomina import calcular_periodo
+
+        resultado = calcular_periodo(
+            self.user,
+            date(2026, 10, 1),
+            date(2026, 10, 15),
+        )
+
+        self.assertEqual(resultado['horas_normales'], Decimal('0.00'))
+        self.assertEqual(resultado['bruto'], Decimal('0.00'))
+
+    def test_calculo_con_registros(self):
+        from gestion_mantenimiento.users.nomina import calcular_periodo
+
+        inicio = date(2026, 10, 1)
+        for i in range(5):
+            fecha = inicio + timedelta(days=i)
+            RegistroAsistencia.objects.create(
+                usuario=self.user,
+                fecha=fecha,
+                hora_entrada=timezone.make_aware(
+                    datetime.combine(fecha, datetime.min.time().replace(hour=8))
+                ),
+                hora_salida=timezone.make_aware(
+                    datetime.combine(fecha, datetime.min.time().replace(hour=16))
+                ),
+            )
+
+        resultado = calcular_periodo(
+            self.user,
+            inicio,
+            date(2026, 10, 15),
+        )
+
+        self.assertEqual(resultado['dias_trabajados'], 5)
+        self.assertEqual(resultado['bruto'], Decimal('610000.00'))
+
+    def test_calculo_con_descuento(self):
+        from gestion_mantenimiento.users.nomina import calcular_periodo
+
+        inicio = date(2026, 10, 1)
+        RegistroAsistencia.objects.create(
+            usuario=self.user,
+            fecha=inicio,
+            hora_entrada=timezone.make_aware(
+                datetime.combine(inicio, datetime.min.time().replace(hour=8))
+            ),
+            hora_salida=timezone.make_aware(
+                datetime.combine(inicio, datetime.min.time().replace(hour=16))
+            ),
+        )
+        Descuento.objects.create(
+            usuario=self.user,
+            tipo='prestamo',
+            monto=Decimal('50000.00'),
+            fecha_aplicacion=inicio,
+        )
+
+        resultado = calcular_periodo(
+            self.user,
+            inicio,
+            date(2026, 10, 15),
+        )
+
+        self.assertEqual(resultado['total_descuentos'], Decimal('50000.00'))
+        self.assertEqual(resultado['neto'], Decimal('72000.00'))
 
 
 class DashboardTecnicoTests(TestCase):
