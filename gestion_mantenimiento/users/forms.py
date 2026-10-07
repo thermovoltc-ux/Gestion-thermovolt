@@ -2,6 +2,9 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
 
+from .models import CalendarioTecnico, ConfiguracionPago, Descuento
+
+
 class CustomUserCreationForm(UserCreationForm):
     email = forms.EmailField(required=True, label="Correo electrónico")
     
@@ -47,3 +50,59 @@ class CustomAuthenticationForm(AuthenticationForm):
             self.add_error('co', 'El CO del PDV es requerido para administradores.')
 
         return cleaned_data
+
+
+class ConfiguracionPagoForm(forms.ModelForm):
+    class Meta:
+        model = ConfiguracionPago
+        fields = [
+            'tipo_pago',
+            'valor_dia',
+            'salario_mensual',
+            'valor_hora_normal',
+            'valor_hora_extra',
+            'recargo_nocturno_porcentaje',
+            'recargo_festivo_porcentaje',
+            'horas_semana_estandar',
+            'dia_pico_placa',
+            'activo',
+        ]
+        widgets = {
+            'tipo_pago': forms.Select(attrs={'class': 'form-control'}),
+            'valor_dia': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'salario_mensual': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'valor_hora_normal': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'valor_hora_extra': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'recargo_nocturno_porcentaje': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'recargo_festivo_porcentaje': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'horas_semana_estandar': forms.NumberInput(attrs={'class': 'form-control'}),
+            'dia_pico_placa': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+
+class DescuentoForm(forms.ModelForm):
+    class Meta:
+        model = Descuento
+        fields = [
+            'usuario',
+            'tipo',
+            'monto',
+            'fecha_aplicacion',
+            'descripcion',
+            'cuotas_totales',
+            'cuota_actual',
+            'activo',
+        ]
+
+
+class CalendarioTecnicoForm(forms.ModelForm):
+    class Meta:
+        model = CalendarioTecnico
+        fields = [
+            'usuario',
+            'fecha',
+            'tipo',
+            'horas_esperadas',
+            'remunerado',
+            'descripcion',
+        ]

@@ -1,0 +1,12 @@
+{% extends "solicitudes/indexpadre.html" %}
+{% block title %}Descuentos de Nómina{% endblock %}
+{% block content %}
+<div style="padding: 24px;">
+    <h1 style="margin-bottom: 8px;">💳 Descuentos</h1>
+    <p style="color: #64748b; margin-bottom: 24px;">Administrá descuentos aplicables a los técnicos.</p>
+    <a href="{% url 'nomina_descuento_nuevo' %}" style="background: #3b82f6; color: white; padding: 10px 16px; border-radius: 8px; text-decoration: none;">+ Nuevo descuento</a>
+    <div style="margin-top: 18px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f1f5f9;"><th style="padding: 12px;">Usuario</th><th style="padding: 12px;">Tipo</th><th style="padding: 12px;">Monto</th><th style="padding: 12px;">Fecha</th><th style="padding: 12px;">Acción</th></tr></thead><tbody>{% for descuento in descuentos %}<tr style="border-bottom: 1px solid #e2e8f0;"><td style="padding: 12px; font-weight: 600;">{{ descuento.usuario.username }}</td><td style="padding: 12px;">{{ descuento.get_tipo_display }}</td><td style="padding: 12px;">${{ descuento.monto }}</td><td style="padding: 12px;">{{ descuento.fecha_aplicacion }}</td><td style="padding: 12px;"><a href="{% url 'nomina_descuento_editar' descuento.id %}" style="color: #3b82f6;">Editar</a></td></tr>{% empty %}<tr><td colspan="5" style="padding: 24px; text-align: center; color: #94a3b8;">No hay descuentos.</td></tr>{% endfor %}</tbody></table>
+    </div>
+</div>
+{% endblock %}

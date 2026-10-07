@@ -1,22 +1,29 @@
 from datetime import timedelta
 
-from django.shortcuts import render, redirect
+from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib import messages
 from django.contrib.auth import login as auth_login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import Group, User
 from django.utils import timezone
 from django.db.models import Q
 from django.http import JsonResponse
 from django.urls import reverse
 from django.views.decorators.http import require_POST
-from .forms import CustomUserCreationForm, CustomAuthenticationForm
+from .forms import (
+    CalendarioTecnicoForm,
+    ConfiguracionPagoForm,
+    CustomAuthenticationForm,
+    CustomUserCreationForm,
+    DescuentoForm,
+)
 from django.contrib.auth.decorators import user_passes_test
 from allauth.socialaccount.models import SocialApp
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo, TareaMantenimiento
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
 from gestion_mantenimiento.users.access import obtener_cliente_actual, obtener_scope_ubicacion_ids
-from .models import RegistroAsistencia
+from .models import CalendarioTecnico, ConfiguracionPago, Descuento, RegistroAsistencia
 
 TIPO_CUENTA_A_GRUPO = {
     'jefe_de_area': 'Admin',
@@ -321,3 +328,131 @@ def group_required(*group_names):
 @group_required('Admin')
 def admin_view(request):
     return render(request, 'users/admin_view.html')
+
+
+def _es_admin(user):
+    return user.is_staff or user.groups.filter(name__in=['Admin', 'Supervisor']).exists()
+
+
+def _requiere_admin(view_func):
+    from functools import wraps
+
+    @wraps(view_func)
+    @login_required
+    def wrapper(request, *args, **kwargs):
+        if not _es_admin(request.user):
+            messages.error(request, 'No tenés permiso para acceder a esta sección.')
+            return redirect('dashboard')
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+
+
+@_requiere_admin
+def nomina_configuracion(request):
+    try:
+        grupo_tecnico = Group.objects.get(name='Tecnico')
+        tecnicos = User.objects.filter(groups=grupo_tecnico).order_by('username')
+    except Group.DoesNotExist:
+        tecnicos = User.objects.none()
+
+    tecnicos_data = []
+    for tecnico in tecnicos:
+        try:
+            config = tecnico.configuracion_pago
+        except ConfiguracionPago.DoesNotExist:
+            config = None
+        tecnicos_data.append({'usuario': tecnico, 'config': config})
+
+    return render(
+        request,
+        'users/nomina/configuracion.html',
+        {'tecnicos_data': tecnicos_data},
+    )
+
+
+@_requiere_admin
+def nomina_configurar_tecnico(request, user_id):
+    tecnico = get_object_or_404(User, id=user_id)
+    try:
+        config = tecnico.configuracion_pago
+    except ConfiguracionPago.DoesNotExist:
+        config = ConfiguracionPago(usuario=tecnico)
+
+    if request.method == 'POST':
+        form = ConfiguracionPagoForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Configuración actualizada para {tecnico.username}.')
+            return redirect('nomina_configuracion')
+    else:
+        form = ConfiguracionPagoForm(instance=config)
+
+    return render(
+        request,
+        'users/nomina/configurar_tecnico.html',
+        {'tecnico': tecnico, 'form': form},
+    )
+
+
+@_requiere_admin
+def nomina_descuentos(request):
+    descuentos = Descuento.objects.order_by('-fecha_aplicacion')
+    return render(
+        request,
+        'users/nomina/descuentos.html',
+        {'descuentos': descuentos},
+    )
+
+
+@_requiere_admin
+def nomina_descuento_form(request, descuento_id=None):
+    descuento = (
+        get_object_or_404(Descuento, id=descuento_id)
+        if descuento_id is not None
+        else None
+    )
+    if request.method == 'POST':
+        form = DescuentoForm(request.POST, instance=descuento)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Descuento guardado correctamente.')
+            return redirect('nomina_descuentos')
+    else:
+        form = DescuentoForm(instance=descuento)
+
+    return render(
+        request,
+        'users/nomina/descuento_form.html',
+        {'form': form, 'descuento': descuento},
+    )
+
+
+@_requiere_admin
+def nomina_calendario(request):
+    dias = CalendarioTecnico.objects.order_by('-fecha')
+    return render(
+        request,
+        'users/nomina/calendario.html',
+        {'dias': dias},
+    )
+
+
+@_requiere_admin
+def nomina_calendario_form(request, dia_id=None):
+    dia = get_object_or_404(CalendarioTecnico, id=dia_id) if dia_id is not None else None
+    if request.method == 'POST':
+        form = CalendarioTecnicoForm(request.POST, instance=dia)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Día especial guardado correctamente.')
+            return redirect('nomina_calendario')
+    else:
+        form = CalendarioTecnicoForm(instance=dia)
+
+    return render(
+        request,
+        'users/nomina/calendario_form.html',
+        {'form': form, 'dia': dia},
+    )
+

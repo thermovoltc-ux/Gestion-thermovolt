@@ -1,0 +1,20 @@
+{% extends "solicitudes/indexpadre.html" %}
+{% load static %}
+
+{% block title %}Configurar {{ tecnico.username }}{% endblock %}
+
+{% block content %}
+<div style="padding: 24px; max-width: 800px;">
+    <a href="{% url 'nomina_configuracion' %}" style="color: #3b82f6; text-decoration: none; font-size: 14px;">← Volver</a>
+    <h1 style="margin: 12px 0 24px;">⚙️ Configurar pago de {{ tecnico.username }}</h1>
+    <form method="post" style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+        {% csrf_token %}
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            {% for field in form %}
+            <div><label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px;">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small style="color: #94a3b8;">{{ field.help_text }}</small>{% endif %}{% if field.errors %}<div style="color: #dc3545; font-size: 13px; margin-top: 4px;">{{ field.errors.0 }}</div>{% endif %}</div>
+            {% endfor %}
+        </div>
+        <div style="margin-top: 24px; display: flex; gap: 12px;"><button type="submit" style="background: #10b981; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer;">💾 Guardar</button><a href="{% url 'nomina_configuracion' %}" style="background: #e2e8f0; color: #334155; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">Cancelar</a></div>
+    </form>
+</div>
+{% endblock %}
