@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.db.models import Q
 from django.http import JsonResponse
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 from .forms import CustomUserCreationForm, CustomAuthenticationForm
 from django.contrib.auth.decorators import user_passes_test
@@ -258,9 +259,11 @@ def marcar_asistencia(request):
         fecha=fecha_actual,
     )
 
+    calendar_url = f"{reverse('listar_ot')}?vista=calendario"
+
     if registro.hora_entrada and registro.hora_salida:
         messages.success(request, 'Ya completaste el día.')
-        return redirect('listar_ot')
+        return redirect(calendar_url)
 
     if accion == 'entrada':
         if registro.hora_entrada is None:
@@ -271,12 +274,13 @@ def marcar_asistencia(request):
             messages.info(request, 'La entrada de hoy ya fue registrada.')
     elif registro.hora_entrada is None:
         messages.error(request, 'Primero debes registrar la entrada del día.')
+        return redirect(calendar_url)
     else:
         registro.hora_salida = timezone.now()
         registro.save()
         messages.success(request, 'Salida registrada correctamente.')
 
-    return redirect('listar_ot')
+    return redirect(calendar_url)
 
 
 def logout_view(request):

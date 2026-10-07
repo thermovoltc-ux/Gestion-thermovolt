@@ -952,10 +952,13 @@ def listar_ot(request):
                 'textColor': '#ffffff',
             })
 
+    vista_calendario = request.GET.get('vista') == 'calendario'
+
     return render(request, 'Gestion_ot/listar_ot.html', {
         'ots': ots,
         'filter_label': filter_label,
         'calendar_events_json': json.dumps(calendar_events),
+        'vista_calendario': vista_calendario,
     })
 
 # Vista para cerrar una OT

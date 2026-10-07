@@ -224,7 +224,7 @@ window.addEventListener('load', function() {
         setActiveView('calendar');
     });
 
-    setActiveView('table');
+    setActiveView('{% if vista_calendario %}calendar{% else %}table{% endif %}');
 });
 </script>
 

@@ -17,11 +17,15 @@
 </div>
 
 {% if tipo_cuenta == 'tecnico' %}
-<div class="cardBox" style="margin-bottom: 30px;">
+<div class="asistencia-card cardBox" style="margin-bottom: 30px;">
     <div class="cardHeader">
-        <h2>Registro de asistencia</h2>
+        <div>
+            <p style="margin:0 0 4px; color:#2563eb; font-size:0.85rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;">Registro de Asistencia</p>
+            <h2 style="margin:0;">Control de jornada</h2>
+        </div>
         <span style="color:#475569; font-size:0.9rem;">Estado: {{ asistencia_estado|title }}</span>
     </div>
+    <p style="margin:14px 0 0; color:#64748b;">Registra la entrada y salida de tu jornada para mantener el seguimiento del técnico.</p>
     <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:20px;">
         <form method="post" action="{% url 'marcar_asistencia' %}">
             {% csrf_token %}

@@ -50,8 +50,10 @@ class RegistroAsistenciaTests(TestCase):
         response = self.client.get(reverse('dashboard'))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'asistencia-card')
         self.assertContains(response, 'Marcar entrada')
         self.assertContains(response, 'Marcar salida')
+        self.assertContains(response, 'Registro de Asistencia')
 
     def test_marcar_entrada_crea_registro_y_redirige_al_calendario(self):
         user = get_user_model().objects.create_user(
@@ -71,7 +73,10 @@ class RegistroAsistenciaTests(TestCase):
         registro = RegistroAsistencia.objects.get(usuario=user)
         self.assertIsNotNone(registro.hora_entrada)
         self.assertIsNone(registro.hora_salida)
-        self.assertRedirects(response, reverse('listar_ot'))
+        self.assertRedirects(
+            response,
+            f"{reverse('listar_ot')}?vista=calendario",
+        )
 
     def test_marcar_salida_completa_el_dia(self):
         user = get_user_model().objects.create_user(
@@ -99,7 +104,10 @@ class RegistroAsistenciaTests(TestCase):
         )
         self.assertIsNotNone(registro.hora_salida)
         self.assertEqual(registro.horas_trabajadas, 8.0)
-        self.assertRedirects(response, reverse('listar_ot'))
+        self.assertRedirects(
+            response,
+            f"{reverse('listar_ot')}?vista=calendario",
+        )
 
     def test_dia_completado_muestra_mensaje(self):
         user = get_user_model().objects.create_user(
@@ -123,7 +131,10 @@ class RegistroAsistenciaTests(TestCase):
             follow=True,
         )
 
-        self.assertRedirects(response, reverse('listar_ot'))
+        self.assertRedirects(
+            response,
+            f"{reverse('listar_ot')}?vista=calendario",
+        )
         self.assertEqual(
             str(list(response.wsgi_request._messages)[0]),
             'Ya completaste el día.',
