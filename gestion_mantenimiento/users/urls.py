@@ -21,5 +21,7 @@ urlpatterns = [
     path('nomina/recibo/<int:recibo_id>/', views.nomina_recibo_detalle, name='nomina_recibo_detalle'),
     path('nomina/recibo/<int:recibo_id>/cambiar-estado/', views.nomina_recibo_cambiar_estado, name='nomina_recibo_cambiar_estado'),
     path('nomina/recibo/<int:recibo_id>/enviar/', views.nomina_recibo_enviar_email, name='nomina_recibo_enviar_email'),
+    path('nomina/reportes/', views.nomina_reportes, name='nomina_reportes'),
+    path('nomina/reportes/export-excel/', views.nomina_reporte_export_excel, name='nomina_reporte_export_excel'),
     path('nomina/mis-recibos/', views.nomina_mis_recibos, name='nomina_mis_recibos'),
 ]

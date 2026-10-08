@@ -445,3 +445,39 @@ class DashboardTecnicoTests(TestCase):
         self.assertGreaterEqual(len(response.context['ots_hoy']), 1)
         self.assertContains(response, 'Mi agenda de hoy')
         self.assertContains(response, 'OT-')
+
+
+class ReportesNominaTests(TestCase):
+    def setUp(self):
+        self.admin = get_user_model().objects.create_user(
+            username='admin-reportes',
+            password='test-password',
+            is_staff=True,
+        )
+        self.client.force_login(self.admin)
+
+    def test_reportes_renderizan_resumen_y_filtros(self):
+        response = self.client.get(
+            reverse('nomina_reportes'),
+            {'periodo': 'mensual', 'desde': '2026-10-01', 'hasta': '2026-10-31'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Reportes de Nómina')
+        self.assertContains(response, 'Exportar a Excel')
+        self.assertEqual(response.context['fecha_inicio'], date(2026, 10, 1))
+        self.assertEqual(response.context['fecha_fin'], date(2026, 10, 31))
+
+    def test_export_excel_devuelve_workbook_valido(self):
+        response = self.client.get(
+            reverse('nomina_reporte_export_excel'),
+            {'desde': '2026-10-01', 'hasta': '2026-10-31'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        self.assertTrue(response.content.startswith(b'PK\x03\x04'))
+        self.assertIn('Content-Disposition', response)

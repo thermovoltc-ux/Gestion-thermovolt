@@ -9,11 +9,13 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
 from django.utils import timezone
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl import Workbook
 from .forms import (
     CalendarioTecnicoForm,
     ConfiguracionPagoForm,
@@ -534,6 +536,178 @@ def nomina_supervisor(request):
             'total_general': total_general,
         },
     )
+
+
+def _calcular_filas_reportes(fecha_inicio, fecha_fin, tecnico_id=''):
+    """Calcula las filas consolidadas de un período para la vista y el Excel."""
+    from .nomina import calcular_periodo
+
+    try:
+        grupo_tecnico = Group.objects.get(name='Tecnico')
+        tecnicos = User.objects.filter(groups=grupo_tecnico).order_by('username')
+        if tecnico_id:
+            tecnicos = tecnicos.filter(id=tecnico_id)
+    except Group.DoesNotExist:
+        tecnicos = User.objects.none()
+
+    filas = []
+    for tecnico in tecnicos:
+        try:
+            calculo = calcular_periodo(tecnico, fecha_inicio, fecha_fin)
+            filas.append({
+                'usuario': tecnico,
+                'dias': calculo['dias_trabajados'],
+                'horas': calculo['horas_normales'],
+                'extras': calculo['horas_extras'],
+                'bruto': calculo['bruto'],
+                'descuentos': calculo['total_descuentos'],
+                'neto': calculo['neto'],
+            })
+        except Exception as error:
+            filas.append({'usuario': tecnico, 'error': str(error)})
+
+    return filas
+
+
+@_requiere_admin
+def nomina_reportes(request):
+    """Muestra un reporte consolidado de nómina con filtros de período y técnico."""
+    hoy = date.today()
+    tipo_periodo = request.GET.get('periodo', 'quincenal')
+
+    if tipo_periodo == 'q1':
+        fecha_inicio = hoy.replace(day=1)
+        fecha_fin = hoy.replace(day=15)
+    elif tipo_periodo == 'q2':
+        fecha_inicio = hoy.replace(day=16)
+        fecha_fin = hoy.replace(day=monthrange(hoy.year, hoy.month)[1])
+    elif tipo_periodo == 'mensual':
+        fecha_inicio = hoy.replace(day=1)
+        fecha_fin = hoy.replace(day=monthrange(hoy.year, hoy.month)[1])
+    else:
+        fecha_inicio = hoy.replace(day=1)
+        fecha_fin = hoy.replace(day=15) if hoy.day <= 15 else hoy
+
+    if request.GET.get('desde'):
+        fecha_inicio = date.fromisoformat(request.GET['desde'])
+    if request.GET.get('hasta'):
+        fecha_fin = date.fromisoformat(request.GET['hasta'])
+
+    tecnico_id = request.GET.get('tecnico', '')
+    try:
+        tecnico_id = int(tecnico_id) if tecnico_id else ''
+    except ValueError:
+        tecnico_id = ''
+
+    try:
+        grupo_tecnico = Group.objects.get(name='Tecnico')
+        todos_tecnicos = User.objects.filter(groups=grupo_tecnico).order_by('username')
+    except Group.DoesNotExist:
+        todos_tecnicos = []
+
+    filas = _calcular_filas_reportes(fecha_inicio, fecha_fin, tecnico_id)
+    totales = {
+        'bruto': sum((fila['bruto'] for fila in filas if 'error' not in fila), Decimal('0.00')),
+        'descuentos': sum((fila['descuentos'] for fila in filas if 'error' not in fila), Decimal('0.00')),
+        'neto': sum((fila['neto'] for fila in filas if 'error' not in fila), Decimal('0.00')),
+        'cantidad_tecnicos': sum('error' not in fila for fila in filas),
+    }
+
+    return render(
+        request,
+        'users/nomina/reportes.html',
+        {
+            'filas': filas,
+            'fecha_inicio': fecha_inicio,
+            'fecha_fin': fecha_fin,
+            'tipo_periodo': tipo_periodo,
+            'todos_tecnicos': todos_tecnicos,
+            'tecnico_seleccionado': tecnico_id,
+            'totales': totales,
+        },
+    )
+
+
+@_requiere_admin
+def nomina_reporte_export_excel(request):
+    """Exporta el reporte consolidado a un archivo XLSX."""
+    try:
+        fecha_inicio = date.fromisoformat(request.GET['desde'])
+        fecha_fin = date.fromisoformat(request.GET['hasta'])
+    except (KeyError, ValueError):
+        messages.error(request, 'Las fechas desde y hasta son obligatorias.')
+        return redirect('nomina_reportes')
+
+    tecnico_id = request.GET.get('tecnico', '')
+    try:
+        tecnico_id = int(tecnico_id) if tecnico_id else ''
+    except ValueError:
+        tecnico_id = ''
+
+    filas = _calcular_filas_reportes(fecha_inicio, fecha_fin, tecnico_id)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Nómina'
+    header_font = Font(bold=True, color='FFFFFF', size=11)
+    header_fill = PatternFill(start_color='1E40AF', end_color='1E40AF', fill_type='solid')
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin'),
+    )
+
+    ws.merge_cells('A1:G1')
+    ws['A1'] = f"Reporte de Nómina - {fecha_inicio.strftime('%d/%m/%Y')} al {fecha_fin.strftime('%d/%m/%Y')}"
+    ws['A1'].font = Font(bold=True, size=14, color='1E293B')
+    ws['A1'].alignment = Alignment(horizontal='center')
+
+    headers = ['Técnico', 'Días', 'Horas Normales', 'Horas Extras', 'Bruto', 'Descuentos', 'Neto']
+    for column, header in enumerate(headers, 1):
+        cell = ws.cell(row=3, column=column, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = border
+
+    row = 4
+    total_bruto = Decimal('0.00')
+    total_descuentos = Decimal('0.00')
+    total_neto = Decimal('0.00')
+    for fila in filas:
+        if 'error' in fila:
+            continue
+        tecnico = fila['usuario']
+        ws.cell(row=row, column=1, value=tecnico.username).border = border
+        ws.cell(row=row, column=2, value=fila['dias']).border = border
+        ws.cell(row=row, column=3, value=float(fila['horas'])).border = border
+        ws.cell(row=row, column=4, value=float(fila['extras'])).border = border
+        for column, value in (
+            (5, float(fila['bruto'])),
+            (6, float(fila['descuentos'])),
+            (7, float(fila['neto'])),
+        ):
+            cell = ws.cell(row=row, column=column, value=value)
+            cell.number_format = '$#,##0.00'
+            cell.border = border
+        total_bruto += fila['bruto']
+        total_descuentos += fila['descuentos']
+        total_neto += fila['neto']
+        row += 1
+
+    ws.cell(row=row, column=1, value='TOTALES').font = Font(bold=True)
+    for column, value in ((5, total_bruto), (6, total_descuentos), (7, total_neto)):
+        cell = ws.cell(row=row, column=column, value=float(value))
+        cell.number_format = '$#,##0.00'
+        cell.font = Font(bold=True, color='065F46')
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    filename = f"nomina_{fecha_inicio.strftime('%Y%m%d')}_{fecha_fin.strftime('%Y%m%d')}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    wb.save(response)
+    return response
 
 
 @_requiere_admin

@@ -1,0 +1,108 @@
+{% extends "solicitudes/indexpadre.html" %}
+{% load static %}
+
+{% block title %}Reportes de Nómina{% endblock %}
+
+{% block content %}
+<div style="padding: 24px; max-width: 1400px; margin: 0 auto;">
+    <h1 style="margin-bottom: 8px;">📊 Reportes de Nómina</h1>
+    <p style="color: #64748b; margin-bottom: 24px;">
+        Reporte del {{ fecha_inicio|date:"d M Y" }} al {{ fecha_fin|date:"d M Y" }}
+    </p>
+
+    <form method="get" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 24px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; align-items: end;">
+            <div>
+                <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Tipo de período</label>
+                <select name="periodo" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                    <option value="quincenal" {% if tipo_periodo == 'quincenal' %}selected{% endif %}>Quincenal actual</option>
+                    <option value="q1" {% if tipo_periodo == 'q1' %}selected{% endif %}>Primera quincena</option>
+                    <option value="q2" {% if tipo_periodo == 'q2' %}selected{% endif %}>Segunda quincena</option>
+                    <option value="mensual" {% if tipo_periodo == 'mensual' %}selected{% endif %}>Mensual</option>
+                </select>
+            </div>
+            <div>
+                <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Desde</label>
+                <input type="date" name="desde" value="{{ fecha_inicio|date:'Y-m-d' }}" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+            </div>
+            <div>
+                <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Hasta</label>
+                <input type="date" name="hasta" value="{{ fecha_fin|date:'Y-m-d' }}" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+            </div>
+            <div>
+                <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Técnico</label>
+                <select name="tecnico" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                    <option value="">Todos</option>
+                    {% for tecnico in todos_tecnicos %}
+                        <option value="{{ tecnico.id }}" {% if tecnico_seleccionado == tecnico.id|stringformat:"s" %}selected{% endif %}>{{ tecnico.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <button type="submit" style="width: 100%; background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">🔍 Generar</button>
+            </div>
+        </div>
+    </form>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px;">
+        <div style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 20px; border-radius: 12px;">
+            <div style="font-size: 12px; opacity: 0.9;">Total bruto</div>
+            <div style="font-size: 28px; font-weight: 700;">${{ totales.bruto }}</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 20px; border-radius: 12px;">
+            <div style="font-size: 12px; opacity: 0.9;">Descuentos</div>
+            <div style="font-size: 28px; font-weight: 700;">-${{ totales.descuentos }}</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px; border-radius: 12px;">
+            <div style="font-size: 12px; opacity: 0.9;">Neto a pagar</div>
+            <div style="font-size: 28px; font-weight: 700;">${{ totales.neto }}</div>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+            <div style="font-size: 12px; color: #64748b;">Técnicos</div>
+            <div style="font-size: 28px; font-weight: 700; color: #1e293b;">{{ totales.cantidad_tecnicos }}</div>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 16px; display: flex; justify-content: flex-end;">
+        <a href="{% url 'nomina_reporte_export_excel' %}?desde={{ fecha_inicio|date:'Y-m-d' }}&hasta={{ fecha_fin|date:'Y-m-d' }}{% if tecnico_seleccionado %}&tecnico={{ tecnico_seleccionado }}{% endif %}"
+           style="background: #10b981; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+            📥 Exportar a Excel
+        </a>
+    </div>
+
+    <div style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f1f5f9;">
+                    <th style="padding: 12px; text-align: left;">Técnico</th>
+                    <th style="padding: 12px; text-align: center;">Días</th>
+                    <th style="padding: 12px; text-align: right;">Horas</th>
+                    <th style="padding: 12px; text-align: right;">Extras</th>
+                    <th style="padding: 12px; text-align: right;">Bruto</th>
+                    <th style="padding: 12px; text-align: right;">Descuentos</th>
+                    <th style="padding: 12px; text-align: right;">Neto</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in filas %}
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 12px; font-weight: 600;">{{ fila.usuario.username }}</td>
+                        {% if fila.error %}
+                            <td colspan="6" style="padding: 12px; text-align: center; color: #dc3545;">⚠️ {{ fila.error }}</td>
+                        {% else %}
+                            <td style="padding: 12px; text-align: center;">{{ fila.dias }}</td>
+                            <td style="padding: 12px; text-align: right;">{{ fila.horas }}</td>
+                            <td style="padding: 12px; text-align: right;">{{ fila.extras }}</td>
+                            <td style="padding: 12px; text-align: right;">${{ fila.bruto }}</td>
+                            <td style="padding: 12px; text-align: right; color: #dc3545;">-${{ fila.descuentos }}</td>
+                            <td style="padding: 12px; text-align: right; font-weight: 700; color: #059669;">${{ fila.neto }}</td>
+                        {% endif %}
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" style="padding: 24px; text-align: center; color: #94a3b8;">No hay resultados para este período.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
