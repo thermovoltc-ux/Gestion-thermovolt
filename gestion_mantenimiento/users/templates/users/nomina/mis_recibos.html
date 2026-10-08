@@ -1,0 +1,48 @@
+{% extends "solicitudes/indexpadre.html" %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div style="padding: 24px;">
+    <h1 style="margin-bottom: 24px;">📄 {{ titulo }}</h1>
+    <div style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f1f5f9;">
+                    {% if es_admin_view %}<th style="padding: 12px; text-align: left;">Técnico</th>{% endif %}
+                    <th style="padding: 12px; text-align: left;">Período</th>
+                    <th style="padding: 12px; text-align: right;">Bruto</th>
+                    <th style="padding: 12px; text-align: right;">Neto</th>
+                    <th style="padding: 12px; text-align: center;">Estado</th>
+                    <th style="padding: 12px; text-align: center;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for recibo in recibos %}
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                    {% if es_admin_view %}<td style="padding: 12px; font-weight: 600;">{{ recibo.usuario.username }}</td>{% endif %}
+                    <td style="padding: 12px;">{{ recibo.fecha_inicio|date:"d M" }} - {{ recibo.fecha_fin|date:"d M Y" }}</td>
+                    <td style="padding: 12px; text-align: right;">${{ recibo.bruto }}</td>
+                    <td style="padding: 12px; text-align: right; font-weight: 700; color: #059669;">${{ recibo.neto }}</td>
+                    <td style="padding: 12px; text-align: center;">
+                        <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+                            {% if recibo.estado == 'borrador' %}background: #fef3c7; color: #92400e;
+                            {% elif recibo.estado == 'aprobado' %}background: #dbeafe; color: #1e40af;
+                            {% elif recibo.estado == 'pagado' %}background: #d1fae5; color: #065f46;
+                            {% else %}background: #fee2e2; color: #991b1b;{% endif %}">
+                            {{ recibo.get_estado_display }}
+                        </span>
+                    </td>
+                    <td style="padding: 12px; text-align: center;">
+                        <a href="{% url 'nomina_recibo_detalle' recibo.id %}" style="background: #3b82f6; color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 13px;">Ver</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="{% if es_admin_view %}6{% else %}5{% endif %}" style="padding: 32px; text-align: center; color: #94a3b8;">No hay recibos generados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

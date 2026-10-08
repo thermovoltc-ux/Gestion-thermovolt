@@ -599,3 +599,72 @@ def nomina_generar_recibos(request):
     )
     return redirect('nomina_supervisor')
 
+
+@login_required
+def nomina_recibo_detalle(request, recibo_id):
+    """Muestra el detalle de un recibo al propietario o a un administrador."""
+    recibo = get_object_or_404(ReciboPago, id=recibo_id)
+    es_admin = _es_admin(request.user)
+    es_propietario = recibo.usuario == request.user
+
+    if not (es_admin or es_propietario):
+        messages.error(request, 'No tenés permiso para ver este recibo.')
+        return redirect('dashboard')
+
+    return render(
+        request,
+        'users/nomina/recibo_detalle.html',
+        {
+            'recibo': recibo,
+            'es_admin': es_admin,
+            'puede_cambiar_estado': es_admin and recibo.estado != 'pagado',
+            'estados_disponibles': [
+                ('borrador', 'Borrador'),
+                ('aprobado', 'Aprobado'),
+                ('pagado', 'Pagado'),
+                ('anulado', 'Anulado'),
+            ],
+        },
+    )
+
+
+@_requiere_admin
+@require_POST
+def nomina_recibo_cambiar_estado(request, recibo_id):
+    """Permite cambiar el estado de un recibo a un administrador."""
+    recibo = get_object_or_404(ReciboPago, id=recibo_id)
+    nuevo_estado = request.POST.get('estado', '')
+    estados_validos = ['borrador', 'aprobado', 'pagado', 'anulado']
+
+    if nuevo_estado not in estados_validos:
+        messages.error(request, 'Estado inválido.')
+        return redirect('nomina_recibo_detalle', recibo_id=recibo.id)
+
+    recibo.estado = nuevo_estado
+    recibo.save(update_fields=['estado', 'actualizado'])
+    messages.success(request, f'Recibo actualizado a "{recibo.get_estado_display()}".')
+    return redirect('nomina_recibo_detalle', recibo_id=recibo.id)
+
+
+@login_required
+def nomina_mis_recibos(request):
+    """Lista los recibos del técnico o todos los recibos para administración."""
+    if _es_admin(request.user):
+        recibos = ReciboPago.objects.all().select_related('usuario').order_by('-fecha_inicio')
+        titulo = 'Todos los Recibos'
+        es_admin_view = True
+    else:
+        recibos = ReciboPago.objects.filter(usuario=request.user).order_by('-fecha_inicio')
+        titulo = 'Mis Recibos'
+        es_admin_view = False
+
+    return render(
+        request,
+        'users/nomina/mis_recibos.html',
+        {
+            'recibos': recibos,
+            'titulo': titulo,
+            'es_admin_view': es_admin_view,
+        },
+    )
+

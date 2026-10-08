@@ -1,0 +1,70 @@
+{% extends "solicitudes/indexpadre.html" %}
+{% load static %}
+
+{% block title %}Recibo {{ recibo.usuario.username }}{% endblock %}
+
+{% block content %}
+<div style="padding: 24px; max-width: 900px; margin: 0 auto;">
+    <a href="{% url 'nomina_mis_recibos' %}" style="color: #3b82f6; text-decoration: none; font-size: 14px;">← Volver</a>
+
+    <div style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 32px; margin-top: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: start; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 24px;">
+            <div>
+                <h1 style="margin: 0; font-size: 24px;">Recibo de Pago</h1>
+                <p style="margin: 4px 0 0; color: #64748b;">{{ recibo.get_tipo_periodo_display }}</p>
+            </div>
+            <div style="text-align: right;">
+                <div style="display: inline-block; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px;
+                    {% if recibo.estado == 'borrador' %}background: #fef3c7; color: #92400e;
+                    {% elif recibo.estado == 'aprobado' %}background: #dbeafe; color: #1e40af;
+                    {% elif recibo.estado == 'pagado' %}background: #d1fae5; color: #065f46;
+                    {% else %}background: #fee2e2; color: #991b1b;{% endif %}">
+                    {{ recibo.get_estado_display }}
+                </div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+            <div>
+                <div style="font-size: 12px; color: #64748b; text-transform: uppercase;">Técnico</div>
+                <div style="font-size: 18px; font-weight: 600;">{{ recibo.usuario.get_full_name|default:recibo.usuario.username }}</div>
+                <div style="font-size: 14px; color: #64748b;">{{ recibo.usuario.username }}</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 12px; color: #64748b; text-transform: uppercase;">Período</div>
+                <div style="font-size: 18px; font-weight: 600;">{{ recibo.fecha_inicio|date:"d M Y" }} - {{ recibo.fecha_fin|date:"d M Y" }}</div>
+            </div>
+        </div>
+
+        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
+            <h3 style="margin: 0 0 16px; font-size: 16px;">⏱️ Horas</h3>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+                <div><div style="font-size: 12px; color: #64748b;">Días trabajados</div><div style="font-size: 20px; font-weight: 600;">{{ recibo.dias_trabajados }}</div></div>
+                <div><div style="font-size: 12px; color: #64748b;">Horas normales</div><div style="font-size: 20px; font-weight: 600;">{{ recibo.horas_normales }}</div></div>
+                <div><div style="font-size: 12px; color: #64748b;">Horas extras</div><div style="font-size: 20px; font-weight: 600;">{{ recibo.horas_extras }}</div></div>
+                <div><div style="font-size: 12px; color: #64748b;">Horas nocturnas</div><div style="font-size: 20px; font-weight: 600;">{{ recibo.horas_nocturnas }}</div></div>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e2e8f0;"><span style="color: #64748b;">Bruto</span><span style="font-weight: 600;">${{ recibo.bruto }}</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e2e8f0;"><span style="color: #64748b;">Descuentos</span><span style="font-weight: 600; color: #dc3545;">-${{ recibo.total_descuentos }}</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 16px 0; font-size: 24px; font-weight: 700; color: #059669; border-top: 2px solid #059669;"><span>NETO A PAGAR</span><span>${{ recibo.neto }}</span></div>
+        </div>
+
+        {% if puede_cambiar_estado %}
+        <div style="margin-top: 32px; padding-top: 20px; border-top: 2px solid #e2e8f0;">
+            <h3 style="margin: 0 0 12px; font-size: 16px;">Cambiar estado</h3>
+            <form method="post" action="{% url 'nomina_recibo_cambiar_estado' recibo.id %}" style="display: flex; gap: 12px; flex-wrap: wrap;">
+                {% csrf_token %}
+                {% for valor, label in estados_disponibles %}
+                    {% if valor != recibo.estado %}
+                    <button type="submit" name="estado" value="{{ valor }}" style="padding: 10px 20px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;{% if valor == 'aprobado' %} background: #3b82f6; color: white;{% elif valor == 'pagado' %} background: #10b981; color: white;{% elif valor == 'anulado' %} background: #dc3545; color: white;{% else %} background: #e2e8f0; color: #334155;{% endif %}">Marcar como {{ label }}</button>
+                    {% endif %}
+                {% endfor %}
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

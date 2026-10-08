@@ -74,6 +74,16 @@
 {% endif %}
 
 {% if tipo_cuenta == 'tecnico' %}
+<div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+    <div>
+        <h3 style="margin: 0; font-size: 16px;">📄 Mis Recibos de Pago</h3>
+        <p style="margin: 4px 0 0; color: #64748b; font-size: 14px;">Consultá tus recibos de pago generados.</p>
+    </div>
+    <a href="{% url 'nomina_mis_recibos' %}" style="background: #3b82f6; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600;">Ver recibos</a>
+</div>
+{% endif %}
+
+{% if tipo_cuenta == 'tecnico' %}
 <section style="margin: 30px 0; padding: 24px; background:#ffffff; border:1px solid #e2e8f0; border-radius:18px; box-shadow:0 8px 24px rgba(15,23,42,0.05);">
     <div class="cardHeader" style="margin-bottom:18px;">
         <h2>Mi agenda de hoy</h2>
