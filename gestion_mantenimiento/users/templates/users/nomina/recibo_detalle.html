@@ -65,6 +65,29 @@
             </form>
         </div>
         {% endif %}
+
+        {% if es_admin %}
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 2px solid #e2e8f0;">
+            <h3 style="margin: 0 0 12px; font-size: 16px;">Enviar al técnico</h3>
+            {% if recibo.enviado_por_email %}
+                <div style="background: #d1fae5; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+                    <div style="color: #065f46; font-weight: 600;">✅ Enviado por email</div>
+                    <div style="color: #047857; font-size: 13px; margin-top: 4px;">Fecha: {{ recibo.fecha_envio|date:"d/m/Y H:i" }}</div>
+                    {% if recibo.usuario.email %}<div style="color: #047857; font-size: 13px;">Para: {{ recibo.usuario.email }}</div>{% endif %}
+                </div>
+            {% endif %}
+            {% if not recibo.usuario.email %}
+                <div style="background: #fef3c7; padding: 12px; border-radius: 6px; margin-bottom: 12px; color: #92400e;">⚠️ El técnico no tiene email configurado.</div>
+            {% else %}
+                <form method="post" action="{% url 'nomina_recibo_enviar_email' recibo.id %}">
+                    {% csrf_token %}
+                    <button type="submit" style="background: #0ea5e9; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                        📧 {% if recibo.enviado_por_email %}Reenviar{% else %}Enviar por email{% endif %} a {{ recibo.usuario.email }}
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

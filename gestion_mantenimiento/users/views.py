@@ -12,6 +12,8 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.urls import reverse
 from django.views.decorators.http import require_POST
+from django.core.mail import EmailMultiAlternatives
+from django.conf import settings
 from .forms import (
     CalendarioTecnicoForm,
     ConfiguracionPagoForm,
@@ -26,6 +28,7 @@ from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
 from gestion_mantenimiento.users.access import obtener_cliente_actual, obtener_scope_ubicacion_ids
 from .models import CalendarioTecnico, ConfiguracionPago, Descuento, ReciboPago, RegistroAsistencia
+from .nomina_pdf import generar_nombre_pdf, generar_pdf_recibo
 
 TIPO_CUENTA_A_GRUPO = {
     'jefe_de_area': 'Admin',
@@ -643,6 +646,72 @@ def nomina_recibo_cambiar_estado(request, recibo_id):
     recibo.estado = nuevo_estado
     recibo.save(update_fields=['estado', 'actualizado'])
     messages.success(request, f'Recibo actualizado a "{recibo.get_estado_display()}".')
+    return redirect('nomina_recibo_detalle', recibo_id=recibo.id)
+
+
+@_requiere_admin
+@require_POST
+def nomina_recibo_enviar_email(request, recibo_id):
+    """Genera el PDF y envía el recibo al técnico configurado."""
+    recibo = get_object_or_404(ReciboPago, id=recibo_id)
+
+    if not recibo.usuario.email:
+        messages.error(request, f'El técnico {recibo.usuario.username} no tiene email configurado.')
+        return redirect('nomina_recibo_detalle', recibo_id=recibo.id)
+
+    try:
+        pdf_buffer = generar_pdf_recibo(recibo)
+        pdf_nombre = generar_nombre_pdf(recibo)
+        pdf_bytes = pdf_buffer.getvalue()
+
+        subject = (
+            f"Recibo de Pago - "
+            f"{recibo.fecha_inicio.strftime('%d/%m/%Y')} al "
+            f"{recibo.fecha_fin.strftime('%d/%m/%Y')}"
+        )
+        text_content = (
+            f"Hola {recibo.usuario.get_full_name() or recibo.usuario.username},\n\n"
+            f"Adjuntamos tu recibo de pago del período "
+            f"{recibo.fecha_inicio.strftime('%d/%m/%Y')} al "
+            f"{recibo.fecha_fin.strftime('%d/%m/%Y')}.\n\n"
+            f"Neto a pagar: ${recibo.neto}\n\n"
+            "Saludos,\nEquipo de Thermovolt"
+        )
+        html_content = f"""
+        <html><body style="font-family: Arial, sans-serif; color: #333;">
+            <h2 style="color: #1e293b;">Recibo de Pago</h2>
+            <p>Hola <strong>{recibo.usuario.get_full_name() or recibo.usuario.username}</strong>,</p>
+            <p>Adjuntamos tu recibo de pago del período <strong>{recibo.fecha_inicio.strftime('%d/%m/%Y')} al {recibo.fecha_fin.strftime('%d/%m/%Y')}</strong>.</p>
+            <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 20px 0;">
+                <table style="width: 100%;">
+                    <tr><td style="color: #64748b;">Bruto:</td><td style="text-align: right;">${recibo.bruto}</td></tr>
+                    <tr><td style="color: #64748b;">Descuentos:</td><td style="text-align: right; color: #dc3545;">-${recibo.total_descuentos}</td></tr>
+                    <tr><td style="font-weight: 700; padding-top: 8px;">NETO A PAGAR:</td><td style="text-align: right; font-weight: 700; color: #059669;">${recibo.neto}</td></tr>
+                </table>
+            </div>
+            <p>Encontrás el detalle completo en el PDF adjunto.</p>
+            <p>Saludos,<br>Equipo de Thermovolt</p>
+        </body></html>
+        """
+
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@thermovolt.com'),
+            to=[recibo.usuario.email],
+        )
+        email.attach_alternative(html_content, 'text/html')
+        email.attach(pdf_nombre, pdf_bytes, 'application/pdf')
+        email.send(fail_silently=False)
+
+        recibo.enviado_por_email = True
+        recibo.fecha_envio = timezone.now()
+        recibo.pdf_path = pdf_nombre
+        recibo.save(update_fields=['enviado_por_email', 'fecha_envio', 'pdf_path', 'actualizado'])
+        messages.success(request, f'Recibo enviado a {recibo.usuario.email}')
+    except Exception as error:
+        messages.error(request, f'Error al enviar: {error}')
+
     return redirect('nomina_recibo_detalle', recibo_id=recibo.id)
 
 
