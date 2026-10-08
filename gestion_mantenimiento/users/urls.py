@@ -8,6 +8,7 @@ urlpatterns = [
     path('dashboard/', dashboard, name='dashboard'),
     path('marcar-asistencia/', marcar_asistencia, name='marcar_asistencia'),
     path('logout/', logout_view, name='logout'),
+    path('nomina/', views.nomina_panel, name='nomina_panel'),
     path('nomina/configuracion/', views.nomina_configuracion, name='nomina_configuracion'),
     path('nomina/configuracion/<int:user_id>/', views.nomina_configurar_tecnico, name='nomina_configurar_tecnico'),
     path('nomina/descuentos/', views.nomina_descuentos, name='nomina_descuentos'),

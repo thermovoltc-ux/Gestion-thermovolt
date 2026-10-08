@@ -8,7 +8,7 @@ from django.contrib.auth import login as auth_login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -534,6 +534,55 @@ def nomina_supervisor(request):
             'fecha_fin': fecha_fin,
             'tipo_periodo': tipo_periodo,
             'total_general': total_general,
+        },
+    )
+
+
+@_requiere_admin
+def nomina_panel(request):
+    """Panel principal de Nómina con KPIs, accesos rápidos y recibos recientes."""
+    hoy = date.today()
+    inicio_mes = hoy.replace(day=1)
+    fin_mes = hoy.replace(day=monthrange(hoy.year, hoy.month)[1])
+
+    total_mes = ReciboPago.objects.filter(
+        fecha_inicio__gte=inicio_mes,
+        fecha_fin__lte=fin_mes,
+    ).aggregate(total=Sum('neto'))['total'] or Decimal('0.00')
+    total_pagado = ReciboPago.objects.filter(
+        fecha_inicio__gte=inicio_mes,
+        fecha_fin__lte=fin_mes,
+        estado='pagado',
+    ).aggregate(total=Sum('neto'))['total'] or Decimal('0.00')
+    pendientes = ReciboPago.objects.filter(estado='borrador').count()
+
+    try:
+        grupo_tecnico = Group.objects.get(name='Tecnico')
+        tecnicos_activos = User.objects.filter(groups=grupo_tecnico).count()
+    except Group.DoesNotExist:
+        tecnicos_activos = 0
+
+    ultimos_recibos = ReciboPago.objects.select_related('usuario').order_by('-creado')[:5]
+    stats = ReciboPago.objects.filter(
+        fecha_inicio__gte=inicio_mes,
+        fecha_fin__lte=fin_mes,
+    ).aggregate(
+        bruto=Sum('bruto'),
+        descuentos=Sum('total_descuentos'),
+        neto=Sum('neto'),
+    )
+
+    return render(
+        request,
+        'users/nomina/panel.html',
+        {
+            'total_mes': total_mes,
+            'total_pagado': total_pagado,
+            'pendientes': pendientes,
+            'tecnicos_activos': tecnicos_activos,
+            'ultimos_recibos': ultimos_recibos,
+            'stats': stats,
+            'mes_actual': hoy.strftime('%B %Y'),
         },
     )
 
