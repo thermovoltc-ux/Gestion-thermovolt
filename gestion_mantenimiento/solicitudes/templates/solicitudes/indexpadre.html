@@ -155,6 +155,16 @@
                                 <span class="title">Recurso humano</span>
                             </a>
                         </li>
+                        {% if user.is_staff or user.is_superuser or request.session.tipo_cuenta == 'administrador' %}
+                            <li>
+                                <a href="{% url 'nomina_supervisor' %}" class="{% if 'nomina' in request.path %}active{% endif %}">
+                                    <span class="icon">
+                                        <ion-icon name="wallet-outline"></ion-icon>
+                                    </span>
+                                    <span class="title">Nómina</span>
+                                </a>
+                            </li>
+                        {% endif %}
                     {% elif request.session.tipo_cuenta == 'tecnico' %}
                         <!-- Elementos accesibles solo para técnicos -->
                         <li>

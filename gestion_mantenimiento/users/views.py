@@ -1,4 +1,6 @@
-from datetime import timedelta
+from calendar import monthrange
+from datetime import date, timedelta
+from decimal import Decimal
 
 from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib import messages
@@ -23,7 +25,7 @@ from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo, TareaMantenimi
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
 from gestion_mantenimiento.users.access import obtener_cliente_actual, obtener_scope_ubicacion_ids
-from .models import CalendarioTecnico, ConfiguracionPago, Descuento, RegistroAsistencia
+from .models import CalendarioTecnico, ConfiguracionPago, Descuento, ReciboPago, RegistroAsistencia
 
 TIPO_CUENTA_A_GRUPO = {
     'jefe_de_area': 'Admin',
@@ -455,4 +457,145 @@ def nomina_calendario_form(request, dia_id=None):
         'users/nomina/calendario_form.html',
         {'form': form, 'dia': dia},
     )
+
+
+@_requiere_admin
+def nomina_supervisor(request):
+    """Calcula la nómina del período para todos los técnicos."""
+    from .nomina import calcular_periodo
+
+    tipo_periodo = request.GET.get('periodo', 'quincenal')
+    hoy = date.today()
+
+    if tipo_periodo == 'quincenal':
+        if hoy.day <= 15:
+            fecha_inicio = hoy.replace(day=1)
+            fecha_fin = hoy.replace(day=15)
+        else:
+            fecha_inicio = hoy.replace(day=16)
+            fecha_fin = hoy.replace(day=monthrange(hoy.year, hoy.month)[1])
+    elif tipo_periodo == 'mensual':
+        fecha_inicio = hoy.replace(day=1)
+        fecha_fin = hoy.replace(day=monthrange(hoy.year, hoy.month)[1])
+    elif tipo_periodo == 'semanal':
+        fecha_inicio = hoy - timedelta(days=hoy.weekday())
+        fecha_fin = fecha_inicio + timedelta(days=6)
+    else:
+        fecha_inicio = hoy.replace(day=1)
+        fecha_fin = hoy
+
+    for campo, parametro in (
+        ('desde', 'fecha_inicio'),
+        ('hasta', 'fecha_fin'),
+    ):
+        valor = request.GET.get(campo)
+        if valor:
+            try:
+                if parametro == 'fecha_inicio':
+                    fecha_inicio = date.fromisoformat(valor)
+                else:
+                    fecha_fin = date.fromisoformat(valor)
+            except ValueError:
+                pass
+
+    try:
+        grupo_tecnico = Group.objects.get(name='Tecnico')
+        tecnicos = User.objects.filter(groups=grupo_tecnico).order_by('username')
+    except Group.DoesNotExist:
+        tecnicos = User.objects.none()
+
+    nominas = []
+    total_general = Decimal('0.00')
+    for tecnico in tecnicos:
+        try:
+            calculo = calcular_periodo(tecnico, fecha_inicio, fecha_fin)
+            calculo['usuario'] = tecnico
+            calculo['tiene_config'] = hasattr(tecnico, 'configuracion_pago')
+            nominas.append(calculo)
+            total_general += calculo['neto']
+        except Exception as error:
+            nominas.append({
+                'usuario': tecnico,
+                'error': str(error),
+                'tiene_config': False,
+            })
+
+    return render(
+        request,
+        'users/nomina/supervisor.html',
+        {
+            'nominas': nominas,
+            'fecha_inicio': fecha_inicio,
+            'fecha_fin': fecha_fin,
+            'tipo_periodo': tipo_periodo,
+            'total_general': total_general,
+        },
+    )
+
+
+@_requiere_admin
+@require_POST
+def nomina_generar_recibos(request):
+    """Genera recibos de pago para todos los técnicos del período."""
+    from .nomina import calcular_periodo
+
+    fecha_inicio_str = request.POST.get('fecha_inicio')
+    fecha_fin_str = request.POST.get('fecha_fin')
+    tipo_periodo = request.POST.get('tipo_periodo', 'quincenal')
+
+    try:
+        fecha_inicio = date.fromisoformat(fecha_inicio_str)
+        fecha_fin = date.fromisoformat(fecha_fin_str)
+    except (TypeError, ValueError):
+        messages.error(request, 'Fechas inválidas.')
+        return redirect('nomina_supervisor')
+
+    try:
+        grupo_tecnico = Group.objects.get(name='Tecnico')
+        tecnicos = User.objects.filter(groups=grupo_tecnico)
+    except Group.DoesNotExist:
+        messages.error(request, 'No existe el grupo Tecnico.')
+        return redirect('nomina_supervisor')
+
+    generados = 0
+    omitidos = 0
+    for tecnico in tecnicos:
+        existe = ReciboPago.objects.filter(
+            usuario=tecnico,
+            tipo_periodo=tipo_periodo,
+            fecha_inicio=fecha_inicio,
+            fecha_fin=fecha_fin,
+        ).exists()
+        if existe:
+            omitidos += 1
+            continue
+
+        try:
+            calculo = calcular_periodo(tecnico, fecha_inicio, fecha_fin)
+            ReciboPago.objects.create(
+                usuario=tecnico,
+                tipo_periodo=tipo_periodo,
+                fecha_inicio=fecha_inicio,
+                fecha_fin=fecha_fin,
+                horas_normales=calculo['horas_normales'],
+                horas_extras=calculo['horas_extras'],
+                horas_nocturnas=calculo['horas_nocturnas'],
+                horas_festivas=calculo['horas_festivas'],
+                dias_trabajados=calculo['dias_trabajados'],
+                dias_descanso=calculo['dias_descanso'],
+                bruto=calculo['bruto'],
+                total_descuentos=calculo['total_descuentos'],
+                neto=calculo['neto'],
+                detalles=calculo['detalles'],
+                estado='borrador',
+            )
+            generados += 1
+        except Exception as error:
+            messages.warning(request, f'Error con {tecnico.username}: {error}')
+
+    messages.success(
+        request,
+        f'Recibos generados: {generados}. Omitidos (ya existían): {omitidos}.',
+    )
+    return redirect('nomina_supervisor')
 

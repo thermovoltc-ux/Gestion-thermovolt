@@ -16,4 +16,6 @@ urlpatterns = [
     path('nomina/calendario/', views.nomina_calendario, name='nomina_calendario'),
     path('nomina/calendario/nuevo/', views.nomina_calendario_form, name='nomina_calendario_nuevo'),
     path('nomina/calendario/<int:dia_id>/', views.nomina_calendario_form, name='nomina_calendario_editar'),
+    path('nomina/supervisor/', views.nomina_supervisor, name='nomina_supervisor'),
+    path('nomina/generar-recibos/', views.nomina_generar_recibos, name='nomina_generar_recibos'),
 ]

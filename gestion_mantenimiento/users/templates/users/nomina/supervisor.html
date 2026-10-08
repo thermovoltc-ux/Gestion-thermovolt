@@ -1,0 +1,79 @@
+{% extends "solicitudes/indexpadre.html" %}
+{% load static %}
+
+{% block title %}Supervisor de Nómina{% endblock %}
+
+{% block content %}
+<div style="padding: 24px;">
+    <h1 style="margin-bottom: 8px;">📊 Supervisor de Nómina</h1>
+    <p style="color: #64748b; margin-bottom: 24px;">
+        Cálculo del período {{ fecha_inicio|date:"d M Y" }} al {{ fecha_fin|date:"d M Y" }}
+    </p>
+
+    <form method="get" style="background: white; padding: 16px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 24px; display: flex; gap: 12px; align-items: end; flex-wrap: wrap;">
+        <div>
+            <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px;">Tipo de período</label>
+            <select name="periodo" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                <option value="quincenal" {% if tipo_periodo == 'quincenal' %}selected{% endif %}>Quincenal</option>
+                <option value="mensual" {% if tipo_periodo == 'mensual' %}selected{% endif %}>Mensual</option>
+                <option value="semanal" {% if tipo_periodo == 'semanal' %}selected{% endif %}>Semanal</option>
+            </select>
+        </div>
+        <div>
+            <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px;">Desde</label>
+            <input type="date" name="desde" value="{{ fecha_inicio|date:'Y-m-d' }}" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+        </div>
+        <div>
+            <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px;">Hasta</label>
+            <input type="date" name="hasta" value="{{ fecha_fin|date:'Y-m-d' }}" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+        </div>
+        <button type="submit" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">🔍 Calcular</button>
+    </form>
+
+    <div style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(16,185,129,0.3);">
+        <div style="font-size: 14px; opacity: 0.9;">Total a pagar en el período</div>
+        <div style="font-size: 32px; font-weight: 700;">${{ total_general }}</div>
+    </div>
+
+    <div style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f1f5f9;">
+                    <th style="padding: 12px; text-align: left;">Técnico</th>
+                    <th style="padding: 12px; text-align: center;">Días</th>
+                    <th style="padding: 12px; text-align: center;">Horas</th>
+                    <th style="padding: 12px; text-align: right;">Bruto</th>
+                    <th style="padding: 12px; text-align: right;">Descuentos</th>
+                    <th style="padding: 12px; text-align: right;">Neto</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for nom in nominas %}
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 12px; font-weight: 600;">{{ nom.usuario.username }}</td>
+                        {% if nom.error %}
+                            <td colspan="5" style="padding: 12px; text-align: center; color: #dc3545;">⚠️ Error: {{ nom.error }}</td>
+                        {% else %}
+                            <td style="padding: 12px; text-align: center;">{{ nom.dias_trabajados }}</td>
+                            <td style="padding: 12px; text-align: center;">{{ nom.horas_normales }} + {{ nom.horas_extras }} extra</td>
+                            <td style="padding: 12px; text-align: right;">${{ nom.bruto }}</td>
+                            <td style="padding: 12px; text-align: right; color: #dc3545;">{% if nom.total_descuentos > 0 %}-${{ nom.total_descuentos }}{% else %}—{% endif %}</td>
+                            <td style="padding: 12px; text-align: right; font-weight: 700; color: #059669;">${{ nom.neto }}</td>
+                        {% endif %}
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6" style="padding: 24px; text-align: center; color: #94a3b8;">No hay técnicos registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <form method="post" action="{% url 'nomina_generar_recibos' %}" style="margin-top: 24px; text-align: right;">
+        {% csrf_token %}
+        <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio|date:'Y-m-d' }}">
+        <input type="hidden" name="fecha_fin" value="{{ fecha_fin|date:'Y-m-d' }}">
+        <input type="hidden" name="tipo_periodo" value="{{ tipo_periodo }}">
+        <button type="submit" style="background: #10b981; color: white; border: none; padding: 14px 28px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 15px;">📄 Generar recibos del período</button>
+    </form>
+</div>
+{% endblock %}
