@@ -72,24 +72,8 @@ function touchEnd(event) {
     }
 }
 
-// Agregar event listeners para arrastre y touch
+// Agregar event listeners para touch
 document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.kanban-card[draggable="true"]').forEach(function(card) {
-        card.addEventListener('dragstart', drag);
-        card.addEventListener('mousedown', startClick);
-        card.addEventListener('mouseup', function(event) {
-            const numeroActivo = card.getAttribute('data-numero-activo') || card.id.replace(/^tarea-/, '');
-            if (numeroActivo) {
-                endClick(event, numeroActivo);
-            }
-        });
-    });
-
-    document.querySelectorAll('.kanban-column').forEach(function(column) {
-        column.addEventListener('dragover', allowDrop);
-        column.addEventListener('drop', dropDesktop);
-    });
-
     document.addEventListener('touchstart', touchStart, { passive: false });
     document.addEventListener('touchmove', touchMove, { passive: false });
     document.addEventListener('touchend', touchEnd, { passive: false });
