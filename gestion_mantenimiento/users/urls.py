@@ -20,6 +20,7 @@ urlpatterns = [
     path('nomina/supervisor/', views.nomina_supervisor, name='nomina_supervisor'),
     path('nomina/generar-recibos/', views.nomina_generar_recibos, name='nomina_generar_recibos'),
     path('nomina/recibo/<int:recibo_id>/', views.nomina_recibo_detalle, name='nomina_recibo_detalle'),
+    path('nomina/recibo/<int:recibo_id>/recalcular/', views.nomina_recibo_recalcular, name='nomina_recibo_recalcular'),
     path('nomina/recibo/<int:recibo_id>/cambiar-estado/', views.nomina_recibo_cambiar_estado, name='nomina_recibo_cambiar_estado'),
     path('nomina/recibo/<int:recibo_id>/enviar/', views.nomina_recibo_enviar_email, name='nomina_recibo_enviar_email'),
     path('nomina/reportes/', views.nomina_reportes, name='nomina_reportes'),

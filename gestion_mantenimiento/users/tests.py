@@ -481,3 +481,139 @@ class ReportesNominaTests(TestCase):
         )
         self.assertTrue(response.content.startswith(b'PK\x03\x04'))
         self.assertIn('Content-Disposition', response)
+
+
+class RegenerarRecibosTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='tecnico_regenerar',
+            password='test-password',
+        )
+        self.grupo_tecnico = Group.objects.get_or_create(name='Tecnico')[0]
+        self.user.groups.add(self.grupo_tecnico)
+        ConfiguracionPago.objects.create(
+            usuario=self.user,
+            tipo_pago='por_dia',
+            valor_dia=Decimal('100000.00'),
+        )
+        self.admin = get_user_model().objects.create_user(
+            username='admin_regenerar',
+            password='test-password',
+            is_staff=True,
+        )
+        self.client.force_login(self.admin)
+        self.fecha_inicio = date(2026, 10, 1)
+        self.fecha_fin = date(2026, 10, 15)
+
+    def _crear_asistencia(self, fecha):
+        hora_inicio = datetime.combine(fecha, datetime.min.time().replace(hour=8))
+        hora_fin = datetime.combine(fecha, datetime.min.time().replace(hour=16))
+        RegistroAsistencia.objects.create(
+            usuario=self.user,
+            fecha=fecha,
+            hora_entrada=timezone.make_aware(hora_inicio),
+            hora_salida=timezone.make_aware(hora_fin),
+        )
+
+    def _post_generar(self):
+        return self.client.post(
+            reverse('nomina_generar_recibos'),
+            {
+                'fecha_inicio': self.fecha_inicio.isoformat(),
+                'fecha_fin': self.fecha_fin.isoformat(),
+                'tipo_periodo': 'quincenal',
+            },
+        )
+
+    def _crear_recibo(self, estado='borrador', usuario=None):
+        return ReciboPago.objects.create(
+            usuario=usuario or self.user,
+            tipo_periodo='quincenal',
+            fecha_inicio=self.fecha_inicio,
+            fecha_fin=self.fecha_fin,
+            dias_trabajados=1,
+            bruto=Decimal('100000.00'),
+            neto=Decimal('100000.00'),
+            estado=estado,
+        )
+
+    def test_regenerar_borrador_actualiza_datos(self):
+        recibo_viejo = self._crear_recibo()
+        self._crear_asistencia(self.fecha_inicio)
+        self._crear_asistencia(self.fecha_inicio + timedelta(days=1))
+
+        response = self._post_generar()
+
+        self.assertEqual(response.status_code, 302)
+        recibos = ReciboPago.objects.filter(
+            usuario=self.user,
+            tipo_periodo='quincenal',
+            fecha_inicio=self.fecha_inicio,
+            fecha_fin=self.fecha_fin,
+        )
+        self.assertEqual(recibos.count(), 1)
+        recibo_nuevo = recibos.get()
+        self.assertNotEqual(recibo_nuevo.id, recibo_viejo.id)
+        self.assertEqual(recibo_nuevo.dias_trabajados, 2)
+        self.assertEqual(recibo_nuevo.bruto, Decimal('200000.00'))
+
+    def test_regeneracion_masiva_no_modifica_aprobado_ni_pagado(self):
+        aprobado = self._crear_recibo(estado='aprobado')
+        otro_tecnico = get_user_model().objects.create_user(username='tecnico_pagado')
+        otro_tecnico.groups.add(self.grupo_tecnico)
+        ConfiguracionPago.objects.create(
+            usuario=otro_tecnico,
+            tipo_pago='por_dia',
+            valor_dia=Decimal('100000.00'),
+        )
+        pagado = self._crear_recibo(estado='pagado', usuario=otro_tecnico)
+
+        self._post_generar()
+
+        aprobado.refresh_from_db()
+        pagado.refresh_from_db()
+        self.assertEqual(aprobado.estado, 'aprobado')
+        self.assertEqual(aprobado.bruto, Decimal('100000.00'))
+        self.assertEqual(pagado.estado, 'pagado')
+        self.assertEqual(pagado.bruto, Decimal('100000.00'))
+
+    def test_recalcular_recibo_borrador_conserva_id_actualiza_datos(self):
+        recibo = self._crear_recibo()
+        recibo_id = recibo.id
+        recibo.pdf_path = 'recibo-anterior.pdf'
+        recibo.enviado_por_email = True
+        recibo.fecha_envio = timezone.now()
+        recibo.save()
+        self._crear_asistencia(self.fecha_inicio)
+        self._crear_asistencia(self.fecha_inicio + timedelta(days=1))
+
+        detalle = self.client.get(reverse('nomina_recibo_detalle', args=[recibo_id]))
+        self.assertContains(detalle, 'Recalcular')
+
+        response = self.client.post(
+            reverse('nomina_recibo_recalcular', args=[recibo_id]),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        recibo.refresh_from_db()
+        self.assertEqual(recibo.id, recibo_id)
+        self.assertEqual(recibo.dias_trabajados, 2)
+        self.assertEqual(recibo.bruto, Decimal('200000.00'))
+        self.assertEqual(recibo.pdf_path, '')
+        self.assertFalse(recibo.enviado_por_email)
+        self.assertIsNone(recibo.fecha_envio)
+
+    def test_recalcular_no_modifica_recibo_aprobado(self):
+        recibo = self._crear_recibo(estado='aprobado')
+        detalle = self.client.get(
+            reverse('nomina_recibo_detalle', args=[recibo.id]),
+        )
+        self.assertNotContains(detalle, 'Recalcular')
+        response = self.client.post(
+            reverse('nomina_recibo_recalcular', args=[recibo.id]),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        recibo.refresh_from_db()
+        self.assertEqual(recibo.estado, 'aprobado')
+        self.assertEqual(recibo.bruto, Decimal('100000.00'))

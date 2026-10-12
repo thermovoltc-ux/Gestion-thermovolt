@@ -73,7 +73,8 @@
         <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio|date:'Y-m-d' }}">
         <input type="hidden" name="fecha_fin" value="{{ fecha_fin|date:'Y-m-d' }}">
         <input type="hidden" name="tipo_periodo" value="{{ tipo_periodo }}">
-        <button type="submit" style="background: #10b981; color: white; border: none; padding: 14px 28px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 15px;">📄 Generar recibos del período</button>
+        <button type="submit" style="background: #10b981; color: white; border: none; padding: 14px 28px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 15px;">🔄 Regenerar borradores del período</button>
+        <p style="color: #64748b; font-size: 12px; margin-top: 8px; text-align: right;">Los recibos en estado "aprobado" o "pagado" no serán modificados.</p>
     </form>
 </div>
 {% endblock %}

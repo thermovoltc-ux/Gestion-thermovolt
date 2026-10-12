@@ -52,6 +52,19 @@
             <div style="display: flex; justify-content: space-between; padding: 16px 0; font-size: 24px; font-weight: 700; color: #059669; border-top: 2px solid #059669;"><span>NETO A PAGAR</span><span>${{ recibo.neto }}</span></div>
         </div>
 
+        {% if es_admin and recibo.estado == 'borrador' %}
+        <div style="margin-bottom: 16px; padding: 12px; background: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-weight: 600; color: #1e40af;">Recalcular</div>
+                <div style="font-size: 13px; color: #1e40af;">Este recibo está en borrador. Podés recalcularlo con las horas más recientes.</div>
+            </div>
+            <form method="post" action="{% url 'nomina_recibo_recalcular' recibo.id %}" style="margin: 0;">
+                {% csrf_token %}
+                <button type="submit" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">🔄 Recalcular</button>
+            </form>
+        </div>
+        {% endif %}
+
         {% if puede_cambiar_estado %}
         <div style="margin-top: 32px; padding-top: 20px; border-top: 2px solid #e2e8f0;">
             <h3 style="margin: 0 0 12px; font-size: 16px;">Cambiar estado</h3>

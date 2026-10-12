@@ -8,6 +8,7 @@ from django.contrib.auth import login as auth_login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
 from django.utils import timezone
+from django.db import transaction
 from django.db.models import Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.urls import reverse
@@ -776,6 +777,14 @@ def nomina_generar_recibos(request):
         messages.error(request, 'Fechas inválidas.')
         return redirect('nomina_supervisor')
 
+    if fecha_inicio > fecha_fin:
+        messages.error(request, 'La fecha inicial no puede ser posterior a la fecha final.')
+        return redirect('nomina_supervisor')
+
+    if tipo_periodo not in dict(ReciboPago.TIPO_PERIODO_CHOICES):
+        messages.error(request, 'Tipo de período inválido.')
+        return redirect('nomina_supervisor')
+
     try:
         grupo_tecnico = Group.objects.get(name='Tecnico')
         tecnicos = User.objects.filter(groups=grupo_tecnico)
@@ -784,45 +793,63 @@ def nomina_generar_recibos(request):
         return redirect('nomina_supervisor')
 
     generados = 0
+    regenerados = 0
     omitidos = 0
     for tecnico in tecnicos:
-        existe = ReciboPago.objects.filter(
-            usuario=tecnico,
-            tipo_periodo=tipo_periodo,
-            fecha_inicio=fecha_inicio,
-            fecha_fin=fecha_fin,
-        ).exists()
-        if existe:
-            omitidos += 1
-            continue
-
         try:
-            calculo = calcular_periodo(tecnico, fecha_inicio, fecha_fin)
-            ReciboPago.objects.create(
-                usuario=tecnico,
-                tipo_periodo=tipo_periodo,
-                fecha_inicio=fecha_inicio,
-                fecha_fin=fecha_fin,
-                horas_normales=calculo['horas_normales'],
-                horas_extras=calculo['horas_extras'],
-                horas_nocturnas=calculo['horas_nocturnas'],
-                horas_festivas=calculo['horas_festivas'],
-                dias_trabajados=calculo['dias_trabajados'],
-                dias_descanso=calculo['dias_descanso'],
-                bruto=calculo['bruto'],
-                total_descuentos=calculo['total_descuentos'],
-                neto=calculo['neto'],
-                detalles=calculo['detalles'],
-                estado='borrador',
-            )
-            generados += 1
+            with transaction.atomic():
+                recibo_existente = ReciboPago.objects.select_for_update().filter(
+                    usuario=tecnico,
+                    tipo_periodo=tipo_periodo,
+                    fecha_inicio=fecha_inicio,
+                    fecha_fin=fecha_fin,
+                ).first()
+
+                if recibo_existente and recibo_existente.estado != 'borrador':
+                    omitidos += 1
+                    continue
+
+                es_regeneracion = recibo_existente is not None
+                if es_regeneracion:
+                    recibo_existente.delete()
+
+                calculo = calcular_periodo(tecnico, fecha_inicio, fecha_fin)
+                ReciboPago.objects.create(
+                    usuario=tecnico,
+                    tipo_periodo=tipo_periodo,
+                    fecha_inicio=fecha_inicio,
+                    fecha_fin=fecha_fin,
+                    horas_normales=calculo['horas_normales'],
+                    horas_extras=calculo['horas_extras'],
+                    horas_nocturnas=calculo['horas_nocturnas'],
+                    horas_festivas=calculo['horas_festivas'],
+                    dias_trabajados=calculo['dias_trabajados'],
+                    dias_descanso=calculo['dias_descanso'],
+                    bruto=calculo['bruto'],
+                    total_descuentos=calculo['total_descuentos'],
+                    neto=calculo['neto'],
+                    detalles=calculo['detalles'],
+                    estado='borrador',
+                )
+
+                if es_regeneracion:
+                    regenerados += 1
+                else:
+                    generados += 1
         except Exception as error:
             messages.warning(request, f'Error con {tecnico.username}: {error}')
 
-    messages.success(
-        request,
-        f'Recibos generados: {generados}. Omitidos (ya existían): {omitidos}.',
-    )
+    resumen = []
+    if generados:
+        resumen.append(f'{generados} generados')
+    if regenerados:
+        resumen.append(f'{regenerados} regenerados')
+    if omitidos:
+        resumen.append(f'{omitidos} omitidos (aprobados/pagados)')
+    if resumen:
+        messages.success(request, f"Recibos: {', '.join(resumen)}.")
+    else:
+        messages.info(request, 'No se generaron recibos para este período.')
     return redirect('nomina_supervisor')
 
 
@@ -852,6 +879,60 @@ def nomina_recibo_detalle(request, recibo_id):
             ],
         },
     )
+
+
+@_requiere_admin
+@require_POST
+def nomina_recibo_recalcular(request, recibo_id):
+    """Recalcula un recibo individual únicamente si continúa en borrador."""
+    from .nomina import calcular_periodo
+
+    try:
+        with transaction.atomic():
+            recibo = get_object_or_404(
+                ReciboPago.objects.select_for_update().select_related('usuario'),
+                id=recibo_id,
+            )
+            if recibo.estado != 'borrador':
+                estado_display = recibo.get_estado_display()
+                messages.error(
+                    request,
+                    f'No se puede recalcular un recibo en estado "{estado_display}".',
+                )
+                return redirect('nomina_recibo_detalle', recibo_id=recibo.id)
+
+            calculo = calcular_periodo(
+                recibo.usuario,
+                recibo.fecha_inicio,
+                recibo.fecha_fin,
+            )
+            for campo in (
+                'horas_normales',
+                'horas_extras',
+                'horas_nocturnas',
+                'horas_festivas',
+                'dias_trabajados',
+                'dias_descanso',
+                'bruto',
+                'total_descuentos',
+                'neto',
+                'detalles',
+            ):
+                setattr(recibo, campo, calculo[campo])
+
+            recibo.pdf_path = ''
+            recibo.enviado_por_email = False
+            recibo.fecha_envio = None
+            recibo.save()
+
+        messages.success(
+            request,
+            f'Recibo de {recibo.usuario.username} recalculado correctamente.',
+        )
+    except Exception as error:
+        messages.error(request, f'Error al recalcular: {error}')
+
+    return redirect('nomina_recibo_detalle', recibo_id=recibo_id)
 
 
 @_requiere_admin
