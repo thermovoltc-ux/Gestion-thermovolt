@@ -1,7 +1,7 @@
 {
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "clean": "rimraf \"./static/dist/*\"",
+    "clean": "rimraf \"../static/dist/*\"",
     "build": "npm run clean && webpack --config webpack.config.js",
     "dev": "webpack --watch --mode development"
   },

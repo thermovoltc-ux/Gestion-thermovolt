@@ -2,16 +2,17 @@ const path = require('path');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
 module.exports = {
-    mode: 'development', // Puedes cambiar a 'production' cuando estés listo para producción
+    mode: 'development',
+    context: __dirname,
     entry: {
-        main: './static/js/main.js',
-        forms: './static/css/forms.css',
-        style: './static/css/style.css',
-        cierre_ot: './static/css/modules/cierre_ot.css'
+        main: '../static/js/main.js',
+        forms: '../static/css/forms.css',
+        style: '../static/css/style.css',
+        cierre_ot: '../static/css/modules/cierre_ot.css'
     },
     output: {
         filename: '[name].bundle.js',
-        path: path.resolve(__dirname, 'static/dist')
+        path: path.resolve(__dirname, '../static/dist')
     },
     module: {
         rules: [
