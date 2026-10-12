@@ -31,8 +31,12 @@ load_dotenv(BASE_DIR / '.env')
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key-change-in-production')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+# DEBUG por defecto habilitado en local; Railway fuerza False en producción.
+# Esto evita que el servidor de desarrollo de Django no sirva los assets estáticos.
+DEBUG_ENV = os.environ.get('DEBUG')
+if DEBUG_ENV is None:
+    DEBUG_ENV = 'True' if not os.environ.get('RAILWAY_ENVIRONMENT') else 'False'
+DEBUG = DEBUG_ENV.lower() == 'true'
 
 # Forzar DEBUG=False en Railway (producción)
 if os.environ.get('RAILWAY_ENVIRONMENT'):
