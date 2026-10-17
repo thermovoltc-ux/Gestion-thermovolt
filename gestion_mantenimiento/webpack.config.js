@@ -11,7 +11,8 @@ module.exports = {
         cierre_ot: '../static/css/modules/cierre_ot.css',
         gestion_ot: '../static/css/gestion_ot.css',
         form_plan: '../static/css/form_plan.css',
-        form_actividad: '../static/css/form_actividad.css'
+        form_actividad: '../static/css/form_actividad.css',
+        lista_planes: '../static/css/lista_planes.css'
     },
     output: {
         filename: '[name].bundle.js',
