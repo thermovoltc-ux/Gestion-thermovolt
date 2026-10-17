@@ -10,7 +10,8 @@ module.exports = {
         style: '../static/css/style.css',
         cierre_ot: '../static/css/modules/cierre_ot.css',
         gestion_ot: '../static/css/gestion_ot.css',
-        form_plan: '../static/css/form_plan.css'
+        form_plan: '../static/css/form_plan.css',
+        form_actividad: '../static/css/form_actividad.css'
     },
     output: {
         filename: '[name].bundle.js',
