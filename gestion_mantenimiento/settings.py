@@ -262,6 +262,23 @@ STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Google Drive is used only by the image fields that explicitly select the
+# project Drive storage; the default media backend remains unchanged.
+RAILWAY_ENVIRONMENT = os.environ.get('RAILWAY_ENVIRONMENT', '')
+GOOGLE_DRIVE_MEDIA_FOLDER_ID = (
+    os.environ.get('GOOGLE_DRIVE_MEDIA_FOLDER_ID')
+    or os.environ.get('GOOGLE_DRIVE_FOLDER_ID')
+    or ''
+).strip()
+GOOGLE_DRIVE_MEDIA_ENABLED = bool(
+    GOOGLE_DRIVE_MEDIA_FOLDER_ID
+    and (
+        os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
+        or os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON_PATH')
+        or os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+    )
+)
+
 # Cloudinary settings
 import cloudinary_storage
 import cloudinary
@@ -379,7 +396,6 @@ LOGGING = {
         },
     },
 }
-
 
 
 

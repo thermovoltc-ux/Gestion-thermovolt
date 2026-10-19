@@ -120,6 +120,40 @@ def subir_pdf_privado_a_drive(pdf_bytes: bytes, filename: str, folder_id: Option
     }
 
 
+def subir_archivo_privado_a_drive(file_obj, filename: str, mime_type: str, folder_id: Optional[str] = None) -> dict:
+    """Sube un archivo a Drive sin hacerlo público y devuelve sus metadatos."""
+    if MediaIoBaseUpload is None:
+        raise RuntimeError('La librería de Google Drive no está instalada en este entorno para subir archivos.')
+
+    folder_id = folder_id.strip() if folder_id else ''
+    if not folder_id:
+        raise RuntimeError('Para subir medios a Drive se requiere GOOGLE_DRIVE_MEDIA_FOLDER_ID o GOOGLE_DRIVE_FOLDER_ID.')
+
+    drive_service = crear_drive_service()
+    with tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024) as file_stream:
+        for chunk in file_obj.chunks():
+            file_stream.write(chunk)
+        file_stream.seek(0)
+        media = MediaIoBaseUpload(file_stream, mimetype=mime_type, resumable=True)
+        created_file = drive_service.files().create(
+            body={'name': filename, 'parents': [folder_id]},
+            media_body=media,
+            fields='id,name,mimeType,size',
+            supportsAllDrives=True,
+        ).execute()
+
+    file_id = created_file.get('id')
+    if not file_id:
+        raise RuntimeError('No se pudo obtener el ID del archivo subido a Drive.')
+
+    return {
+        'drive_file_id': file_id,
+        'nombre_archivo': created_file.get('name') or filename,
+        'mime_type': created_file.get('mimeType') or mime_type,
+        'file_size_bytes': int(created_file.get('size') or 0),
+    }
+
+
 def descargar_archivo_privado_drive(file_id: str):
     """Descarga un archivo de Drive en streaming seguro hacia un archivo temporal local."""
     if MediaIoBaseUpload is None or MediaIoBaseDownload is None:

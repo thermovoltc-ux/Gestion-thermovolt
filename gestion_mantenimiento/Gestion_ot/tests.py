@@ -2,6 +2,7 @@ from datetime import datetime, timezone as datetime_timezone
 from decimal import Decimal
 from io import BytesIO
 from io import StringIO
+import os
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -9,6 +10,8 @@ from django.db import IntegrityError
 from django.core import mail
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files import File
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -25,6 +28,8 @@ from gestion_mantenimiento.Gestion_ot.models import (
     ProcesoInforme,
 )
 from gestion_mantenimiento.Gestion_ot import views
+from gestion_mantenimiento.Gestion_ot.plantilla_utils import _obtener_imagen_temporal
+from gestion_mantenimiento.Gestion_ot.storage import GoogleDriveMediaStorage
 from gestion_mantenimiento.solicitudes.models import Solicitud
 
 
@@ -552,3 +557,192 @@ class MaterialOTAjaxTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertFalse(Material.objects.filter(codigo='MAT-002').exists())
+
+
+class GoogleDriveMediaStorageTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(
+            username='drive-storage-user',
+            password='test-password',
+        )
+        self.ubicacion = Ubicacion.objects.create(
+            nombre='Ubicación Drive',
+            codigo='UBI-DRIVE',
+        )
+        self.equipo = Equipo.objects.create(
+            nombre='Equipo Drive',
+            codigo='EQ-DRIVE',
+            ubicacion=self.ubicacion,
+        )
+        estado, _ = Estado.objects.get_or_create(nombre='en proceso')
+        solicitud = Solicitud.objects.create(
+            creado_por=self.user.username,
+            descripcion_problema='Prueba almacenamiento Drive',
+            equipo=self.equipo,
+            ubicacion=self.ubicacion,
+            estado=estado,
+        )
+        self.ot = OrdenTrabajo.objects.create(
+            solicitud=solicitud,
+            tecnico_asignado=self.user.username,
+            estado=estado,
+        )
+        self.storage = GoogleDriveMediaStorage()
+
+    @override_settings(
+        GOOGLE_DRIVE_MEDIA_ENABLED=True,
+        GOOGLE_DRIVE_MEDIA_FOLDER_ID='drive-folder',
+        RAILWAY_ENVIRONMENT='',
+    )
+    def test_drive_storage_upload_is_private_and_uses_short_field_name(self):
+        upload = SimpleUploadedFile(
+            'una-factura-con-un-nombre-muy-largo.png',
+            b'image-bytes',
+            content_type='image/png',
+        )
+        with patch(
+            'gestion_mantenimiento.Gestion_ot.drive_utils.subir_archivo_privado_a_drive',
+            return_value={'drive_file_id': 'drive-file-id'},
+        ) as upload_to_drive:
+            saved_name = self.storage.save(
+                'materiales/facturas/una-factura-con-un-nombre-muy-largo.png',
+                upload,
+            )
+
+        self.assertEqual(saved_name, 'drive/drive-file-id/file.png')
+        self.assertLessEqual(len(saved_name), 100)
+        upload_to_drive.assert_called_once()
+        self.assertEqual(
+            self.storage.url(saved_name),
+            reverse('drive_media', args=['drive-file-id']),
+        )
+
+    @override_settings(
+        GOOGLE_DRIVE_MEDIA_ENABLED=True,
+        GOOGLE_DRIVE_MEDIA_FOLDER_ID='drive-folder',
+        RAILWAY_ENVIRONMENT='',
+    )
+    def test_drive_storage_opens_private_file_through_drive_helper(self):
+        with patch(
+            'gestion_mantenimiento.Gestion_ot.drive_utils.descargar_archivo_privado_drive',
+            return_value=BytesIO(b'private-image'),
+        ) as download_from_drive:
+            with self.storage.open('drive/drive-file-id/file.png') as image_file:
+                self.assertEqual(image_file.read(), b'private-image')
+
+        download_from_drive.assert_called_once_with('drive-file-id')
+
+    @override_settings(
+        GOOGLE_DRIVE_MEDIA_ENABLED=True,
+        GOOGLE_DRIVE_MEDIA_FOLDER_ID='drive-folder',
+        RAILWAY_ENVIRONMENT='',
+    )
+    def test_pdf_image_helper_reads_private_drive_file_without_local_path(self):
+        material = Material.objects.create(
+            codigo='DRIVE-PDF-001',
+            nombre='Material PDF',
+            costo_base='10.00',
+            precio_venta_sugerido='14.29',
+        )
+        material_ot = MaterialOT.objects.create(
+            orden_trabajo=self.ot,
+            material=material,
+            cantidad='1',
+            costo_real='10.00',
+        )
+        material_ot.foto_factura.name = 'drive/pdf-file-id/file.png'
+
+        with patch(
+            'gestion_mantenimiento.Gestion_ot.drive_utils.descargar_archivo_privado_drive',
+            return_value=BytesIO(b'private-image-for-pdf'),
+        ):
+            image_path, is_temp = views.obtener_imagen_temporal_para_pdf(
+                material_ot.foto_factura
+            )
+
+        self.assertTrue(is_temp)
+        with open(image_path, 'rb') as image_file:
+            self.assertEqual(image_file.read(), b'private-image-for-pdf')
+        os.remove(image_path)
+
+        template_file_field = MaterialOT(
+            orden_trabajo=self.ot,
+            material=material,
+            cantidad='1',
+            costo_real='10.00',
+            foto_factura='drive/pdf-file-id/file.png',
+        ).foto_factura
+        with patch(
+            'gestion_mantenimiento.Gestion_ot.drive_utils.descargar_archivo_privado_drive',
+            return_value=BytesIO(b'private-image-for-template'),
+        ):
+            template_image_path, is_temp = _obtener_imagen_temporal(
+                template_file_field
+            )
+
+        self.assertTrue(is_temp)
+        with open(template_image_path, 'rb') as image_file:
+            self.assertEqual(image_file.read(), b'private-image-for-template')
+        os.remove(template_image_path)
+
+    @override_settings(
+        GOOGLE_DRIVE_MEDIA_ENABLED=False,
+        RAILWAY_ENVIRONMENT='production',
+    )
+    def test_missing_drive_configuration_fails_in_railway(self):
+        upload = SimpleUploadedFile('invoice.png', b'image-bytes')
+        with self.assertRaisesMessage(
+            ImproperlyConfigured,
+            'Google Drive media storage requiere credenciales',
+        ):
+            self.storage.save('materiales/facturas/invoice.png', upload)
+
+    def test_private_drive_media_view_checks_ot_access(self):
+        from django.contrib.auth import get_user_model
+
+        material = Material.objects.create(
+            codigo='DRIVE-001',
+            nombre='Material con factura privada',
+            costo_base='10.00',
+            precio_venta_sugerido='14.29',
+        )
+        material_ot = MaterialOT.objects.create(
+            orden_trabajo=self.ot,
+            material=material,
+            cantidad='1',
+            costo_real='10.00',
+        )
+        material_ot.foto_factura.name = 'drive/private-file-id/file.png'
+        material_ot.save(update_fields=['foto_factura'])
+
+        with patch.object(
+            GoogleDriveMediaStorage,
+            'open',
+            return_value=File(BytesIO(b'private-image'), name='file.png'),
+        ):
+            self.client.force_login(self.user)
+            response = self.client.get(
+                reverse('drive_media', args=['private-file-id'])
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Cache-Control'], 'private, no-store')
+            self.assertEqual(response['X-Content-Type-Options'], 'nosniff')
+            self.assertEqual(b''.join(response.streaming_content), b'private-image')
+
+            self.client.logout()
+            response = self.client.get(
+                reverse('drive_media', args=['private-file-id'])
+            )
+            self.assertEqual(response.status_code, 302)
+
+            other_user = get_user_model().objects.create_user(
+                username='other-drive-user',
+                password='test-password',
+            )
+            self.client.force_login(other_user)
+            response = self.client.get(
+                reverse('drive_media', args=['private-file-id'])
+            )
+            self.assertEqual(response.status_code, 404)

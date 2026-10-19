@@ -9,6 +9,7 @@ urlpatterns = [
     path('actualizar_estado_solicitud/', views.actualizar_estado_solicitud, name='actualizar_estado_solicitud'),
     path('listar_ot/', views.listar_ot, name='listar_ot'),
     path('cierre_ot/<int:ot_id>/', views.cierre_ot, name='cierre_ot'),
+    path('media/<str:file_id>/', views.drive_media, name='drive_media'),
     path('ot/<int:ot_id>/material/crear/', views.crear_material_ajax, name='crear_material_ajax'),
     path('ot/<int:ot_id>/material/agregar/', views.agregar_material_ot, name='agregar_material_ot'),
     path('ot/<int:ot_id>/material/rapido/crear/', views.crear_material_rapido_ajax, name='crear_material_rapido_ajax'),

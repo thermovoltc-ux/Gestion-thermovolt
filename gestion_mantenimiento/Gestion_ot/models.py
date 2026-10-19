@@ -5,6 +5,7 @@ from mptt.models import MPTTModel, TreeForeignKey
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 import uuid
+from .storage import GoogleDriveMediaStorage
 
 # Modelo de Estado
 class Estado(models.Model):
@@ -89,7 +90,10 @@ class ImagenCierreOt(models.Model):
         ("despues", "Después"),
     )
     cierre_ot = models.ForeignKey(CierreOt, on_delete=models.CASCADE, related_name="imagenes")
-    imagen = models.ImageField(upload_to="cierre_ot/imagenes/")
+    imagen = models.ImageField(
+        upload_to="cierre_ot/imagenes/",
+        storage=GoogleDriveMediaStorage(),
+    )
     tipo = models.CharField(max_length=10, choices=TIPO_CHOICES)
     descripcion = models.CharField(max_length=255, blank=True, null=True)
 
@@ -350,6 +354,7 @@ class MaterialOT(models.Model):
         upload_to='materiales/facturas/',
         blank=True,
         null=True,
+        storage=GoogleDriveMediaStorage(),
     )
     fecha_registro = models.DateTimeField(auto_now_add=True)
     precio_venta_aplicado = models.DecimalField(

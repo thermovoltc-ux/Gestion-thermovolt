@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, FileResponse, Http404, StreamingHttpResponse
 from django.views.decorators.http import require_POST
 import json
+import mimetypes
 from decimal import Decimal, ROUND_HALF_UP
 from django.db import models, transaction, IntegrityError
 from django.db.models import Q
@@ -51,6 +52,8 @@ import threading
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from .drive_utils import subir_pdf_a_drive, subir_pdf_privado_a_drive, descargar_archivo_privado_drive, iterar_archivo_privado_drive
+from .storage import GoogleDriveMediaStorage
+from googleapiclient.errors import HttpError
 
 try:
     import pythoncom
@@ -199,13 +202,22 @@ def obtener_imagen_temporal_para_pdf(file_field):
                 except Exception as e:
                     logger.warning('No se pudo descargar imagen remota para PDF: %s', e)
 
-        if hasattr(file_field, 'path'):
-            try:
-                local_path = file_field.path
-                if local_path and os.path.exists(local_path):
-                    return local_path, False
-            except (AttributeError, ValueError, NotImplementedError) as e:
-                logger.warning('No se pudo obtener path local de file_field: %s', e)
+        try:
+            local_path = file_field.path
+            if local_path and os.path.exists(local_path):
+                return local_path, False
+        except (AttributeError, ValueError, NotImplementedError) as e:
+            logger.warning('No se pudo obtener path local de file_field: %s', e)
+
+        try:
+            suffix = os.path.splitext(file_name or 'image')[1] or '.jpg'
+            with file_field.open('rb') as image_file:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+                    for chunk in image_file.chunks():
+                        temp_file.write(chunk)
+                    return temp_file.name, True
+        except (AttributeError, OSError, ValueError) as e:
+            logger.warning('No se pudo copiar imagen desde su storage para PDF: %s', e)
 
     except Exception as e:
         logger.warning('Error al obtener imagen temporal para PDF: %s', e)
@@ -1018,6 +1030,36 @@ def _ot_tecnico_en_proceso(request, ot_id):
         ),
         pk=ot_id,
     )
+
+
+@login_required
+def drive_media(request, file_id):
+    stored_prefix = f'drive/{file_id}/'
+    visible_ots = _ordenes_visibles_para_usuario(request)
+    material_name = MaterialOT.objects.filter(
+        foto_factura__startswith=stored_prefix,
+        orden_trabajo__in=visible_ots,
+    ).values_list('foto_factura', flat=True).first()
+    image_name = ImagenCierreOt.objects.filter(
+        imagen__startswith=stored_prefix,
+        cierre_ot__orden_trabajo__in=visible_ots,
+    ).values_list('imagen', flat=True).first()
+    stored_name = material_name or image_name
+    if not stored_name:
+        raise Http404('Imagen no encontrada.')
+
+    try:
+        image_file = GoogleDriveMediaStorage().open(stored_name, 'rb')
+    except HttpError as exc:
+        if exc.resp.status == 404:
+            raise Http404('Imagen no encontrada en Google Drive.') from exc
+        raise
+
+    content_type = mimetypes.guess_type(stored_name)[0] or 'application/octet-stream'
+    response = FileResponse(image_file, content_type=content_type)
+    response['Cache-Control'] = 'private, no-store'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 
 def _crear_material_catalogo(request):

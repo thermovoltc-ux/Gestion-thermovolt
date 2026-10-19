@@ -128,10 +128,20 @@ def _obtener_imagen_temporal(file_field_o_url):
                 return _obtener_imagen_temporal(url)
         
         # Manejar FileField con atributo path
-        if hasattr(file_field_o_url, 'path'):
+        try:
             local_path = file_field_o_url.path
             if local_path and os.path.exists(local_path):
                 return local_path, False
+        except (AttributeError, NotImplementedError, ValueError):
+            pass
+
+        if hasattr(file_field_o_url, 'open'):
+            suffix = os.path.splitext(getattr(file_field_o_url, 'name', 'image'))[1] or '.jpg'
+            with file_field_o_url.open('rb') as image_file:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                    for chunk in image_file.chunks():
+                        tmp.write(chunk)
+                    return tmp.name, True
     
     except Exception as e:
         logger.warning(f"Error obteniendo imagen: {e}")
