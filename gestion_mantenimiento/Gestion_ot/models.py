@@ -323,6 +323,39 @@ class TareaMantenimiento(models.Model):
         return f"Tarea {self.plan.equipo.nombre} — {self.get_estado_display()}"
 
 
+class Material(models.Model):
+    codigo = models.CharField(max_length=50, unique=True)
+    nombre = models.CharField(max_length=150)
+    costo_base = models.DecimalField(max_digits=12, decimal_places=2)
+    precio_venta_sugerido = models.DecimalField(max_digits=12, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.codigo} - {self.nombre}"
+
+
+class MaterialOT(models.Model):
+    orden_trabajo = models.ForeignKey(
+        OrdenTrabajo,
+        on_delete=models.CASCADE,
+        related_name='materiales',
+    )
+    material = models.ForeignKey(
+        Material,
+        on_delete=models.PROTECT,
+        related_name='usos_en_ordenes',
+    )
+    cantidad = models.DecimalField(max_digits=10, decimal_places=2)
+    costo_real = models.DecimalField(max_digits=12, decimal_places=2)
+    foto_factura = models.ImageField(
+        upload_to='materiales/facturas/',
+        blank=True,
+        null=True,
+    )
+
+    def __str__(self):
+        return f"{self.material} x {self.cantidad} - OT-{self.orden_trabajo_id}"
+
+
 # ============================================================================
 # SIGNALS PARA GENERACIÓN AUTOMÁTICA
 # ============================================================================
