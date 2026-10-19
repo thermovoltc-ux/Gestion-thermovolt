@@ -379,6 +379,9 @@ def _serialize_ubicacion_node(ubicacion, scope_ids=None):
 @login_required
 def api_arbol_json(request):
     """Endpoint preparatorio para jsTree: expone el árbol de ubicaciones y equipos en JSON."""
+    from django.db.models import OuterRef, Subquery
+    from .models import CentroCostos
+
     tipo_cuenta = request.session.get('tipo_cuenta')
     scope_ids = set()
 
@@ -389,36 +392,157 @@ def api_arbol_json(request):
         return JsonResponse({'data': []})
 
     node_id = request.GET.get('node', '')
+    ubicacion_id = None
+    if node_id.startswith('equipo-'):
+        return JsonResponse({'data': []})
     if node_id.startswith('ubicacion-'):
         try:
             ubicacion_id = int(node_id.replace('ubicacion-', '', 1))
         except ValueError:
             return JsonResponse({'data': []})
 
-        ubicacion = Ubicacion.objects.filter(id=ubicacion_id).first()
+    centro_costo_nombre = CentroCostos.objects.filter(
+        area__ubicacion_id=OuterRef('ubicacion_id')
+    ).order_by('area_id', 'nombre').values('nombre')[:1]
+    ubicaciones = list(Ubicacion.objects.select_related('parent').order_by('nombre'))
+    equipos = list(
+        Equipo.objects.select_related('ubicacion__parent', 'parent')
+        .annotate(centro_costo_nombre=Subquery(centro_costo_nombre))
+        .order_by('nombre')
+    )
+
+    ubicaciones_por_id = {ubicacion.id: ubicacion for ubicacion in ubicaciones}
+    ubicaciones_por_padre = {}
+    equipos_por_ubicacion = {}
+    equipos_por_padre = {}
+
+    for ubicacion in ubicaciones:
+        ubicaciones_por_padre.setdefault(ubicacion.parent_id, []).append(ubicacion)
+
+    for equipo in equipos:
+        equipos_por_ubicacion.setdefault(equipo.ubicacion_id, []).append(equipo)
+        equipos_por_padre.setdefault(equipo.parent_id, []).append(equipo)
+
+    def construir_nodo_equipo(equipo):
+        foto_url = ''
+        try:
+            if equipo.imagen:
+                foto_url = _normalizar_url_media(equipo.imagen.url)
+        except Exception:
+            foto_url = ''
+
+        ubicacion = equipo.ubicacion
+        ubicacion_padre_id = str(equipo.ubicacion_id) if ubicacion else ''
+        ubicacion_padre_nombre = ubicacion.nombre or '' if ubicacion else ''
+        hijos = [
+            construir_nodo_equipo(hijo)
+            for hijo in equipos_por_padre.get(equipo.id, [])
+        ]
+
+        return {
+            'id': f'equipo-{equipo.id}',
+            'text': equipo.nombre or f'Equipo {equipo.id}',
+            'parent': f'ubicacion-{equipo.ubicacion_id}' if equipo.ubicacion_id else '#',
+            'type': 'equipo',
+            'icon': 'fa fa-cogs',
+            'children': hijos,
+            'a_attr': {
+                'data-tipo': 'equipo',
+                'data-id': str(equipo.id),
+                'data-nombre': _safe_node_value(equipo.nombre),
+                'data-codigo': _safe_node_value(equipo.codigo),
+                'data-serie': _safe_node_value(equipo.serie or ''),
+                'data-numero-serie': _safe_node_value(equipo.serie or ''),
+                'data-numero-activo': _safe_node_value(equipo.serie or ''),
+                'data-centro-costo': _safe_node_value(equipo.centro_costo_nombre or ''),
+                'data-descripcion': _safe_node_value(equipo.descripcion),
+                'data-foto-url': _safe_node_value(foto_url),
+                'data-ubicacion-id': _safe_node_value(ubicacion_padre_id),
+                'data-ubicacion-padre-id': _safe_node_value(ubicacion_padre_id),
+                'data-ubicacion-padre-nombre': _safe_node_value(ubicacion_padre_nombre),
+                'data-parent-id': _safe_node_value(equipo.parent_id),
+                'data-parent-nombre': _safe_node_value(equipo.parent.nombre if equipo.parent_id else ''),
+                'data-fabricante': _safe_node_value(equipo.fabricante),
+                'data-modelo': _safe_node_value(equipo.modelo),
+                'data-prioridad': _safe_node_value(equipo.prioridad),
+                'data-fecha-adquisicion': _safe_node_value(equipo.fecha_adquisicion or ''),
+                'data-horas-uso': _safe_node_value(equipo.horas_uso or ''),
+                'data-valor-compra': _safe_node_value(equipo.valor_compra or ''),
+                'data-valor-actual': _safe_node_value(equipo.valor_actual or ''),
+            },
+        }
+
+    def construir_nodo_ubicacion(ubicacion, filtrar_scope=False):
+        foto_url = ''
+        try:
+            if ubicacion.imagen:
+                foto_url = _normalizar_url_media(ubicacion.imagen.url)
+        except Exception:
+            foto_url = ''
+
+        hijos = [
+            construir_nodo_ubicacion(child, filtrar_scope=True)
+            for child in ubicaciones_por_padre.get(ubicacion.id, [])
+        ]
+        hijos.extend(
+            construir_nodo_equipo(equipo)
+            for equipo in equipos_por_ubicacion.get(ubicacion.id, [])
+        )
+
+        if filtrar_scope and scope_ids:
+            hijos = [
+                hijo for hijo in hijos
+                if not hijo['id'].startswith('ubicacion-')
+                or int(hijo['id'].replace('ubicacion-', '', 1)) in scope_ids
+            ]
+
+        return {
+            'id': f'ubicacion-{ubicacion.id}',
+            'text': ubicacion.nombre or f'Ubicación {ubicacion.id}',
+            'parent': '#' if ubicacion.parent_id is None else f'ubicacion-{ubicacion.parent_id}',
+            'type': 'ubicacion',
+            'icon': 'fa fa-building',
+            'children': hijos,
+            'a_attr': {
+                'data-tipo': 'ubicacion',
+                'data-id': str(ubicacion.id),
+                'data-nombre': _safe_node_value(ubicacion.nombre),
+                'data-codigo': _safe_node_value(ubicacion.codigo),
+                'data-parent-id': _safe_node_value(ubicacion.parent_id),
+                'data-parent-nombre': _safe_node_value(ubicacion.parent.nombre if ubicacion.parent_id else ''),
+                'data-co': _safe_node_value(ubicacion.co or ''),
+                'data-descripcion': _safe_node_value(ubicacion.descripcion),
+                'data-direccion': _safe_node_value(ubicacion.direccion),
+                'data-ciudad': _safe_node_value(ubicacion.ciudad),
+                'data-pais': _safe_node_value(ubicacion.pais),
+                'data-foto-url': _safe_node_value(foto_url),
+            },
+        }
+
+    if node_id.startswith('ubicacion-'):
+        ubicacion = ubicaciones_por_id.get(ubicacion_id)
         if not ubicacion:
             return JsonResponse({'data': []})
 
         children = []
-        for child in ubicacion.children.all().order_by('nombre'):
+        for child in ubicaciones_por_padre.get(ubicacion.id, []):
             if scope_ids and child.id not in scope_ids:
                 continue
-            children.append(_serialize_ubicacion_node(child, scope_ids=scope_ids))
+            children.append(construir_nodo_ubicacion(child, filtrar_scope=True))
 
-        for equipo in Equipo.objects.filter(ubicacion_id=ubicacion.id).order_by('nombre'):
-            children.append(_equipo_a_nodo(equipo))
+        for equipo in equipos_por_ubicacion.get(ubicacion.id, []):
+            children.append(construir_nodo_equipo(equipo))
 
         return JsonResponse({'data': children})
 
-    if node_id.startswith('equipo-'):
-        return JsonResponse({'data': []})
-
-    if tipo_cuenta == 'administrador':
-        roots = Ubicacion.objects.filter(id__in=scope_ids, parent__isnull=True).order_by('nombre')
-    else:
-        roots = Ubicacion.objects.filter(parent__isnull=True).order_by('nombre')
-
-    data = [_serialize_ubicacion_node(root, scope_ids=scope_ids or None) for root in roots]
+    roots = [
+        ubicacion for ubicacion in ubicaciones_por_padre.get(None, [])
+        if tipo_cuenta != 'administrador' or ubicacion.id in scope_ids
+    ]
+    data = [
+        construir_nodo_ubicacion(root, filtrar_scope=bool(scope_ids))
+        for root in roots
+    ]
     return JsonResponse({'data': data})
 
 
