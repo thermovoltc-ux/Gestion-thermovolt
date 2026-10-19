@@ -1,0 +1,62 @@
+<div class="materiales-ot-modal" id="modal-agregar-material" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-material" hidden>
+    <div class="materiales-ot-modal-content">
+        {% csrf_token %}
+        <h3 id="titulo-modal-material">Agregar material a la OT</h3>
+        <div class="materiales-ot-field">
+            <label for="buscar-material">Buscar en el catálogo</label>
+            <input type="search" id="buscar-material" class="form-control" autocomplete="off">
+            <label for="select-material">Material</label>
+            <select id="select-material" class="form-control" required>
+                <option value="">Seleccionar material...</option>
+                {% for m in materiales_catalogo %}
+                <option value="{{ m.id }}" data-costo="{{ m.costo_base }}">{{ m.codigo }} — {{ m.nombre }}</option>
+                {% endfor %}
+            </select>
+            <button type="button" class="cierre-ot-btn cierre-ot-btn-secondary" id="btn-abrir-modal-nuevo-material">Crear nuevo repuesto</button>
+        </div>
+        <div class="materiales-ot-field">
+            <label for="input-cantidad">Cantidad</label>
+            <input type="number" id="input-cantidad" class="form-control" value="1" min="0.01" step="0.01" required>
+        </div>
+        <div class="materiales-ot-field">
+            <label for="input-costo-real">Costo unitario real (según factura)</label>
+            <input type="number" id="input-costo-real" class="form-control" min="0" step="0.01" required>
+        </div>
+        <div class="materiales-ot-field">
+            <label for="input-foto-factura">Foto de factura o recibo (opcional)</label>
+            <input type="file" id="input-foto-factura" class="form-control" accept="image/*" capture="environment">
+        </div>
+        <div class="materiales-ot-field">
+            <label for="input-observaciones-material">Observación del material (opcional)</label>
+            <textarea id="input-observaciones-material" class="form-control" rows="3" maxlength="5000"></textarea>
+        </div>
+        <div class="materiales-ot-error" id="error-material" role="alert" aria-live="polite"></div>
+        <div class="materiales-ot-actions">
+            <button type="button" class="cierre-ot-btn cierre-ot-btn-secondary" id="btn-cancelar-material">Cancelar</button>
+            <button type="button" class="cierre-ot-btn cierre-ot-btn-primary" id="btn-guardar-material">Guardar material</button>
+        </div>
+    </div>
+</div>
+
+<div class="materiales-ot-modal materiales-ot-modal-nuevo" id="modal-nuevo-material" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-nuevo-material" hidden>
+    <div class="materiales-ot-modal-content">
+        <h3 id="titulo-modal-nuevo-material">Crear nuevo repuesto</h3>
+        <div class="materiales-ot-field">
+            <label for="nuevo-codigo">Código (SKU)</label>
+            <input type="text" id="nuevo-codigo" class="form-control" maxlength="50" required>
+        </div>
+        <div class="materiales-ot-field">
+            <label for="nuevo-nombre">Nombre</label>
+            <input type="text" id="nuevo-nombre" class="form-control" maxlength="150" required>
+        </div>
+        <div class="materiales-ot-field">
+            <label for="nuevo-costo">Costo base</label>
+            <input type="number" id="nuevo-costo" class="form-control" min="0" step="0.01" required>
+        </div>
+        <div class="materiales-ot-error" id="error-nuevo-material" role="alert" aria-live="polite"></div>
+        <div class="materiales-ot-actions">
+            <button type="button" class="cierre-ot-btn cierre-ot-btn-secondary" id="btn-cancelar-nuevo">Cancelar</button>
+            <button type="button" class="cierre-ot-btn cierre-ot-btn-primary" id="btn-crear-nuevo">Crear y seleccionar</button>
+        </div>
+    </div>
+</div>

@@ -6,10 +6,14 @@
 
 {% block content %}
 <link rel="stylesheet" href="{% static 'dist/cierre_ot.bundle.css' %}">
+<link rel="stylesheet" href="{% static 'css/materiales_ot.css' %}">
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/cierre_ot.css' %}">
 {% endblock %}
-<div class="cierre-ot-form-container" data-ot-id="{{ ot.id }}">
+<div class="cierre-ot-form-container"
+     data-ot-id="{{ ot.id }}"
+     data-material-create-url="{% url 'crear_material_ajax' ot.id %}"
+     data-material-add-url="{% url 'agregar_material_ot' ot.id %}">
     <h1 style="display: flex; align-items: center; gap: 12px;">
         Cierre de OT - {{ ot.solicitud.consecutivo }}
         <button type="button" class="btn-accion btn-info" id="infoOtBtn" title="Ver información de la OT" style="margin-left: 8px; border: none; background: none; cursor: pointer; padding: 0;">
@@ -98,10 +102,58 @@
                             <p>No hay actividades del plan vinculadas a esta OT.</p>
                         {% endif %}
                     </div>
-                    <div class="cierre-ot-form-group cierre-ot-large-textarea">
-                        {{ form.materiales_utilizados }}
-                        <label for="{{ form.materiales_utilizados.id_for_label }}">Materiales utilizados</label>
-                    </div>
+                    <section class="materiales-ot-section" aria-labelledby="materiales-ot-title">
+                        <h3 id="materiales-ot-title">Materiales utilizados</h3>
+                        <div class="materiales-ot-table-wrapper">
+                            <table class="materiales-ot-table" id="tabla-materiales">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Material</th>
+                                        <th scope="col">Cantidad</th>
+                                        <th scope="col">Costo unitario real</th>
+                                        <th scope="col">Factura</th>
+                                        <th scope="col">Observaciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lista-materiales">
+                                    {% for mat_ot in ot.materiales.all %}
+                                    <tr>
+                                        <td>{{ mat_ot.material.nombre }}</td>
+                                        <td>{{ mat_ot.cantidad }}</td>
+                                        <td>${{ mat_ot.costo_real }}</td>
+                                        <td>
+                                            {% if mat_ot.foto_factura %}
+                                            <a href="{{ mat_ot.foto_factura.url }}" target="_blank" rel="noopener">Ver factura</a>
+                                            {% else %}
+                                            —
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ mat_ot.observaciones|default:"—" }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr id="sin-materiales">
+                                        <td colspan="5">Todavía no se agregaron materiales a esta OT.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {% if not read_only %}
+                        <button type="button" class="cierre-ot-btn cierre-ot-btn-primary" id="btn-abrir-modal-material">
+                            Agregar Material / Repuesto
+                        </button>
+                        {% endif %}
+
+                        <div class="cierre-ot-form-group cierre-ot-large-textarea">
+                            {{ form.materiales_utilizados }}
+                            <label for="{{ form.materiales_utilizados.id_for_label }}">Observaciones de materiales</label>
+                        </div>
+                    </section>
+
+                    {% if not read_only %}
+                    {% include "Gestion_ot/_materiales_modal.html" %}
+                    {% endif %}
                     <div class="cierre-ot-checkbox-group">
                         {{ form.se_soluciono }}
                         <label for="{{ form.se_soluciono.id_for_label }}">¿Se solucionó la falla?</label>
@@ -221,6 +273,7 @@
 <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
 {% block extra_js %}
 <script src="{% static 'js/cierre_ot.js' %}"></script>
+<script src="{% static 'js/materiales_ot.js' %}"></script>
 {% endblock %}
 
 {% endblock %}

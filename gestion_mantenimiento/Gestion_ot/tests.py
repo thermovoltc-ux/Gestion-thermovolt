@@ -1,4 +1,5 @@
 from datetime import datetime, timezone as datetime_timezone
+from decimal import Decimal
 from io import BytesIO
 from io import StringIO
 from types import SimpleNamespace
@@ -6,6 +7,8 @@ from unittest.mock import patch
 
 from django.db import IntegrityError
 from django.core import mail
+from django.contrib.auth.models import Group
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -13,7 +16,14 @@ from django.utils import timezone
 from dateutil.relativedelta import relativedelta
 
 from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
-from gestion_mantenimiento.Gestion_ot.models import CierreOt, Estado, OrdenTrabajo, ProcesoInforme
+from gestion_mantenimiento.Gestion_ot.models import (
+    CierreOt,
+    Estado,
+    Material,
+    MaterialOT,
+    OrdenTrabajo,
+    ProcesoInforme,
+)
 from gestion_mantenimiento.Gestion_ot import views
 from gestion_mantenimiento.solicitudes.models import Solicitud
 
@@ -280,3 +290,265 @@ class ProcesoInformePersistenciaTests(TestCase):
         self.assertEqual(self.proceso.pdf_path, local_path)
         self.assertEqual(self.proceso.pdf_size_bytes, len(pdf_buffer.getvalue()))
         enviar_email.assert_called_once_with(pdf_buffer, self.cierre_ot, None)
+
+
+class MaterialOTAjaxTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(
+            username='tecnico-materiales',
+            password='test-password',
+        )
+        self.client.force_login(self.user)
+        self.user.groups.add(Group.objects.get_or_create(name='Tecnico')[0])
+        self.client.session['tipo_cuenta'] = 'tecnico'
+        self.client.session.save()
+        self.estado_abierta, _ = Estado.objects.get_or_create(nombre='solicitado')
+        self.estado_en_proceso, _ = Estado.objects.get_or_create(nombre='en proceso')
+        self.estado_finalizada, _ = Estado.objects.get_or_create(nombre='finalizada')
+        self.ot = self._crear_ot('tecnico-materiales', self.estado_abierta, 'OT propia')
+        self.ot_ajena = self._crear_ot('otro-tecnico', self.estado_abierta, 'OT ajena')
+        self.material = Material.objects.create(
+            codigo='MAT-001',
+            nombre='Rodamiento',
+            costo_base='10.00',
+            precio_venta_sugerido='14.29',
+        )
+
+    def _crear_ot(self, tecnico, estado, descripcion):
+        ubicacion = Ubicacion.objects.create(
+            nombre=f'Ubicación {descripcion}',
+            codigo=f'UBI-{descripcion.replace(" ", "-")}',
+        )
+        equipo = Equipo.objects.create(
+            nombre=f'Equipo {descripcion}',
+            codigo=f'EQ-{descripcion.replace(" ", "-")}',
+            ubicacion=ubicacion,
+        )
+        solicitud = Solicitud.objects.create(
+            creado_por=tecnico,
+            descripcion_problema=descripcion,
+            equipo=equipo,
+            ubicacion=ubicacion,
+            estado=estado,
+        )
+        return OrdenTrabajo.objects.create(
+            solicitud=solicitud,
+            tecnico_asignado=tecnico,
+            estado=estado,
+        )
+
+    def test_adds_material_and_calculates_historical_sale_price(self):
+        response = self.client.post(
+            reverse('agregar_material_ot', args=[self.ot.pk]),
+            {
+                'material': self.material.pk,
+                'cantidad': '2.00',
+                'costo_real': '10.00',
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
+        self.assertEqual(material_ot.precio_venta_aplicado, Decimal('14.29'))
+        self.assertEqual(material_ot.cantidad, Decimal('2.00'))
+        self.assertIsNotNone(material_ot.fecha_registro)
+
+    def test_quick_add_saves_observations_for_the_assigned_technician(self):
+        self.ot.estado = self.estado_en_proceso
+        self.ot.save(update_fields=['estado'])
+        response = self.client.post(
+            reverse('agregar_material_rapido_ot', args=[self.ot.pk]),
+            {
+                'material': self.material.pk,
+                'cantidad': '2.00',
+                'costo_real': '10.00',
+                'observaciones': 'Dos unidades corresponden a esta OT.',
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
+        self.assertEqual(
+            material_ot.observaciones,
+            'Dos unidades corresponden a esta OT.',
+        )
+        self.assertEqual(
+            response.json()['observaciones'],
+            'Dos unidades corresponden a esta OT.',
+        )
+
+    def test_quick_add_accepts_same_invoice_for_two_assigned_orders(self):
+        from tempfile import TemporaryDirectory
+        from PIL import Image
+
+        self.ot.estado = self.estado_en_proceso
+        self.ot.save(update_fields=['estado'])
+        self.ot_ajena.tecnico_asignado = self.user.username
+        self.ot_ajena.estado = self.estado_en_proceso
+        self.ot_ajena.save(update_fields=['tecnico_asignado', 'estado'])
+        self.ot_ajena.refresh_from_db()
+
+        image_buffer = BytesIO()
+        Image.new('RGB', (1, 1), color='white').save(image_buffer, format='PNG')
+        image_content = image_buffer.getvalue()
+
+        with TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                for order in (self.ot, self.ot_ajena):
+                    response = self.client.post(
+                        reverse('agregar_material_rapido_ot', args=[order.pk]),
+                        {
+                            'material': self.material.pk,
+                            'cantidad': '1',
+                            'costo_real': '10.00',
+                            'foto_factura': SimpleUploadedFile(
+                                'factura.png',
+                                image_content,
+                                content_type='image/png',
+                            ),
+                        },
+                    )
+                    self.assertEqual(response.status_code, 201)
+
+                records = list(MaterialOT.objects.order_by('orden_trabajo_id'))
+                self.assertEqual(len(records), 2)
+                self.assertNotEqual(
+                    records[0].foto_factura.name,
+                    records[1].foto_factura.name,
+                )
+
+    def test_quick_add_requires_assigned_technician_and_in_process_status(self):
+        response = self.client.post(
+            reverse('agregar_material_rapido_ot', args=[self.ot.pk]),
+            {
+                'material': self.material.pk,
+                'cantidad': '1',
+                'costo_real': '10.00',
+            },
+        )
+        self.assertEqual(response.status_code, 404)
+
+        self.ot.estado = self.estado_en_proceso
+        self.ot.save(update_fields=['estado'])
+        response = self.client.post(
+            reverse('agregar_material_rapido_ot', args=[self.ot_ajena.pk]),
+            {
+                'material': self.material.pk,
+                'cantidad': '1',
+                'costo_real': '10.00',
+            },
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(MaterialOT.objects.exists())
+
+    def test_rejects_invalid_quantity(self):
+        response = self.client.post(
+            reverse('agregar_material_ot', args=[self.ot.pk]),
+            {
+                'material': self.material.pk,
+                'cantidad': '0',
+                'costo_real': '10.00',
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('cantidad', response.json()['errors'])
+        self.assertFalse(MaterialOT.objects.exists())
+
+    def test_cannot_add_material_to_another_technicians_order(self):
+        response = self.client.post(
+            reverse('agregar_material_ot', args=[self.ot_ajena.pk]),
+            {
+                'material': self.material.pk,
+                'cantidad': '1',
+                'costo_real': '10.00',
+            },
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(MaterialOT.objects.exists())
+
+    def test_cannot_add_material_to_read_only_order(self):
+        self.ot.estado = self.estado_finalizada
+        self.ot.save(update_fields=['estado'])
+
+        response = self.client.post(
+            reverse('agregar_material_ot', args=[self.ot.pk]),
+            {
+                'material': self.material.pk,
+                'cantidad': '1',
+                'costo_real': '10.00',
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(MaterialOT.objects.exists())
+
+    def test_creates_catalog_material_with_suggested_markup(self):
+        response = self.client.post(
+            reverse('crear_material_ajax', args=[self.ot.pk]),
+            data='{"codigo":"MAT-002","nombre":"Correa","costo_base":"7.00"}',
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        material = Material.objects.get(codigo='MAT-002')
+        self.assertEqual(material.precio_venta_sugerido, Decimal('10.00'))
+
+    def test_catalog_price_field_fits_the_full_supported_base_cost(self):
+        response = self.client.post(
+            reverse('crear_material_ajax', args=[self.ot.pk]),
+            data='{"codigo":"MAT-MAX","nombre":"Material costo alto","costo_base":"9999999999.99"}',
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        material = Material.objects.get(codigo='MAT-MAX')
+        self.assertEqual(
+            material.precio_venta_sugerido,
+            Decimal('14285714285.70'),
+        )
+
+    def test_closure_page_renders_material_catalog_and_table(self):
+        response = self.client.get(reverse('cierre_ot', args=[self.ot.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Agregar Material / Repuesto')
+        self.assertContains(response, 'Rodamiento')
+        self.assertContains(response, 'materiales_ot.js')
+
+    def test_ot_list_shows_quick_material_button_only_for_assigned_in_process_orders(self):
+        self.ot.estado = self.estado_en_proceso
+        self.ot.save(update_fields=['estado'])
+        self.ot_ajena.estado = self.estado_en_proceso
+        self.ot_ajena.save(update_fields=['estado'])
+
+        response = self.client.get(reverse('listar_ot'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse('agregar_material_rapido_ot', args=[self.ot.pk]),
+        )
+        self.assertNotContains(
+            response,
+            reverse('agregar_material_rapido_ot', args=[self.ot_ajena.pk]),
+        )
+        self.assertContains(response, 'Materiales (0)')
+
+    def test_cannot_open_another_technicians_closure(self):
+        response = self.client.get(reverse('cierre_ot', args=[self.ot_ajena.pk]))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_cannot_create_catalog_material_for_another_technicians_order(self):
+        response = self.client.post(
+            reverse('crear_material_ajax', args=[self.ot_ajena.pk]),
+            data='{"codigo":"MAT-002","nombre":"Correa","costo_base":"7.00"}',
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(Material.objects.filter(codigo='MAT-002').exists())

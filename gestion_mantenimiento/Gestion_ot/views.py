@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, FileResponse, Http404, StreamingHttpResponse
 from django.views.decorators.http import require_POST
 import json
+from decimal import Decimal, ROUND_HALF_UP
 from django.db import models, transaction, IntegrityError
 from django.db.models import Q
 from django.utils import timezone
@@ -15,8 +16,8 @@ import os
 from django.contrib import messages
 import os
 import smtplib
-from .models import OrdenTrabajo, Estado, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad, InformeDriveArchivo, ProcesoInforme
-from .forms import OrdenTrabajoForm, CierreOtForm, ImagenAntesForm, ImagenDespuesForm, CierreOtActividadFormSet
+from .models import OrdenTrabajo, Estado, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad, InformeDriveArchivo, ProcesoInforme, Material, MaterialOT
+from .forms import OrdenTrabajoForm, CierreOtForm, ImagenAntesForm, ImagenDespuesForm, CierreOtActividadFormSet, MaterialForm, MaterialOTForm
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.users.access import obtener_scope_ubicacion_ids
 import logging
@@ -931,6 +932,13 @@ def listar_ot(request):
         else:
             filter_label = f'Historial de OT para Ubicación ID {ubicacion_id}'
 
+    es_tecnico = (
+        request.user.groups.filter(name='Tecnico').exists()
+        and not request.user.is_staff
+        and not request.user.is_superuser
+    )
+    ots = ots.annotate(materiales_count=models.Count('materiales'))
+
     def get_ot_event_color(estado_nombre):
         if estado_nombre == 'solicitado':
             return '#6c757d'
@@ -963,15 +971,192 @@ def listar_ot(request):
         'filter_label': filter_label,
         'calendar_events_json': json.dumps(calendar_events),
         'vista_calendario': vista_calendario,
+        'puede_cargar_materiales': es_tecnico,
+        'materiales_catalogo': Material.objects.order_by('nombre') if es_tecnico else Material.objects.none(),
     })
 
 # Vista para cerrar una OT
+def _ordenes_visibles_para_usuario(request):
+    if request.session.get('tipo_cuenta') == 'administrador':
+        scope_ids = obtener_scope_ubicacion_ids(request)
+        if not scope_ids:
+            return OrdenTrabajo.objects.none()
+        return OrdenTrabajo.objects.filter(
+            Q(solicitud__ubicacion_id__in=scope_ids)
+            | Q(solicitud__equipo__ubicacion_id__in=scope_ids)
+        )
+
+    if request.user.is_superuser or request.user.groups.filter(name='Admin').exists():
+        return OrdenTrabajo.objects.all()
+
+    return OrdenTrabajo.objects.filter(tecnico_asignado=request.user.username)
+
+
+def _ot_es_solo_lectura(ot):
+    return bool(ot.estado and ot.estado.nombre in ['en revision', 'finalizada'])
+
+
+def _errores_formulario_json(form):
+    return {
+        field: [str(error) for error in errors]
+        for field, errors in form.errors.items()
+    }
+
+
+def _ot_tecnico_en_proceso(request, ot_id):
+    if (
+        request.user.is_staff
+        or request.user.is_superuser
+        or not request.user.groups.filter(name='Tecnico').exists()
+    ):
+        return get_object_or_404(OrdenTrabajo.objects.none(), pk=ot_id)
+
+    return get_object_or_404(
+        OrdenTrabajo.objects.filter(
+            tecnico_asignado=request.user.username,
+            estado__nombre='en proceso',
+        ),
+        pk=ot_id,
+    )
+
+
+def _crear_material_catalogo(request):
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse(
+            {'ok': False, 'error': 'El contenido enviado no es JSON válido.'},
+            status=400,
+        )
+    if not isinstance(data, dict):
+        return JsonResponse(
+            {'ok': False, 'error': 'Se esperaba un objeto JSON.'},
+            status=400,
+        )
+
+    form = MaterialForm(data)
+    if not form.is_valid():
+        return JsonResponse(
+            {'ok': False, 'errors': _errores_formulario_json(form)},
+            status=400,
+        )
+
+    material = form.save(commit=False)
+    material.precio_venta_sugerido = (
+        material.costo_base / Decimal('0.7')
+    ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    try:
+        with transaction.atomic():
+            material.save()
+    except IntegrityError:
+        logger.info('Conflicto al crear material con código %s', material.codigo)
+        return JsonResponse(
+            {'ok': False, 'error': 'Ya existe un material con ese código.'},
+            status=409,
+        )
+
+    return JsonResponse({
+        'ok': True,
+        'id': material.pk,
+        'codigo': material.codigo,
+        'nombre': material.nombre,
+        'costo_base': str(material.costo_base),
+    }, status=201)
+
+
+@login_required
+@require_POST
+def crear_material_ajax(request, ot_id):
+    ot = get_object_or_404(_ordenes_visibles_para_usuario(request), pk=ot_id)
+    if _ot_es_solo_lectura(ot):
+        return JsonResponse(
+            {'ok': False, 'error': 'Esta OT está en modo solo lectura.'},
+            status=400,
+        )
+
+    return _crear_material_catalogo(request)
+
+
+@login_required
+@require_POST
+def crear_material_rapido_ajax(request, ot_id):
+    _ot_tecnico_en_proceso(request, ot_id)
+    return _crear_material_catalogo(request)
+
+
+@login_required
+@require_POST
+def agregar_material_ot(request, ot_id):
+    ot = get_object_or_404(_ordenes_visibles_para_usuario(request), pk=ot_id)
+    if _ot_es_solo_lectura(ot):
+        return JsonResponse(
+            {'ok': False, 'error': 'Esta OT está en modo solo lectura.'},
+            status=400,
+        )
+
+    form = MaterialOTForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return JsonResponse(
+            {'ok': False, 'errors': _errores_formulario_json(form)},
+            status=400,
+        )
+
+    material_ot = form.save(commit=False)
+    material_ot.orden_trabajo = ot
+    material_ot.precio_venta_aplicado = (
+        material_ot.costo_real / Decimal('0.7')
+    ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    material_ot.save()
+
+    return JsonResponse({
+        'ok': True,
+        'id': material_ot.pk,
+        'material': material_ot.material.nombre,
+        'cantidad': str(material_ot.cantidad),
+        'costo_real': str(material_ot.costo_real),
+        'foto_url': material_ot.foto_factura.url if material_ot.foto_factura else '',
+        'fecha_registro': material_ot.fecha_registro.isoformat(),
+        'observaciones': material_ot.observaciones or '',
+    }, status=201)
+
+
+@login_required
+@require_POST
+def agregar_material_rapido_ot(request, ot_id):
+    ot = _ot_tecnico_en_proceso(request, ot_id)
+    form = MaterialOTForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return JsonResponse(
+            {'ok': False, 'errors': _errores_formulario_json(form)},
+            status=400,
+        )
+
+    material_ot = form.save(commit=False)
+    material_ot.orden_trabajo = ot
+    material_ot.precio_venta_aplicado = (
+        material_ot.costo_real / Decimal('0.7')
+    ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    material_ot.save()
+
+    return JsonResponse({
+        'ok': True,
+        'id': material_ot.pk,
+        'material': material_ot.material.nombre,
+        'cantidad': str(material_ot.cantidad),
+        'costo_real': str(material_ot.costo_real),
+        'foto_url': material_ot.foto_factura.url if material_ot.foto_factura else '',
+        'fecha_registro': material_ot.fecha_registro.isoformat(),
+        'observaciones': material_ot.observaciones or '',
+    }, status=201)
+
+
 @login_required
 def cierre_ot(request, ot_id):
     logger.info("cierre_ot called ot_id=%s method=%s", ot_id, request.method)
-    ot = get_object_or_404(OrdenTrabajo, id=ot_id)
+    ot = get_object_or_404(_ordenes_visibles_para_usuario(request), id=ot_id)
     cierre_ot, created = CierreOt.objects.get_or_create(orden_trabajo=ot)
-    read_only = ot.estado and ot.estado.nombre in ['en revision', 'finalizada']
+    read_only = _ot_es_solo_lectura(ot)
+    materiales_catalogo = Material.objects.order_by('nombre')
     existing_proceso = _get_active_proceso_para_cierre(cierre_ot)
     operation_id = existing_proceso.operation_id if existing_proceso else ''
     if not operation_id:
@@ -1003,6 +1188,7 @@ def cierre_ot(request, ot_id):
                 'form_antes': form_antes,
                 'form_despues': form_despues,
                 'ot': ot,
+                'materiales_catalogo': materiales_catalogo,
                 'read_only': read_only,
                 'operation_id': operation_id
             })
@@ -1029,6 +1215,7 @@ def cierre_ot(request, ot_id):
                 'form_antes': form_antes,
                 'form_despues': form_despues,
                 'ot': ot,
+                'materiales_catalogo': materiales_catalogo,
                 'operation_id': operation_id
             })
 
@@ -1136,6 +1323,7 @@ def cierre_ot(request, ot_id):
         'form_antes': form_antes,
         'form_despues': form_despues,
         'ot': ot,
+        'materiales_catalogo': materiales_catalogo,
         'read_only': read_only,
         'operation_id': operation_id
     })
@@ -1842,5 +2030,3 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot, drive_link):
         logger.error("❌ Error enviando email: %s", str(e))
         logger.error("   - Tipo: %s", type(e).__name__)
         return False
-
-

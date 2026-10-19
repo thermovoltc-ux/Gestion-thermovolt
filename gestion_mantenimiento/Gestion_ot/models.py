@@ -327,7 +327,7 @@ class Material(models.Model):
     codigo = models.CharField(max_length=50, unique=True)
     nombre = models.CharField(max_length=150)
     costo_base = models.DecimalField(max_digits=12, decimal_places=2)
-    precio_venta_sugerido = models.DecimalField(max_digits=12, decimal_places=2)
+    precio_venta_sugerido = models.DecimalField(max_digits=14, decimal_places=2)
 
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"
@@ -353,9 +353,14 @@ class MaterialOT(models.Model):
     )
     fecha_registro = models.DateTimeField(auto_now_add=True)
     precio_venta_aplicado = models.DecimalField(
-        max_digits=12,
+        max_digits=14,
         decimal_places=2,
         default=0,
+    )
+    observaciones = models.TextField(
+        blank=True,
+        null=True,
+        help_text='Ej: Los primeros 2 ítems son para esta OT, el resto fue para otra',
     )
 
     def __str__(self):

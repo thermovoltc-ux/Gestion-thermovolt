@@ -2,7 +2,17 @@ from django import forms
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.forms import inlineformset_factory
-from .models import OrdenTrabajo, CierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad
+from decimal import Decimal
+from .models import (
+    OrdenTrabajo,
+    CierreOt,
+    PlanMantenimiento,
+    ActividadMantenimiento,
+    TareaMantenimiento,
+    CierreOtActividad,
+    Material,
+    MaterialOT,
+)
 
 # Formulario para OrdenTrabajo
 class OrdenTrabajoForm(forms.ModelForm):
@@ -185,3 +195,71 @@ class ImagenAntesForm(forms.Form):
 
 class ImagenDespuesForm(forms.Form):
     imagenes_despues = forms.ImageField(widget=MultipleFileInput(attrs={'multiple': True}), required=False, label="Imágenes Después")
+
+
+class MaterialForm(forms.ModelForm):
+    costo_base = forms.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=Decimal('0'),
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'min': '0',
+        }),
+    )
+
+    class Meta:
+        model = Material
+        fields = ['codigo', 'nombre', 'costo_base']
+        widgets = {
+            'codigo': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: RCT001',
+            }),
+            'nombre': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Rodamiento 6205',
+            }),
+        }
+
+
+class MaterialOTForm(forms.ModelForm):
+    cantidad = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=Decimal('0.01'),
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'min': '0.01',
+            'value': '1',
+        }),
+    )
+    costo_real = forms.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=Decimal('0'),
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'min': '0',
+        }),
+    )
+
+    class Meta:
+        model = MaterialOT
+        fields = ['material', 'cantidad', 'costo_real', 'foto_factura', 'observaciones']
+        widgets = {
+            'material': forms.Select(attrs={'class': 'form-control'}),
+            'foto_factura': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/*',
+                'capture': 'environment',
+            }),
+            'observaciones': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'maxlength': '5000',
+            }),
+        }
