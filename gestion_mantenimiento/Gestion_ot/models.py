@@ -351,6 +351,12 @@ class MaterialOT(models.Model):
         blank=True,
         null=True,
     )
+    fecha_registro = models.DateTimeField(auto_now_add=True)
+    precio_venta_aplicado = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+    )
 
     def __str__(self):
         return f"{self.material} x {self.cantidad} - OT-{self.orden_trabajo_id}"
