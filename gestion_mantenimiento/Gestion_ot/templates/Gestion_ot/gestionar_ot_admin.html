@@ -156,7 +156,7 @@
             <form id="admin-create-material-form" class="admin-material-modal-content">
                 <h3 id="admin-create-material-title">Crear nuevo repuesto</h3>
                 <label for="admin-new-material-category">Categoría
-                    <select id="admin-new-material-category" name="categoria" required>
+                    <select id="admin-new-material-category" name="categoria">
                         <option value="repuestos">Repuestos</option>
                         <option value="servicios">Servicios</option>
                         <option value="maquinaria">Maquinaria</option>
@@ -165,10 +165,10 @@
                     </select>
                 </label>
                 <label for="admin-new-material-name">Nombre
-                    <input id="admin-new-material-name" name="nombre" maxlength="150" required>
+                    <input id="admin-new-material-name" name="nombre" maxlength="150">
                 </label>
                 <label for="admin-new-material-cost">Costo base
-                    <input id="admin-new-material-cost" name="costo_base" type="number" min="0" step="0.01" required>
+                    <input id="admin-new-material-cost" name="costo_base" type="number" min="0" step="0.01">
                 </label>
                 <div id="admin-create-material-message" class="admin-ot-message" role="status" aria-live="polite"></div>
                 <div class="admin-material-modal-actions">
@@ -270,8 +270,30 @@ document.addEventListener('DOMContentLoaded', function () {
 
     createMaterialForm.addEventListener('submit', async function (event) {
         event.preventDefault();
-        createMaterialMessage.textContent = 'Creando material…';
         createMaterialMessage.classList.remove('error');
+        createMaterialMessage.textContent = '';
+        const categoryInput = document.getElementById('admin-new-material-category');
+        const nameInput = document.getElementById('admin-new-material-name');
+        const baseCostInput = document.getElementById('admin-new-material-cost');
+        const baseCost = baseCostInput.value.trim();
+        const parsedBaseCost = Number(baseCost);
+        if (!categoryInput.value) {
+            createMaterialMessage.textContent = 'Selecciona una categoría.';
+            categoryInput.focus();
+            return;
+        }
+        if (!nameInput.value.trim()) {
+            createMaterialMessage.textContent = 'Ingresa el nombre del material.';
+            nameInput.focus();
+            return;
+        }
+        if (!baseCost || !Number.isFinite(parsedBaseCost) || parsedBaseCost < 0) {
+            createMaterialMessage.textContent = 'Ingresa un costo base válido (cero o mayor).';
+            baseCostInput.focus();
+            return;
+        }
+        createMaterialMessage.textContent = 'Creando material…';
+        createMaterialMessage.textContent = 'Creando material…';
         createMaterialSubmit.disabled = true;
         try {
             const response = await fetch(root.dataset.createMaterialUrl, {
@@ -283,9 +305,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 credentials: 'same-origin',
                 body: JSON.stringify({
-                    categoria: document.getElementById('admin-new-material-category').value,
-                    nombre: document.getElementById('admin-new-material-name').value,
-                    costo_base: document.getElementById('admin-new-material-cost').value
+                    categoria: categoryInput.value,
+                    nombre: nameInput.value.trim(),
+                    costo_base: baseCost
                 })
             });
             const data = await response.json();

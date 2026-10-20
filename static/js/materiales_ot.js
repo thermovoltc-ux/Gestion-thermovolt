@@ -37,6 +37,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function validateNumber(input, minimum) {
+        const rawValue = input.value.trim();
+        if (!rawValue) {
+            return false;
+        }
+        const value = Number(rawValue);
+        return Number.isFinite(value) && value >= minimum;
+    }
+
     async function readResponse(response) {
         const payload = await response.json();
         if (!response.ok || !payload.ok) {
@@ -139,6 +148,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     addButton.addEventListener('click', async function () {
         addError.textContent = '';
+        if (!select.value) {
+            addError.textContent = 'Selecciona un material del catálogo.';
+            select.focus();
+            return;
+        }
+        if (!validateNumber(quantityInput, 0.01)) {
+            addError.textContent = 'Ingresa una cantidad válida, mayor que cero.';
+            quantityInput.focus();
+            return;
+        }
+        if (!validateNumber(costInput, 0)) {
+            addError.textContent = 'Ingresa un costo real válido (cero o mayor).';
+            costInput.focus();
+            return;
+        }
+
         const formData = new FormData();
         formData.append('material', select.value);
         formData.append('cantidad', quantityInput.value);
@@ -179,6 +204,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
     createButton.addEventListener('click', async function () {
         createError.textContent = '';
+        const categoryInput = document.getElementById('nuevo-categoria');
+        const nameInput = document.getElementById('nuevo-nombre');
+        const baseCostInput = document.getElementById('nuevo-costo');
+        if (!categoryInput.value) {
+            createError.textContent = 'Selecciona una categoría.';
+            categoryInput.focus();
+            return;
+        }
+        if (!nameInput.value.trim()) {
+            createError.textContent = 'Ingresa el nombre del material.';
+            nameInput.focus();
+            return;
+        }
+        if (!validateNumber(baseCostInput, 0)) {
+            createError.textContent = 'Ingresa un costo base válido (cero o mayor).';
+            baseCostInput.focus();
+            return;
+        }
+
         createButton.disabled = true;
         try {
             const response = await fetch(addModal.dataset.materialCreateUrl, {
@@ -189,9 +233,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 credentials: 'same-origin',
                 body: JSON.stringify({
-                    categoria: document.getElementById('nuevo-categoria').value,
-                    nombre: document.getElementById('nuevo-nombre').value,
-                    costo_base: document.getElementById('nuevo-costo').value,
+                    categoria: categoryInput.value,
+                    nombre: nameInput.value.trim(),
+                    costo_base: baseCostInput.value,
                 }),
             });
             const material = await readResponse(response);
@@ -203,9 +247,9 @@ document.addEventListener('DOMContentLoaded', function () {
             select.value = String(material.id);
             costInput.value = material.costo_base;
             searchInput.value = '';
-            document.getElementById('nuevo-categoria').selectedIndex = 0;
-            document.getElementById('nuevo-nombre').value = '';
-            document.getElementById('nuevo-costo').value = '';
+            categoryInput.selectedIndex = 0;
+            nameInput.value = '';
+            baseCostInput.value = '';
             hideModal(createModal);
             if (returnToAddModal) {
                 showModal(addModal);

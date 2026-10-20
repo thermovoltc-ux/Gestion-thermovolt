@@ -6,7 +6,7 @@
             <label for="buscar-material">Buscar en el catálogo</label>
             <input type="search" id="buscar-material" class="form-control" autocomplete="off">
             <label for="select-material">Material</label>
-            <select id="select-material" class="form-control" required>
+            <select id="select-material" class="form-control">
                 <option value="">Seleccionar material...</option>
                 {% for m in materiales_catalogo %}
                 <option value="{{ m.id }}" data-costo="{{ m.costo_base }}">{{ m.codigo }} — {{ m.nombre }}</option>
@@ -16,11 +16,11 @@
         </div>
         <div class="materiales-ot-field">
             <label for="input-cantidad">Cantidad</label>
-            <input type="number" id="input-cantidad" class="form-control" value="1" min="0.01" step="0.01" required>
+            <input type="number" id="input-cantidad" class="form-control" value="1" min="0.01" step="0.01">
         </div>
         <div class="materiales-ot-field">
             <label for="input-costo-real">Costo unitario real (según factura)</label>
-            <input type="number" id="input-costo-real" class="form-control" min="0" step="0.01" required>
+            <input type="number" id="input-costo-real" class="form-control" min="0" step="0.01">
         </div>
         <div class="materiales-ot-field">
             <label for="input-foto-factura">Foto de factura o recibo (opcional)</label>
@@ -43,7 +43,7 @@
         <h3 id="titulo-modal-nuevo-material">Crear nuevo repuesto</h3>
         <div class="materiales-ot-field">
             <label for="nuevo-categoria">Categoría</label>
-            <select id="nuevo-categoria" class="form-control" required>
+            <select id="nuevo-categoria" class="form-control">
                 <option value="repuestos">Repuestos</option>
                 <option value="servicios">Servicios</option>
                 <option value="maquinaria">Maquinaria</option>
@@ -53,11 +53,11 @@
         </div>
         <div class="materiales-ot-field">
             <label for="nuevo-nombre">Nombre</label>
-            <input type="text" id="nuevo-nombre" class="form-control" maxlength="150" required>
+            <input type="text" id="nuevo-nombre" class="form-control" maxlength="150">
         </div>
         <div class="materiales-ot-field">
             <label for="nuevo-costo">Costo base</label>
-            <input type="number" id="nuevo-costo" class="form-control" min="0" step="0.01" required>
+            <input type="number" id="nuevo-costo" class="form-control" min="0" step="0.01">
         </div>
         <div class="materiales-ot-error" id="error-nuevo-material" role="alert" aria-live="polite"></div>
         <div class="materiales-ot-actions">

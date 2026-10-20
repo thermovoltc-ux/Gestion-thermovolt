@@ -584,6 +584,12 @@ class MaterialOTAjaxTests(TestCase):
         self.assertContains(response, 'Rodamiento')
         self.assertContains(response, 'materiales_ot.js')
         self.assertContains(response, 'nuevo-categoria')
+        self.assertContains(response, 'id="select-material" class="form-control">')
+        self.assertContains(response, 'id="input-cantidad" class="form-control" value="1" min="0.01" step="0.01">')
+        self.assertContains(response, 'id="input-costo-real" class="form-control" min="0" step="0.01">')
+        self.assertContains(response, 'id="nuevo-categoria" class="form-control">')
+        self.assertContains(response, 'id="nuevo-nombre" class="form-control" maxlength="150">')
+        self.assertContains(response, 'id="nuevo-costo" class="form-control" min="0" step="0.01">')
         for value, label in (
             ('repuestos', 'Repuestos'),
             ('servicios', 'Servicios'),
@@ -968,6 +974,9 @@ class RentabilidadAdminTests(TestCase):
         self.assertContains(response, 'OT Finalizada')
         self.assertNotContains(response, 'Estado de la OT</strong>')
         self.assertContains(response, 'Agregar material (Admin)')
+        self.assertContains(response, 'id="admin-new-material-category" name="categoria">')
+        self.assertContains(response, 'id="admin-new-material-name" name="nombre" maxlength="150">')
+        self.assertContains(response, 'id="admin-new-material-cost" name="costo_base" type="number" min="0" step="0.01">')
 
     def test_technician_cannot_access_admin_management_or_update_materials(self):
         material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
