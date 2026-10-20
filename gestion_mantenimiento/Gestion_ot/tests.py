@@ -774,6 +774,7 @@ class RentabilidadAdminTests(TestCase):
             ubicacion=self.ubicacion,
         )
         self.estado, _ = Estado.objects.get_or_create(nombre='finalizada')
+        self.estado_revision, _ = Estado.objects.get_or_create(nombre='en revision')
         solicitud = Solicitud.objects.create(
             creado_por=self.tecnico.username,
             descripcion_problema='Prueba rentabilidad',
@@ -853,10 +854,10 @@ class RentabilidadAdminTests(TestCase):
         self.assertContains(response, 'Mano de obra facturada')
 
     def test_manual_labor_form_field_is_optional_and_defaults_to_zero(self):
-        from gestion_mantenimiento.Gestion_ot.forms import CierreOtForm
+        from gestion_mantenimiento.Gestion_ot.forms import CierreOtFacturacionForm
 
         cierre = self.ot.cierreot
-        form = CierreOtForm(data={}, instance=cierre)
+        form = CierreOtFacturacionForm(data={}, instance=cierre)
         form.full_clean()
 
         self.assertFalse(form.fields['valor_mano_obra'].required)
@@ -871,3 +872,125 @@ class RentabilidadAdminTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
+
+    def test_admin_management_view_shows_materials_and_invoice_values(self):
+        material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
+        material_ot.foto_factura.name = 'materiales/facturas/factura-prueba.png'
+        material_ot.save(update_fields=['foto_factura'])
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('gestionar_ot_admin', args=[self.ot.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Gestión y facturación')
+        self.assertContains(response, self.material.nombre)
+        self.assertContains(response, 'Ver factura')
+        self.assertContains(response, 'Total facturado')
+        self.assertContains(response, 'Guardar facturación y estado')
+
+    def test_technician_cannot_access_admin_management_or_update_materials(self):
+        material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
+        self.client.force_login(self.tecnico)
+
+        response = self.client.get(
+            reverse('gestionar_ot_admin', args=[self.ot.pk])
+        )
+        self.assertRedirects(response, reverse('dashboard'))
+
+        response = self.client.post(
+            reverse(
+                'actualizar_material_ot_admin',
+                args=[self.ot.pk, material_ot.pk],
+            ),
+            {'cantidad': '4', 'costo_real': '50', 'precio_venta_aplicado': '100'},
+        )
+        self.assertRedirects(response, reverse('dashboard'))
+        response = self.client.post(
+            reverse('actualizar_mano_obra', args=[self.ot.pk]),
+            {'valor_mano_obra': '900000'},
+        )
+        self.assertEqual(response.status_code, 403)
+        material_ot.refresh_from_db()
+        self.assertEqual(material_ot.cantidad, Decimal('2.00'))
+        self.ot.cierreot.refresh_from_db()
+        self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('60.00'))
+
+    def test_admin_updates_labor_and_state_through_ajax_endpoint(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('actualizar_mano_obra', args=[self.ot.pk]),
+            {
+                'valor_mano_obra': '500000.00',
+                'estado': self.estado_revision.pk,
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['total_materiales'], '200.00')
+        self.assertEqual(response.json()['mano_obra'], '500000.00')
+        self.assertEqual(response.json()['total_facturado'], '500200.00')
+        self.assertEqual(response.json()['costo_nomina'], '200.00')
+        self.assertEqual(response.json()['ganancia'], '499900.00')
+        self.ot.refresh_from_db()
+        self.assertEqual(self.ot.estado, self.estado_revision)
+        self.ot.cierreot.refresh_from_db()
+        self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('500000.00'))
+
+    def test_admin_can_correct_or_delete_order_material(self):
+        material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse(
+                'actualizar_material_ot_admin',
+                args=[self.ot.pk, material_ot.pk],
+            ),
+            {
+                'cantidad': '3.00',
+                'costo_real': '40.00',
+                'precio_venta_aplicado': '80.00',
+            },
+        )
+        self.assertRedirects(
+            response,
+            reverse('gestionar_ot_admin', args=[self.ot.pk]),
+        )
+        material_ot.refresh_from_db()
+        self.assertEqual(material_ot.cantidad, Decimal('3.00'))
+        self.assertEqual(material_ot.costo_real, Decimal('40.00'))
+        self.assertEqual(material_ot.precio_venta_aplicado, Decimal('80.00'))
+
+        response = self.client.post(
+            reverse(
+                'eliminar_material_ot_admin',
+                args=[self.ot.pk, material_ot.pk],
+            )
+        )
+        self.assertRedirects(
+            response,
+            reverse('gestionar_ot_admin', args=[self.ot.pk]),
+        )
+        self.assertFalse(MaterialOT.objects.filter(pk=material_ot.pk).exists())
+
+    def test_technician_closure_form_does_not_expose_manual_labor_price(self):
+        from gestion_mantenimiento.Gestion_ot.forms import CierreOtForm
+
+        self.assertNotIn('valor_mano_obra', CierreOtForm().fields)
+        self.client.force_login(self.tecnico)
+        response = self.client.get(reverse('cierre_ot', args=[self.ot.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Valor cobrado por mano de obra')
+
+    def test_supervisor_list_uses_admin_management_link(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('listar_ot'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse('gestionar_ot_admin', args=[self.ot.pk]),
+        )

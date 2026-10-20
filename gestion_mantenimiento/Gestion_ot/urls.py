@@ -9,6 +9,18 @@ urlpatterns = [
     path('actualizar_estado_solicitud/', views.actualizar_estado_solicitud, name='actualizar_estado_solicitud'),
     path('listar_ot/', views.listar_ot, name='listar_ot'),
     path('rentabilidad/', views.rentabilidad_admin, name='rentabilidad_admin'),
+    path('gestionar_ot/<int:ot_id>/', views.gestionar_ot_admin, name='gestionar_ot_admin'),
+    path('gestionar_ot/<int:ot_id>/mano-obra/', views.actualizar_mano_obra, name='actualizar_mano_obra'),
+    path(
+        'gestionar_ot/<int:ot_id>/material/<int:material_ot_id>/actualizar/',
+        views.actualizar_material_ot_admin,
+        name='actualizar_material_ot_admin',
+    ),
+    path(
+        'gestionar_ot/<int:ot_id>/material/<int:material_ot_id>/eliminar/',
+        views.eliminar_material_ot_admin,
+        name='eliminar_material_ot_admin',
+    ),
     path('cierre_ot/<int:ot_id>/', views.cierre_ot, name='cierre_ot'),
     path('media/<str:file_id>/', views.drive_media, name='drive_media'),
     path('ot/<int:ot_id>/material/crear/', views.crear_material_ajax, name='crear_material_ajax'),

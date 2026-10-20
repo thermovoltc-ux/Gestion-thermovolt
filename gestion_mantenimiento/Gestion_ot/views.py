@@ -18,7 +18,17 @@ from django.contrib import messages
 import os
 import smtplib
 from .models import OrdenTrabajo, Estado, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad, InformeDriveArchivo, ProcesoInforme, Material, MaterialOT
-from .forms import OrdenTrabajoForm, CierreOtForm, ImagenAntesForm, ImagenDespuesForm, CierreOtActividadFormSet, MaterialForm, MaterialOTForm
+from .forms import (
+    OrdenTrabajoForm,
+    CierreOtForm,
+    CierreOtFacturacionForm,
+    MaterialOTAdminForm,
+    ImagenAntesForm,
+    ImagenDespuesForm,
+    CierreOtActividadFormSet,
+    MaterialForm,
+    MaterialOTForm,
+)
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.users.access import obtener_scope_ubicacion_ids
 import logging
@@ -902,7 +912,7 @@ def listar_ot(request):
             ots = OrdenTrabajo.objects.filter(
                 Q(solicitud__ubicacion_id__in=scope_ids) | Q(solicitud__equipo__ubicacion_id__in=scope_ids)
             )
-    elif request.user.groups.filter(name='Admin').exists():
+    elif _es_admin_rentabilidad(request.user):
         ots = OrdenTrabajo.objects.all()
     else:
         ots = OrdenTrabajo.objects.filter(tecnico_asignado=request.user.username)
@@ -970,7 +980,10 @@ def listar_ot(request):
             calendar_events.append({
                 'title': f"OT-{ot.solicitud.consecutivo} - {ot.tecnico_asignado}",
                 'start': ot.fecha_actividad.date().isoformat(),
-                'url': reverse('cierre_ot', args=[ot.id]),
+                'url': reverse(
+                    'gestionar_ot_admin' if _es_admin_rentabilidad(request.user) else 'cierre_ot',
+                    args=[ot.id],
+                ),
                 'backgroundColor': event_color,
                 'borderColor': event_color,
                 'textColor': '#ffffff',
@@ -984,6 +997,7 @@ def listar_ot(request):
         'calendar_events_json': json.dumps(calendar_events),
         'vista_calendario': vista_calendario,
         'puede_cargar_materiales': es_tecnico,
+        'puede_gestionar_ot': _es_admin_rentabilidad(request.user),
         'materiales_catalogo': Material.objects.order_by('nombre') if es_tecnico else Material.objects.none(),
     })
 
@@ -1002,13 +1016,198 @@ def _tarifa_hora_rentabilidad(configuracion):
     return Decimal(configuracion.valor_hora_normal)
 
 
+def _es_admin_rentabilidad(user):
+    return (
+        user.is_staff
+        or user.is_superuser
+        or user.groups.filter(name__in=['Admin', 'Supervisor']).exists()
+    )
+
+
+def _calcular_costos_ot(ot, cierre):
+    from gestion_mantenimiento.users.models import ConfiguracionPago
+
+    materiales = list(ot.materiales.all())
+    ingreso_materiales = sum(
+        (
+            material_ot.precio_venta_aplicado * material_ot.cantidad
+            for material_ot in materiales
+        ),
+        Decimal('0.00'),
+    ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    costo_materiales = sum(
+        (
+            material_ot.costo_real * material_ot.cantidad
+            for material_ot in materiales
+        ),
+        Decimal('0.00'),
+    ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    valor_mano_obra = cierre.valor_mano_obra or Decimal('0.00')
+    ingreso_total = ingreso_materiales + valor_mano_obra
+
+    horas = None
+    costo_nomina = None
+    if cierre.hora_inicio and cierre.hora_fin and cierre.fecha_inicio_actividad:
+        fecha_cierre = timezone.localtime(cierre.fecha_inicio_actividad).date()
+        inicio = datetime.datetime.combine(fecha_cierre, cierre.hora_inicio)
+        fin = datetime.datetime.combine(fecha_cierre, cierre.hora_fin)
+        if fin < inicio:
+            fin += datetime.timedelta(days=1)
+        horas = Decimal(str((fin - inicio).total_seconds())) / Decimal('3600')
+        if horas <= 0:
+            horas = None
+        else:
+            configuracion = ConfiguracionPago.objects.filter(
+                usuario__username=ot.tecnico_asignado,
+            ).first()
+            if configuracion:
+                tarifa_hora = _tarifa_hora_rentabilidad(configuracion)
+                if tarifa_hora is not None:
+                    costo_nomina = (tarifa_hora * horas).quantize(
+                        Decimal('0.01'),
+                        rounding=ROUND_HALF_UP,
+                    )
+
+    ganancia = None
+    if costo_nomina is not None:
+        ganancia = ingreso_total - costo_materiales - costo_nomina
+
+    return {
+        'ingreso_materiales': ingreso_materiales,
+        'costo_materiales': costo_materiales,
+        'valor_mano_obra': valor_mano_obra,
+        'ingreso_total': ingreso_total,
+        'horas': horas,
+        'costo_nomina': costo_nomina,
+        'ganancia': ganancia,
+    }
+
+
+@login_required
+def gestionar_ot_admin(request, ot_id):
+    if not _es_admin_rentabilidad(request.user):
+        messages.error(request, 'No tenés permiso para gestionar esta OT.')
+        return redirect('dashboard')
+
+    ot = get_object_or_404(
+        OrdenTrabajo.objects.select_related(
+            'solicitud__equipo',
+            'solicitud__ubicacion',
+            'estado',
+        ).prefetch_related('materiales__material'),
+        pk=ot_id,
+    )
+    cierre, _ = CierreOt.objects.get_or_create(orden_trabajo=ot)
+
+    if request.method == 'POST':
+        form = CierreOtFacturacionForm(request.POST, instance=cierre)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Se guardaron los datos de facturación de la OT.')
+            return redirect('gestionar_ot_admin', ot_id=ot.pk)
+    else:
+        form = CierreOtFacturacionForm(instance=cierre)
+
+    filas_materiales = [
+        {
+            'material_ot': material_ot,
+            'form': MaterialOTAdminForm(instance=material_ot),
+        }
+        for material_ot in ot.materiales.all()
+    ]
+    resumen = _calcular_costos_ot(ot, cierre)
+    return render(
+        request,
+        'Gestion_ot/gestionar_ot_admin.html',
+        {
+            'ot': ot,
+            'cierre': cierre,
+            'form': form,
+            'filas_materiales': filas_materiales,
+            'resumen': resumen,
+            'material_total_inicial': sum(
+                (
+                    material_ot.precio_venta_aplicado * material_ot.cantidad
+                    for material_ot in ot.materiales.all()
+                ),
+                Decimal('0.00'),
+            ),
+            'actualizar_mano_obra_url': reverse('actualizar_mano_obra', args=[ot.pk]),
+        },
+    )
+
+
+@login_required
+@require_POST
+def actualizar_mano_obra(request, ot_id):
+    if not _es_admin_rentabilidad(request.user):
+        return JsonResponse({'ok': False, 'error': 'No tenés permiso para modificar la facturación.'}, status=403)
+
+    ot = get_object_or_404(
+        OrdenTrabajo.objects.select_related('cierreot').prefetch_related('materiales'),
+        pk=ot_id,
+    )
+    form = CierreOtFacturacionForm(request.POST, instance=ot.cierreot)
+    if not form.is_valid():
+        return JsonResponse(
+            {'ok': False, 'errors': form.errors.get_json_data()},
+            status=400,
+        )
+
+    cierre = form.save()
+    resumen = _calcular_costos_ot(ot, cierre)
+    return JsonResponse({
+        'ok': True,
+        'total_materiales': resumen['ingreso_materiales'],
+        'mano_obra': resumen['valor_mano_obra'],
+        'total_facturado': resumen['ingreso_total'],
+        'costo_nomina': resumen['costo_nomina'],
+        'ganancia': resumen['ganancia'],
+        'estado': cierre.orden_trabajo.estado.get_nombre_display()
+        if hasattr(cierre.orden_trabajo.estado, 'get_nombre_display')
+        else str(cierre.orden_trabajo.estado or ''),
+    })
+
+
+@login_required
+@require_POST
+def actualizar_material_ot_admin(request, ot_id, material_ot_id):
+    if not _es_admin_rentabilidad(request.user):
+        return redirect('dashboard')
+
+    material_ot = get_object_or_404(
+        MaterialOT.objects.select_related('orden_trabajo'),
+        pk=material_ot_id,
+        orden_trabajo_id=ot_id,
+    )
+    form = MaterialOTAdminForm(request.POST, instance=material_ot)
+    if form.is_valid():
+        form.save()
+        messages.success(request, 'Se actualizaron cantidad, costo y precio de venta del material.')
+    else:
+        messages.error(request, f'No se pudo actualizar el material: {form.errors.as_text()}')
+    return redirect('gestionar_ot_admin', ot_id=ot_id)
+
+
+@login_required
+@require_POST
+def eliminar_material_ot_admin(request, ot_id, material_ot_id):
+    if not _es_admin_rentabilidad(request.user):
+        return redirect('dashboard')
+
+    material_ot = get_object_or_404(
+        MaterialOT.objects.select_related('orden_trabajo'),
+        pk=material_ot_id,
+        orden_trabajo_id=ot_id,
+    )
+    material_ot.delete()
+    messages.success(request, 'Se eliminó el material de esta OT.')
+    return redirect('gestionar_ot_admin', ot_id=ot_id)
+
+
 @login_required
 def rentabilidad_admin(request):
-    if not (
-        request.user.is_staff
-        or request.user.is_superuser
-        or request.user.groups.filter(name__in=['Admin', 'Supervisor']).exists()
-    ):
+    if not _es_admin_rentabilidad(request.user):
         messages.error(request, 'No tenés permiso para acceder a esta sección.')
         return redirect('dashboard')
 

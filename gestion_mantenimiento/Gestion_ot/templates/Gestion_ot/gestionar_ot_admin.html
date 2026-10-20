@@ -1,0 +1,212 @@
+{% extends "solicitudes/indexpadre.html" %}
+{% load static %}
+
+{% block title %}Gestión y facturación de OT{% endblock %}
+
+{% block content %}
+<style>
+    .admin-ot-page { max-width: 1500px; margin: 0 auto; padding: 24px; color: #1e293b; }
+    .admin-ot-page h1 { margin: 0 0 8px; }
+    .admin-ot-muted { color: #64748b; }
+    .admin-ot-card { background: #fff; border-radius: 12px; padding: 20px; margin: 18px 0; box-shadow: 0 2px 8px rgba(15,23,42,.08); }
+    .admin-ot-header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; }
+    .admin-ot-meta { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 12px; margin-top: 16px; }
+    .admin-ot-meta div { padding: 12px; background: #f8fafc; border-radius: 8px; }
+    .admin-ot-meta strong { display: block; font-size: 12px; color: #64748b; margin-bottom: 5px; }
+    .admin-ot-table-wrap { overflow-x: auto; }
+    .admin-ot-table { width: 100%; min-width: 1000px; border-collapse: collapse; }
+    .admin-ot-table th, .admin-ot-table td { border-bottom: 1px solid #e2e8f0; padding: 10px; text-align: left; vertical-align: middle; }
+    .admin-ot-table th { background: #f1f5f9; }
+    .admin-ot-table input, .admin-ot-billing input, .admin-ot-billing select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #cbd5e1; border-radius: 6px; }
+    .admin-ot-actions { display: flex; gap: 8px; }
+    .admin-ot-btn { display: inline-block; border: 0; border-radius: 6px; padding: 9px 13px; background: #2563eb; color: #fff; text-decoration: none; font-weight: 600; cursor: pointer; }
+    .admin-ot-btn-danger { background: #dc2626; }
+    .admin-ot-btn-secondary { background: #475569; }
+    .admin-ot-financials { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 12px; }
+    .admin-ot-kpi { padding: 16px; border-radius: 9px; background: #f8fafc; }
+    .admin-ot-kpi span { display: block; color: #64748b; font-size: 13px; }
+    .admin-ot-kpi strong { display: block; margin-top: 6px; font-size: 21px; }
+    .admin-ot-message { margin: 10px 0; padding: 10px 12px; border-radius: 6px; background: #eff6ff; color: #1e40af; }
+    .admin-ot-message.error { background: #fef2f2; color: #b91c1c; }
+    .admin-ot-live { color: #047857; font-weight: 700; }
+    @media (max-width: 640px) { .admin-ot-page { padding: 14px; } }
+</style>
+
+<main class="admin-ot-page" data-ot-admin data-update-url="{{ actualizar_mano_obra_url }}">
+    <div class="admin-ot-header">
+        <div>
+            <h1>Gestión y facturación — OT-{{ ot.solicitud.consecutivo }}</h1>
+            <p class="admin-ot-muted">Revisa lo reportado, corrige materiales y registra el valor de venta del servicio.</p>
+        </div>
+        <a href="{% url 'listar_ot' %}" class="admin-ot-btn admin-ot-btn-secondary">Volver al listado</a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="admin-ot-message {% if message.tags == 'error' %}error{% endif %}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <section class="admin-ot-card">
+        <h2>Resumen de la OT</h2>
+        <div class="admin-ot-meta">
+            <div><strong>Cliente / ubicación</strong>{{ ot.solicitud.ubicacion_nombre|default:"Sin ubicación" }}</div>
+            <div><strong>Equipo</strong>{{ ot.solicitud.equipo.nombre|default:"—" }}</div>
+            <div><strong>Técnico asignado</strong>{{ ot.tecnico_display|default:ot.tecnico_asignado }}</div>
+            <div><strong>Fecha del cierre</strong>{{ cierre.fecha_inicio_actividad|date:"d/m/Y"|default:"—" }}</div>
+            <div><strong>Horario reportado</strong>{% if cierre.hora_inicio and cierre.hora_fin %}{{ cierre.hora_inicio|time:"H:i" }} – {{ cierre.hora_fin|time:"H:i" }}{% else %}No registrado{% endif %}</div>
+            <div><strong>Estado actual</strong>{{ ot.estado|default:"Sin estado" }}</div>
+            <div><strong>Descripción reportada</strong>{{ cierre.descripcion_falla|default:ot.solicitud.descripcion_problema|default:"—" }}</div>
+        </div>
+        {% if cierre.observaciones %}<p><strong>Observaciones:</strong> {{ cierre.observaciones }}</p>{% endif %}
+    </section>
+
+    <section class="admin-ot-card">
+        <h2>Materiales y repuestos reportados</h2>
+        <p class="admin-ot-muted">Puedes ajustar cantidad, costo real y precio de venta aplicado. La foto y observación originales se conservan.</p>
+        <div class="admin-ot-table-wrap">
+            <table class="admin-ot-table">
+                <thead>
+                    <tr><th>Material</th><th>Cantidad</th><th>Costo unitario real</th><th>Precio de venta unitario</th><th>Factura</th><th>Observaciones</th><th>Acciones</th></tr>
+                </thead>
+                <tbody>
+                    {% for fila in filas_materiales %}
+                        <tr>
+                            <td>{{ fila.material_ot.material.nombre }}<br><small>{{ fila.material_ot.material.codigo }}</small></td>
+                            <td colspan="3">
+                                <form method="post" action="{% url 'actualizar_material_ot_admin' ot.pk fila.material_ot.pk %}" class="admin-ot-material-form">
+                                    {% csrf_token %}
+                                    <div style="display:grid;grid-template-columns:repeat(3,minmax(110px,1fr));gap:8px;">
+                                        <label>{{ fila.form.cantidad.label }}{{ fila.form.cantidad }}{{ fila.form.cantidad.errors }}</label>
+                                        <label>{{ fila.form.costo_real.label }}{{ fila.form.costo_real }}{{ fila.form.costo_real.errors }}</label>
+                                        <label>{{ fila.form.precio_venta_aplicado.label }}{{ fila.form.precio_venta_aplicado }}{{ fila.form.precio_venta_aplicado.errors }}</label>
+                                    </div>
+                                    <button type="submit" class="admin-ot-btn" style="margin-top:8px;">Guardar material</button>
+                                </form>
+                            </td>
+                            <td>{% if fila.material_ot.foto_factura %}<a href="{{ fila.material_ot.foto_factura.url }}" target="_blank" rel="noopener">Ver factura</a>{% else %}—{% endif %}</td>
+                            <td>{{ fila.material_ot.observaciones|default:"—" }}</td>
+                            <td>
+                                <form method="post" action="{% url 'eliminar_material_ot_admin' ot.pk fila.material_ot.pk %}" onsubmit="return confirm('¿Eliminar este material de la OT?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="admin-ot-btn admin-ot-btn-danger">Eliminar</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="7" class="admin-ot-muted">No hay materiales registrados en esta OT.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <form method="post" class="admin-ot-card admin-ot-billing" id="admin-ot-billing-form">
+        {% csrf_token %}
+        <h2>Facturación del servicio</h2>
+        {% if form.errors %}<div class="admin-ot-message error">{{ form.errors }}</div>{% endif %}
+        <div class="admin-ot-meta">
+            <div>
+                <label for="{{ form.valor_mano_obra.id_for_label }}"><strong>Valor manual de mano de obra / servicio</strong></label>
+                {{ form.valor_mano_obra }}
+                <small>No se aplica el factor de materiales a este importe.</small>
+            </div>
+            <div>
+                <label for="{{ form.estado.id_for_label }}"><strong>Estado de la OT</strong></label>
+                {{ form.estado }}
+                <small>Opciones disponibles del flujo actual.</small>
+            </div>
+        </div>
+        <button type="submit" class="admin-ot-btn" style="margin-top:14px;">Guardar facturación y estado</button>
+        <span id="admin-ot-save-message" class="admin-ot-live" role="status" aria-live="polite"></span>
+    </form>
+
+    <section class="admin-ot-card">
+        <h2>Resumen financiero estimado</h2>
+        <div class="admin-ot-financials"
+             data-total-materiales="{{ resumen.ingreso_materiales }}"
+             data-costo-materiales="{{ resumen.costo_materiales }}"
+             data-costo-nomina="{{ resumen.costo_nomina|default_if_none:'' }}">
+            <div class="admin-ot-kpi"><span>Total venta de materiales</span><strong id="admin-material-total">${{ resumen.ingreso_materiales|floatformat:2 }}</strong></div>
+            <div class="admin-ot-kpi"><span>Mano de obra</span><strong id="admin-labor-total">${{ resumen.valor_mano_obra|floatformat:2 }}</strong></div>
+            <div class="admin-ot-kpi"><span>Total facturado</span><strong id="admin-invoice-total">${{ resumen.ingreso_total|floatformat:2 }}</strong></div>
+            <div class="admin-ot-kpi"><span>Costo de materiales</span><strong>${{ resumen.costo_materiales|floatformat:2 }}</strong></div>
+            <div class="admin-ot-kpi"><span>Nómina estimada</span><strong id="admin-payroll-total">{% if resumen.costo_nomina != None %}${{ resumen.costo_nomina|floatformat:2 }}{% else %}Sin datos de horas o nómina{% endif %}</strong></div>
+            <div class="admin-ot-kpi"><span>Ganancia estimada</span><strong id="admin-profit-total">{% if resumen.ganancia != None %}${{ resumen.ganancia|floatformat:2 }}{% else %}No calculable{% endif %}</strong></div>
+        </div>
+    </section>
+</main>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const root = document.querySelector('[data-ot-admin]');
+    const form = document.getElementById('admin-ot-billing-form');
+    if (!root || !form) return;
+
+    const laborInput = document.getElementById('{{ form.valor_mano_obra.id_for_label }}');
+    const finance = document.querySelector('.admin-ot-financials');
+    const totalMaterialsEl = document.getElementById('admin-material-total');
+    const laborEl = document.getElementById('admin-labor-total');
+    const invoiceEl = document.getElementById('admin-invoice-total');
+    const payrollEl = document.getElementById('admin-payroll-total');
+    const profitEl = document.getElementById('admin-profit-total');
+    const messageEl = document.getElementById('admin-ot-save-message');
+    const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
+    const money = value => '$' + Number(value || 0).toLocaleString('es-CO', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+    function materialTotal() {
+        let total = 0;
+        document.querySelectorAll('.admin-ot-material-form').forEach(function (materialForm) {
+            const quantity = Number(materialForm.querySelector('[name=cantidad]').value || 0);
+            const sale = Number(materialForm.querySelector('[name=precio_venta_aplicado]').value || 0);
+            total += quantity * sale;
+        });
+        return total;
+    }
+
+    function updatePreview() {
+        const materials = materialTotal();
+        const labor = Number(laborInput.value || 0);
+        const invoice = materials + labor;
+        const payrollRaw = finance.dataset.costoNomina;
+        totalMaterialsEl.textContent = money(materials);
+        laborEl.textContent = money(labor);
+        invoiceEl.textContent = money(invoice);
+        if (payrollRaw !== '') {
+            profitEl.textContent = money(invoice - Number(finance.dataset.costoMateriales || 0) - Number(payrollRaw));
+        }
+    }
+
+    document.querySelectorAll('.admin-ot-material-form input').forEach(input => input.addEventListener('input', updatePreview));
+    laborInput.addEventListener('input', updatePreview);
+    updatePreview();
+
+    form.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        messageEl.textContent = 'Guardando…';
+        try {
+            const response = await fetch(root.dataset.updateUrl, {
+                method: 'POST',
+                headers: {'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest'},
+                body: new FormData(form),
+                credentials: 'same-origin'
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                messageEl.textContent = data.error || 'Revisa los datos del formulario.';
+                messageEl.classList.add('error');
+                return;
+            }
+            finance.dataset.totalMateriales = data.total_materiales;
+            if (data.costo_nomina !== null) finance.dataset.costoNomina = data.costo_nomina;
+            messageEl.classList.remove('error');
+            messageEl.textContent = 'Facturación y estado guardados.';
+            updatePreview();
+        } catch (error) {
+            messageEl.classList.add('error');
+            messageEl.textContent = 'No se pudo guardar. Comprueba tu conexión e inténtalo de nuevo.';
+        }
+    });
+});
+</script>
+{% endblock %}

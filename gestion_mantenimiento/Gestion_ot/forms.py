@@ -5,6 +5,7 @@ from django.forms import inlineformset_factory
 from decimal import Decimal
 from .models import (
     OrdenTrabajo,
+    Estado,
     CierreOt,
     PlanMantenimiento,
     ActividadMantenimiento,
@@ -39,15 +40,6 @@ class OrdenTrabajoForm(forms.ModelForm):
         return fecha_actividad
 
 class CierreOtForm(forms.ModelForm):
-    valor_mano_obra = forms.DecimalField(
-        required=False,
-        min_value=Decimal('0'),
-        max_digits=12,
-        decimal_places=2,
-        initial=Decimal('0'),
-        widget=forms.NumberInput(attrs={'min': '0', 'step': '0.01'}),
-        label='Valor cobrado por mano de obra / servicios prestados',
-    )
     causa_falla = forms.CharField(
         required=False,
         widget=forms.TextInput(),
@@ -73,7 +65,7 @@ class CierreOtForm(forms.ModelForm):
         model = CierreOt
         fields = [
             'tipo_mantenimiento', 'materiales_utilizados', 'correo_tecnico',
-            'descripcion_falla', 'fecha_inicio_actividad', 'valor_mano_obra', 'observaciones',
+            'descripcion_falla', 'fecha_inicio_actividad', 'observaciones',
             'nombre_tecnico', 'causa_falla', 'hora_inicio', 'documento_tecnico',
             'tipo_intervencion', 'hora_fin', 'firma_digital', 'firma_receptor', 'se_soluciono',
             'nombre_receptor', 'documento_receptor'
@@ -84,8 +76,66 @@ class CierreOtForm(forms.ModelForm):
             'hora_fin': forms.TimeInput(attrs={'type': 'time'}),
         }
 
+
+
+class CierreOtFacturacionForm(forms.ModelForm):
+    valor_mano_obra = forms.DecimalField(
+        required=False,
+        min_value=Decimal('0'),
+        max_digits=12,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'min': '0', 'step': '0.01'}),
+        label='Valor cobrado por mano de obra / servicios prestados',
+    )
+    estado = forms.ModelChoiceField(
+        queryset=Estado.objects.all(),
+        required=False,
+        label='Estado de la OT',
+    )
+
+    class Meta:
+        model = CierreOt
+        fields = ['valor_mano_obra']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk and self.instance.orden_trabajo_id:
+            self.fields['estado'].initial = self.instance.orden_trabajo.estado
+
     def clean_valor_mano_obra(self):
         return self.cleaned_data.get('valor_mano_obra') or Decimal('0.00')
+
+    def save(self, commit=True):
+        cierre = super().save(commit=commit)
+        if commit and self.cleaned_data.get('estado'):
+            cierre.orden_trabajo.estado = self.cleaned_data['estado']
+            cierre.orden_trabajo.save(update_fields=['estado'])
+        return cierre
+
+
+class MaterialOTAdminForm(forms.ModelForm):
+    cantidad = forms.DecimalField(
+        min_value=Decimal('0.01'),
+        max_digits=10,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'min': '0.01', 'step': '0.01'}),
+    )
+    costo_real = forms.DecimalField(
+        min_value=Decimal('0'),
+        max_digits=12,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'min': '0', 'step': '0.01'}),
+    )
+    precio_venta_aplicado = forms.DecimalField(
+        min_value=Decimal('0'),
+        max_digits=14,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'min': '0', 'step': '0.01'}),
+    )
+
+    class Meta:
+        model = MaterialOT
+        fields = ['cantidad', 'costo_real', 'precio_venta_aplicado']
 
 
 class CierreOtActividadForm(forms.ModelForm):
