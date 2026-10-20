@@ -1264,6 +1264,7 @@ def gestionar_ot_admin(request, ot_id):
             'ot': ot,
             'cierre': cierre,
             'form': form,
+            'material_admin_form': MaterialOTForm(),
             'filas_materiales': filas_materiales,
             'resumen': resumen,
             'material_total_inicial': sum(
@@ -1276,6 +1277,35 @@ def gestionar_ot_admin(request, ot_id):
             'actualizar_mano_obra_url': reverse('actualizar_mano_obra', args=[ot.pk]),
         },
     )
+
+
+@login_required
+@require_POST
+def agregar_material_ot_admin(request, ot_id):
+    if not _es_admin_rentabilidad(request.user):
+        messages.error(request, 'No tenés permiso para agregar materiales a esta OT.')
+        return redirect('dashboard')
+
+    ot = get_object_or_404(OrdenTrabajo, pk=ot_id)
+    form = MaterialOTForm(request.POST, request.FILES)
+    if not form.is_valid():
+        messages.error(
+            request,
+            f'No se pudo agregar el material: {form.errors.as_text()}',
+        )
+        return redirect('gestionar_ot_admin', ot_id=ot.pk)
+
+    material_ot = form.save(commit=False)
+    material_ot.orden_trabajo = ot
+    material_ot.precio_venta_aplicado = (
+        material_ot.costo_real / Decimal('0.7')
+    ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    material_ot.save()
+    messages.success(
+        request,
+        'Se agregó el material a la OT; el resumen financiero fue actualizado.',
+    )
+    return redirect('gestionar_ot_admin', ot_id=ot.pk)
 
 
 @login_required

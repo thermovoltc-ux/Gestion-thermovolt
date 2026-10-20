@@ -18,6 +18,10 @@
     .admin-ot-table th, .admin-ot-table td { border-bottom: 1px solid #e2e8f0; padding: 10px; text-align: left; vertical-align: middle; }
     .admin-ot-table th { background: #f1f5f9; }
     .admin-ot-table input, .admin-ot-billing input, .admin-ot-billing select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #cbd5e1; border-radius: 6px; }
+    .admin-ot-add-material { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 12px; align-items: end; margin-top: 18px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; }
+    .admin-ot-add-material label { display: block; font-weight: 600; }
+    .admin-ot-add-material input, .admin-ot-add-material select, .admin-ot-add-material textarea { box-sizing: border-box; width: 100%; margin-top: 5px; padding: 9px; border: 1px solid #cbd5e1; border-radius: 6px; }
+    .admin-ot-add-material .field-errors { color: #b91c1c; }
     .admin-ot-actions { display: flex; gap: 8px; }
     .admin-ot-btn { display: inline-block; border: 0; border-radius: 6px; padding: 9px 13px; background: #2563eb; color: #fff; text-decoration: none; font-weight: 600; cursor: pointer; }
     .admin-ot-btn-danger { background: #dc2626; }
@@ -99,6 +103,39 @@
                 </tbody>
             </table>
         </div>
+        <form method="post"
+              action="{% url 'agregar_material_ot_admin' ot.pk %}"
+              enctype="multipart/form-data"
+              class="admin-ot-add-material">
+            {% csrf_token %}
+            <h3 style="grid-column:1/-1;margin:0;">Agregar material (Admin)</h3>
+            <div>
+                <label for="{{ material_admin_form.material.id_for_label }}">Material</label>
+                {{ material_admin_form.material }}
+                {% if material_admin_form.material.errors %}<div class="field-errors">{{ material_admin_form.material.errors }}</div>{% endif %}
+            </div>
+            <div>
+                <label for="{{ material_admin_form.cantidad.id_for_label }}">Cantidad</label>
+                {{ material_admin_form.cantidad }}
+                {% if material_admin_form.cantidad.errors %}<div class="field-errors">{{ material_admin_form.cantidad.errors }}</div>{% endif %}
+            </div>
+            <div>
+                <label for="{{ material_admin_form.costo_real.id_for_label }}">Costo unitario real</label>
+                {{ material_admin_form.costo_real }}
+                {% if material_admin_form.costo_real.errors %}<div class="field-errors">{{ material_admin_form.costo_real.errors }}</div>{% endif %}
+            </div>
+            <div>
+                <label for="{{ material_admin_form.foto_factura.id_for_label }}">Foto de factura (opcional)</label>
+                {{ material_admin_form.foto_factura }}
+                {% if material_admin_form.foto_factura.errors %}<div class="field-errors">{{ material_admin_form.foto_factura.errors }}</div>{% endif %}
+            </div>
+            <div style="grid-column:1/-1;">
+                <label for="{{ material_admin_form.observaciones.id_for_label }}">Observaciones (opcional)</label>
+                {{ material_admin_form.observaciones }}
+                {% if material_admin_form.observaciones.errors %}<div class="field-errors">{{ material_admin_form.observaciones.errors }}</div>{% endif %}
+            </div>
+            <button type="submit" class="admin-ot-btn">➕ Agregar material (Admin)</button>
+        </form>
     </section>
 
     <form method="post" class="admin-ot-card admin-ot-billing" id="admin-ot-billing-form">

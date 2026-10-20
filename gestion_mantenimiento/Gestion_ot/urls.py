@@ -18,6 +18,11 @@ urlpatterns = [
         name='actualizar_material_ot_admin',
     ),
     path(
+        'gestionar_ot/<int:ot_id>/material/agregar/',
+        views.agregar_material_ot_admin,
+        name='agregar_material_ot_admin',
+    ),
+    path(
         'gestionar_ot/<int:ot_id>/material/<int:material_ot_id>/eliminar/',
         views.eliminar_material_ot_admin,
         name='eliminar_material_ot_admin',

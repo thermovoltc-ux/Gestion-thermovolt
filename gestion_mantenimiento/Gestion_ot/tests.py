@@ -893,6 +893,7 @@ class RentabilidadAdminTests(TestCase):
         self.assertContains(response, 'Estado operativo (solo lectura)')
         self.assertContains(response, 'OT Finalizada')
         self.assertNotContains(response, 'Estado de la OT</strong>')
+        self.assertContains(response, 'Agregar material (Admin)')
 
     def test_technician_cannot_access_admin_management_or_update_materials(self):
         material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
@@ -911,6 +912,21 @@ class RentabilidadAdminTests(TestCase):
             {'cantidad': '4', 'costo_real': '50', 'precio_venta_aplicado': '100'},
         )
         self.assertRedirects(response, reverse('dashboard'))
+
+        response = self.client.post(
+            reverse('agregar_material_ot_admin', args=[self.ot.pk]),
+            {
+                'material': self.material.pk,
+                'cantidad': '1',
+                'costo_real': '30.00',
+            },
+        )
+        self.assertRedirects(response, reverse('dashboard'))
+        self.assertEqual(
+            MaterialOT.objects.filter(orden_trabajo=self.ot).count(),
+            1,
+        )
+
         response = self.client.post(
             reverse('actualizar_mano_obra', args=[self.ot.pk]),
             {'valor_mano_obra': '900000'},
@@ -947,6 +963,48 @@ class RentabilidadAdminTests(TestCase):
         self.ot.cierreot.refresh_from_db()
         self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('500000.00'))
         self.assertEqual(self.ot.cierreot.estado_facturacion, 'facturada')
+
+    def test_admin_can_add_material_to_finalized_order_and_financials_update(self):
+        self.assertEqual(self.ot.estado.nombre, 'finalizada')
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('agregar_material_ot_admin', args=[self.ot.pk]),
+            {
+                'material': self.material.pk,
+                'cantidad': '1.00',
+                'costo_real': '30.00',
+                'observaciones': 'Material omitido por el técnico',
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('gestionar_ot_admin', args=[self.ot.pk]),
+        )
+        material_agregado = MaterialOT.objects.get(
+            orden_trabajo=self.ot,
+            observaciones='Material omitido por el técnico',
+        )
+        self.assertEqual(material_agregado.cantidad, Decimal('1.00'))
+        self.assertEqual(material_agregado.costo_real, Decimal('30.00'))
+        self.assertEqual(
+            material_agregado.precio_venta_aplicado,
+            Decimal('42.86'),
+        )
+
+        response = self.client.get(
+            reverse('gestionar_ot_admin', args=[self.ot.pk]),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context['resumen']['ingreso_materiales'],
+            Decimal('242.86'),
+        )
+        self.assertEqual(
+            response.context['resumen']['costo_materiales'],
+            Decimal('130.00'),
+        )
 
     def test_admin_can_correct_or_delete_order_material(self):
         material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
