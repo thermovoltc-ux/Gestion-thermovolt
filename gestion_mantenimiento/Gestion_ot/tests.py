@@ -491,6 +491,14 @@ class MaterialOTAjaxTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(MaterialOT.objects.exists())
 
+        response = self.client.post(
+            reverse('crear_material_ajax', args=[self.ot.pk]),
+            data='{"codigo":"MAT-READONLY","nombre":"Material no permitido","costo_base":"10.00"}',
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Material.objects.filter(codigo='MAT-READONLY').exists())
+
     def test_creates_catalog_material_with_suggested_markup(self):
         response = self.client.post(
             reverse('crear_material_ajax', args=[self.ot.pk]),
@@ -1005,6 +1013,34 @@ class RentabilidadAdminTests(TestCase):
             response.context['resumen']['costo_materiales'],
             Decimal('130.00'),
         )
+
+    def test_admin_can_create_catalog_material_for_finalized_order(self):
+        self.assertEqual(self.ot.estado.nombre, 'finalizada')
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('crear_material_ajax', args=[self.ot.pk]),
+            data='{"codigo":"MAT-ADMIN-NEW","nombre":"Repuesto admin nuevo","costo_base":"70.00"}',
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()['codigo'], 'MAT-ADMIN-NEW')
+        material = Material.objects.get(codigo='MAT-ADMIN-NEW')
+        self.assertEqual(
+            material.precio_venta_sugerido,
+            Decimal('100.00'),
+        )
+        response = self.client.get(
+            reverse('gestionar_ot_admin', args=[self.ot.pk]),
+        )
+        self.assertTrue(
+            response.context['material_admin_form'].fields['material']
+            .queryset.filter(pk=material.pk).exists()
+        )
+        self.assertContains(response, 'admin-open-create-material')
+        self.assertContains(response, 'admin-create-material-modal')
+        self.assertContains(response, reverse('crear_material_ajax', args=[self.ot.pk]))
 
     def test_admin_can_correct_or_delete_order_material(self):
         material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)

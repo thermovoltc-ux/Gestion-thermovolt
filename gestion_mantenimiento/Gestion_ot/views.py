@@ -1698,12 +1698,15 @@ def _crear_material_catalogo(request):
 @login_required
 @require_POST
 def crear_material_ajax(request, ot_id):
-    ot = get_object_or_404(_ordenes_visibles_para_usuario(request), pk=ot_id)
-    if _ot_es_solo_lectura(ot):
-        return JsonResponse(
-            {'ok': False, 'error': 'Esta OT está en modo solo lectura.'},
-            status=400,
-        )
+    if _es_admin_rentabilidad(request.user):
+        get_object_or_404(OrdenTrabajo, pk=ot_id)
+    else:
+        ot = get_object_or_404(_ordenes_visibles_para_usuario(request), pk=ot_id)
+        if _ot_es_solo_lectura(ot):
+            return JsonResponse(
+                {'ok': False, 'error': 'Esta OT está en modo solo lectura.'},
+                status=400,
+            )
 
     return _crear_material_catalogo(request)
 
