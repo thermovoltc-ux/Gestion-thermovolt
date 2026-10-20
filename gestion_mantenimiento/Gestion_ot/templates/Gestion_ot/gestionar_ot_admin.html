@@ -55,7 +55,7 @@
             <div><strong>Técnico asignado</strong>{{ ot.tecnico_display|default:ot.tecnico_asignado }}</div>
             <div><strong>Fecha del cierre</strong>{{ cierre.fecha_inicio_actividad|date:"d/m/Y"|default:"—" }}</div>
             <div><strong>Horario reportado</strong>{% if cierre.hora_inicio and cierre.hora_fin %}{{ cierre.hora_inicio|time:"H:i" }} – {{ cierre.hora_fin|time:"H:i" }}{% else %}No registrado{% endif %}</div>
-            <div><strong>Estado actual</strong>{{ ot.estado|default:"Sin estado" }}</div>
+            <div><strong>Estado operativo (solo lectura)</strong>{{ ot.estado.get_nombre_display|default:"Sin estado" }}</div>
             <div><strong>Descripción reportada</strong>{{ cierre.descripcion_falla|default:ot.solicitud.descripcion_problema|default:"—" }}</div>
         </div>
         {% if cierre.observaciones %}<p><strong>Observaciones:</strong> {{ cierre.observaciones }}</p>{% endif %}
@@ -112,9 +112,8 @@
                 <small>No se aplica el factor de materiales a este importe.</small>
             </div>
             <div>
-                <label for="{{ form.estado.id_for_label }}"><strong>Estado de la OT</strong></label>
-                {{ form.estado }}
-                <small>Estado operativo de la orden.</small>
+                <strong>Estado operativo (solo lectura)</strong>
+                <p>{{ ot.estado.get_nombre_display|default:"Sin estado" }}</p>
             </div>
             <div>
                 <label for="{{ form.estado_facturacion.id_for_label }}"><strong>Estado de facturación</strong></label>
@@ -122,7 +121,7 @@
                 <small>Este estado es independiente del flujo del técnico.</small>
             </div>
         </div>
-        <button type="submit" class="admin-ot-btn" style="margin-top:14px;">Guardar facturación y estado</button>
+        <button type="submit" class="admin-ot-btn" style="margin-top:14px;">Guardar facturación</button>
         <span id="admin-ot-save-message" class="admin-ot-live" role="status" aria-live="polite"></span>
     </form>
 

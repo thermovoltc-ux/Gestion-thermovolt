@@ -862,6 +862,7 @@ class RentabilidadAdminTests(TestCase):
 
         self.assertFalse(form.fields['valor_mano_obra'].required)
         self.assertEqual(form.cleaned_data['valor_mano_obra'], Decimal('0.00'))
+        self.assertNotIn('estado', form.fields)
 
     def test_invalid_date_range_is_rejected(self):
         self.client.force_login(self.admin)
@@ -888,7 +889,10 @@ class RentabilidadAdminTests(TestCase):
         self.assertContains(response, self.material.nombre)
         self.assertContains(response, 'Ver factura')
         self.assertContains(response, 'Total facturado')
-        self.assertContains(response, 'Guardar facturación y estado')
+        self.assertContains(response, 'Guardar facturación')
+        self.assertContains(response, 'Estado operativo (solo lectura)')
+        self.assertContains(response, 'OT Finalizada')
+        self.assertNotContains(response, 'Estado de la OT</strong>')
 
     def test_technician_cannot_access_admin_management_or_update_materials(self):
         material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
@@ -917,12 +921,13 @@ class RentabilidadAdminTests(TestCase):
         self.ot.cierreot.refresh_from_db()
         self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('60.00'))
 
-    def test_admin_updates_labor_and_state_through_ajax_endpoint(self):
+    def test_admin_updates_billing_without_changing_operational_state(self):
         self.client.force_login(self.admin)
         response = self.client.post(
             reverse('actualizar_mano_obra', args=[self.ot.pk]),
             {
                 'valor_mano_obra': '500000.00',
+                # Legacy/tampered submissions must not mutate the operational state.
                 'estado': self.estado_revision.pk,
                 'estado_facturacion': 'facturada',
             },
@@ -938,7 +943,7 @@ class RentabilidadAdminTests(TestCase):
         self.assertEqual(response.json()['margen'], '99.94')
         self.assertEqual(response.json()['estado_facturacion'], 'facturada')
         self.ot.refresh_from_db()
-        self.assertEqual(self.ot.estado, self.estado_revision)
+        self.assertEqual(self.ot.estado, self.estado)
         self.ot.cierreot.refresh_from_db()
         self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('500000.00'))
         self.assertEqual(self.ot.cierreot.estado_facturacion, 'facturada')
@@ -1026,12 +1031,15 @@ class RentabilidadAdminTests(TestCase):
             creado_por=self.tecnico.username,
             descripcion_problema='Cierre más reciente',
             equipo=self.equipo,
-            ubicacion=self.ubicacion,
+            ubicacion=Ubicacion.objects.create(
+                nombre='ZZ Cliente',
+                codigo='UBI-ZZ',
+            ),
             estado=self.estado,
         )
         ot_reciente = OrdenTrabajo.objects.create(
             solicitud=solicitud_reciente,
-            tecnico_asignado=self.tecnico.username,
+            tecnico_asignado='zzz-tecnico',
             estado=self.estado,
         )
         CierreOt.objects.create(
@@ -1055,6 +1063,18 @@ class RentabilidadAdminTests(TestCase):
             reverse('gestionar_ot_admin', args=[ot_reciente.pk]),
         )
 
+        orden_ascendente_esperado = [self.ot.pk, ot_reciente.pk]
+        for columna in ('ot', 'tecnico', 'cliente', 'fecha'):
+            response = self.client.get(
+                reverse('facturacion_admin'),
+                {'orden': columna, 'direccion': 'asc'},
+            )
+            self.assertEqual(
+                list(response.context['ots'].values_list('pk', flat=True)),
+                orden_ascendente_esperado,
+                msg=f'Orden ascendente incorrecto para {columna}.',
+            )
+
         fecha_cierre = self.ot.cierreot.fecha_inicio_actividad.date().isoformat()
         response = self.client.get(
             reverse('facturacion_admin'),
@@ -1073,6 +1093,19 @@ class RentabilidadAdminTests(TestCase):
         )
         self.assertEqual(len(response.context['eventos_calendario']), 1)
         self.assertContains(response, 'billing-calendar')
+        sort_url = response.context['ordenamientos']['ot']['url']
+        self.assertIn('tecnico=', sort_url)
+        self.assertIn('cliente=Cliente+renta', sort_url)
+        self.assertIn(f'fecha_inicio={fecha_cierre}', sort_url)
+        self.assertIn(f'fecha_fin={fecha_cierre}', sort_url)
+
+        response = self.client.get(
+            reverse('facturacion_admin'),
+            {'orden': 'fecha', 'direccion': 'asc'},
+        )
+        self.assertEqual(response.context['orden_actual'], 'fecha')
+        self.assertEqual(response.context['direccion_actual'], 'asc')
+        self.assertContains(response, 'aria-sort="ascending"')
 
     def test_technician_cannot_access_invoice_queue(self):
         self.client.force_login(self.tecnico)

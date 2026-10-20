@@ -1107,6 +1107,16 @@ def facturacion_admin(request):
     cliente = request.GET.get('cliente', '').strip()
     fecha_inicio = request.GET.get('fecha_inicio', '').strip()
     fecha_fin = request.GET.get('fecha_fin', '').strip()
+    orden_solicitado = request.GET.get('orden', 'ot').strip()
+    direccion_solicitada = request.GET.get('direccion', 'desc').strip()
+    campos_orden = {
+        'ot': 'pk',
+        'tecnico': 'tecnico_asignado',
+        'cliente': 'solicitud__ubicacion__nombre',
+        'fecha': 'cierreot__fecha_inicio_actividad',
+    }
+    orden_actual = orden_solicitado if orden_solicitado in campos_orden else 'ot'
+    direccion_actual = direccion_solicitada if direccion_solicitada in {'asc', 'desc'} else 'desc'
 
     tecnicos = ots.order_by().values_list('tecnico_asignado', flat=True).distinct()
     if tecnico:
@@ -1139,7 +1149,41 @@ def facturacion_admin(request):
                 cierreot__fecha_inicio_actividad__date__lte=fecha_fin_parseada,
             )
 
-    ots = ots.order_by('-cierreot__fecha_inicio_actividad', '-pk')
+    if orden_actual == 'cliente':
+        ots = ots.annotate(
+            _cliente_orden=models.Case(
+                models.When(
+                    solicitud__ubicacion__nombre__gt='',
+                    then=models.F('solicitud__ubicacion__nombre'),
+                ),
+                default=models.F('solicitud__PDV'),
+                output_field=models.CharField(),
+            )
+        )
+        campo_orden = '_cliente_orden'
+    else:
+        campo_orden = campos_orden[orden_actual]
+    prefijo_orden = '-' if direccion_actual == 'desc' else ''
+    ots = ots.order_by(f'{prefijo_orden}{campo_orden}', '-pk')
+
+    query_params = request.GET.copy()
+    query_params.pop('orden', None)
+    query_params.pop('direccion', None)
+    ordenamientos = {}
+    for clave in campos_orden:
+        siguiente_direccion = (
+            'desc'
+            if orden_actual == clave and direccion_actual == 'asc'
+            else 'asc'
+        )
+        query_ordenado = query_params.copy()
+        query_ordenado['orden'] = clave
+        query_ordenado['direccion'] = siguiente_direccion
+        ordenamientos[clave] = {
+            'url': f'?{query_ordenado.urlencode()}',
+            'direccion': direccion_actual if orden_actual == clave else '',
+        }
+
     eventos_calendario = []
     for ot in ots:
         fecha_cierre = ot.cierreot.fecha_inicio_actividad
@@ -1172,6 +1216,9 @@ def facturacion_admin(request):
             'filtro_cliente': cliente,
             'filtro_fecha_inicio': fecha_inicio,
             'filtro_fecha_fin': fecha_fin,
+            'orden_actual': orden_actual,
+            'direccion_actual': direccion_actual,
+            'ordenamientos': ordenamientos,
             'eventos_calendario': eventos_calendario,
         },
     )
@@ -1259,9 +1306,6 @@ def actualizar_mano_obra(request, ot_id):
         'ganancia': resumen['ganancia'],
         'margen': resumen['margen'],
         'estado_facturacion': cierre.estado_facturacion,
-        'estado': cierre.orden_trabajo.estado.get_nombre_display()
-        if hasattr(cierre.orden_trabajo.estado, 'get_nombre_display')
-        else str(cierre.orden_trabajo.estado or ''),
     })
 
 

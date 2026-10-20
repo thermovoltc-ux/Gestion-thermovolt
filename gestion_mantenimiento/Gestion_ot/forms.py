@@ -87,30 +87,12 @@ class CierreOtFacturacionForm(forms.ModelForm):
         widget=forms.NumberInput(attrs={'min': '0', 'step': '0.01'}),
         label='Valor cobrado por mano de obra / servicios prestados',
     )
-    estado = forms.ModelChoiceField(
-        queryset=Estado.objects.all(),
-        required=False,
-        label='Estado de la OT',
-    )
-
     class Meta:
         model = CierreOt
         fields = ['valor_mano_obra', 'estado_facturacion']
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.instance.pk and self.instance.orden_trabajo_id:
-            self.fields['estado'].initial = self.instance.orden_trabajo.estado
-
     def clean_valor_mano_obra(self):
         return self.cleaned_data.get('valor_mano_obra') or Decimal('0.00')
-
-    def save(self, commit=True):
-        cierre = super().save(commit=commit)
-        if commit and self.cleaned_data.get('estado'):
-            cierre.orden_trabajo.estado = self.cleaned_data['estado']
-            cierre.orden_trabajo.save(update_fields=['estado'])
-        return cierre
 
 
 class MaterialOTAdminForm(forms.ModelForm):
