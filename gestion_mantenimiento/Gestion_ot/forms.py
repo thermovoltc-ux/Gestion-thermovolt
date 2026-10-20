@@ -39,6 +39,15 @@ class OrdenTrabajoForm(forms.ModelForm):
         return fecha_actividad
 
 class CierreOtForm(forms.ModelForm):
+    valor_mano_obra = forms.DecimalField(
+        required=False,
+        min_value=Decimal('0'),
+        max_digits=12,
+        decimal_places=2,
+        initial=Decimal('0'),
+        widget=forms.NumberInput(attrs={'min': '0', 'step': '0.01'}),
+        label='Valor cobrado por mano de obra / servicios prestados',
+    )
     causa_falla = forms.CharField(
         required=False,
         widget=forms.TextInput(),
@@ -64,7 +73,7 @@ class CierreOtForm(forms.ModelForm):
         model = CierreOt
         fields = [
             'tipo_mantenimiento', 'materiales_utilizados', 'correo_tecnico',
-            'descripcion_falla', 'fecha_inicio_actividad', 'observaciones',
+            'descripcion_falla', 'fecha_inicio_actividad', 'valor_mano_obra', 'observaciones',
             'nombre_tecnico', 'causa_falla', 'hora_inicio', 'documento_tecnico',
             'tipo_intervencion', 'hora_fin', 'firma_digital', 'firma_receptor', 'se_soluciono',
             'nombre_receptor', 'documento_receptor'
@@ -74,6 +83,10 @@ class CierreOtForm(forms.ModelForm):
             'hora_inicio': forms.TimeInput(attrs={'type': 'time'}),
             'hora_fin': forms.TimeInput(attrs={'type': 'time'}),
         }
+
+    def clean_valor_mano_obra(self):
+        return self.cleaned_data.get('valor_mano_obra') or Decimal('0.00')
+
 
 class CierreOtActividadForm(forms.ModelForm):
     actividad = forms.ModelChoiceField(

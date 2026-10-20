@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, FileResponse, Http404, StreamingHttpResponse
+from django.http import JsonResponse, FileResponse, Http404, StreamingHttpResponse, HttpResponseBadRequest
 from django.views.decorators.http import require_POST
 import json
 import mimetypes
@@ -986,6 +986,226 @@ def listar_ot(request):
         'puede_cargar_materiales': es_tecnico,
         'materiales_catalogo': Material.objects.order_by('nombre') if es_tecnico else Material.objects.none(),
     })
+
+
+def _tarifa_hora_rentabilidad(configuracion):
+    if configuracion.tipo_pago == 'por_dia':
+        if configuracion.valor_dia is None:
+            return None
+        return Decimal(configuracion.valor_dia) / Decimal('7')
+    if configuracion.tipo_pago == 'salario_fijo':
+        if configuracion.salario_mensual is None:
+            return None
+        return Decimal(configuracion.salario_mensual) / Decimal('210')
+    if configuracion.valor_hora_normal is None:
+        return None
+    return Decimal(configuracion.valor_hora_normal)
+
+
+@login_required
+def rentabilidad_admin(request):
+    if not (
+        request.user.is_staff
+        or request.user.is_superuser
+        or request.user.groups.filter(name__in=['Admin', 'Supervisor']).exists()
+    ):
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('dashboard')
+
+    hoy = timezone.localdate()
+    try:
+        fecha_inicio = datetime.date.fromisoformat(
+            request.GET.get('desde') or hoy.replace(day=1).isoformat()
+        )
+        fecha_fin = datetime.date.fromisoformat(
+            request.GET.get('hasta') or hoy.isoformat()
+        )
+    except ValueError:
+        return HttpResponseBadRequest('Las fechas deben tener formato AAAA-MM-DD.')
+    if fecha_inicio > fecha_fin:
+        return HttpResponseBadRequest('La fecha inicial no puede ser posterior a la fecha final.')
+
+    tecnicos = User.objects.filter(groups__name='Tecnico').order_by('username').distinct()
+    tecnico_id = request.GET.get('tecnico', '').strip()
+    ots = OrdenTrabajo.objects.filter(
+        cierreot__fecha_inicio_actividad__date__range=(fecha_inicio, fecha_fin),
+    )
+    if tecnico_id:
+        try:
+            tecnico = tecnicos.get(pk=int(tecnico_id))
+        except (ValueError, User.DoesNotExist):
+            return HttpResponseBadRequest('El técnico seleccionado no es válido.')
+        ots = ots.filter(tecnico_asignado=tecnico.username)
+
+    ots = ots.select_related(
+        'solicitud__equipo',
+        'solicitud__ubicacion',
+        'cierreot',
+    ).prefetch_related('materiales').order_by(
+        'cierreot__fecha_inicio_actividad',
+        'solicitud__consecutivo',
+    )
+    usernames = {ot.tecnico_asignado for ot in ots}
+    from gestion_mantenimiento.users.models import ConfiguracionPago
+
+    configuraciones = {
+        config.usuario.username: config
+        for config in ConfiguracionPago.objects.select_related('usuario').filter(
+            usuario__username__in=usernames,
+        )
+    }
+
+    filas = []
+    for ot in ots:
+        cierre = ot.cierreot
+        ingreso_materiales = sum(
+            (
+                material_ot.precio_venta_aplicado * material_ot.cantidad
+                for material_ot in ot.materiales.all()
+            ),
+            Decimal('0.00'),
+        ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        costo_materiales = sum(
+            (
+                material_ot.costo_real * material_ot.cantidad
+                for material_ot in ot.materiales.all()
+            ),
+            Decimal('0.00'),
+        ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        valor_mano_obra = cierre.valor_mano_obra or Decimal('0.00')
+        ingreso_total = ingreso_materiales + valor_mano_obra
+
+        configuracion = configuraciones.get(ot.tecnico_asignado)
+        horas = None
+        costo_nomina = None
+        motivo_sin_calculo = ''
+        if not cierre.hora_inicio or not cierre.hora_fin:
+            motivo_sin_calculo = 'Faltan las horas de inicio o fin del cierre.'
+        elif not configuracion:
+            motivo_sin_calculo = 'El técnico no tiene configuración de pago.'
+        else:
+            fecha_cierre = timezone.localtime(cierre.fecha_inicio_actividad).date()
+            inicio = datetime.datetime.combine(fecha_cierre, cierre.hora_inicio)
+            fin = datetime.datetime.combine(fecha_cierre, cierre.hora_fin)
+            if fin < inicio:
+                fin += datetime.timedelta(days=1)
+            horas = Decimal(str((fin - inicio).total_seconds())) / Decimal('3600')
+            if horas <= 0:
+                horas = None
+                motivo_sin_calculo = 'La duración registrada no es válida.'
+            else:
+                tarifa_hora = _tarifa_hora_rentabilidad(configuracion)
+                if tarifa_hora is None:
+                    horas = None
+                    motivo_sin_calculo = 'Falta el valor de pago necesario en la configuración del técnico.'
+                else:
+                    costo_nomina = (tarifa_hora * horas).quantize(
+                        Decimal('0.01'),
+                        rounding=ROUND_HALF_UP,
+                    )
+
+        ganancia = None
+        margen = None
+        if costo_nomina is not None:
+            ganancia = ingreso_total - costo_materiales - costo_nomina
+            if ingreso_total:
+                margen = (ganancia * Decimal('100') / ingreso_total).quantize(
+                    Decimal('0.01'),
+                    rounding=ROUND_HALF_UP,
+                )
+
+        filas.append({
+            'ot': ot,
+            'fecha': cierre.fecha_inicio_actividad,
+            'ingreso_materiales': ingreso_materiales,
+            'valor_mano_obra': valor_mano_obra,
+            'ingreso_total': ingreso_total,
+            'costo_materiales': costo_materiales,
+            'horas': horas,
+            'costo_nomina': costo_nomina,
+            'ganancia': ganancia,
+            'margen': margen,
+            'motivo_sin_calculo': motivo_sin_calculo,
+        })
+
+    filas_calculables = [fila for fila in filas if fila['ganancia'] is not None]
+    totales = {
+        'ingresos': sum(
+            (fila['ingreso_total'] for fila in filas_calculables),
+            Decimal('0.00'),
+        ),
+        'ingreso_materiales': sum(
+            (fila['ingreso_materiales'] for fila in filas_calculables),
+            Decimal('0.00'),
+        ),
+        'valor_mano_obra': sum(
+            (fila['valor_mano_obra'] for fila in filas_calculables),
+            Decimal('0.00'),
+        ),
+        'costo_materiales': sum(
+            (fila['costo_materiales'] for fila in filas_calculables),
+            Decimal('0.00'),
+        ),
+        'costo_nomina': sum(
+            (fila['costo_nomina'] for fila in filas_calculables),
+            Decimal('0.00'),
+        ),
+        'ganancia': sum(
+            (fila['ganancia'] for fila in filas_calculables),
+            Decimal('0.00'),
+        ),
+    }
+
+    def agrupar_filas(nombre_por_fila):
+        grupos = {}
+        for fila in filas_calculables:
+            nombre = nombre_por_fila(fila) or 'Sin asignar'
+            grupo = grupos.setdefault(nombre, {
+                'nombre': nombre,
+                'cantidad_ots': 0,
+                'ingresos': Decimal('0.00'),
+                'ingreso_materiales': Decimal('0.00'),
+                'valor_mano_obra': Decimal('0.00'),
+                'costo_materiales': Decimal('0.00'),
+                'costo_nomina': Decimal('0.00'),
+                'ganancia': Decimal('0.00'),
+            })
+            grupo['cantidad_ots'] += 1
+            grupo['ingresos'] += fila['ingreso_total']
+            grupo['ingreso_materiales'] += fila['ingreso_materiales']
+            grupo['valor_mano_obra'] += fila['valor_mano_obra']
+            grupo['costo_materiales'] += fila['costo_materiales']
+            grupo['costo_nomina'] += fila['costo_nomina']
+            grupo['ganancia'] += fila['ganancia']
+
+        return sorted(
+            grupos.values(),
+            key=lambda grupo: (-grupo['ganancia'], grupo['nombre']),
+        )
+
+    por_tecnico = agrupar_filas(
+        lambda fila: fila['ot'].tecnico_display or fila['ot'].tecnico_asignado
+    )
+    por_cliente = agrupar_filas(
+        lambda fila: fila['ot'].solicitud.ubicacion_nombre
+    )
+    return render(
+        request,
+        'Gestion_ot/rentabilidad.html',
+        {
+            'filas': filas,
+            'fecha_inicio': fecha_inicio,
+            'fecha_fin': fecha_fin,
+            'tecnicos': tecnicos,
+            'tecnico_seleccionado': tecnico_id,
+            'totales': totales,
+            'por_tecnico': por_tecnico,
+            'por_cliente': por_cliente,
+            'cantidad_calculable': len(filas_calculables),
+            'cantidad_pendiente': len(filas) - len(filas_calculables),
+        },
+    )
+
 
 # Vista para cerrar una OT
 def _ordenes_visibles_para_usuario(request):

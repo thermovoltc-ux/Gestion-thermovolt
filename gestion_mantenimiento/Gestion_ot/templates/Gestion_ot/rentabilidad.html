@@ -1,0 +1,177 @@
+{% extends "solicitudes/indexpadre.html" %}
+
+{% block title %}Rentabilidad{% endblock %}
+
+{% block content %}
+<style>
+    .profit-page { max-width: 1500px; margin: 0 auto; padding: 24px; color: #1e293b; }
+    .profit-page h1 { margin: 0 0 8px; }
+    .profit-muted { color: #64748b; }
+    .profit-note, .profit-warning { padding: 14px 16px; border-radius: 8px; margin: 16px 0; }
+    .profit-note { background: #eff6ff; color: #1e40af; }
+    .profit-warning { background: #fff7ed; color: #9a3412; }
+    .profit-filters, .profit-card, .profit-table-wrap { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(15, 23, 42, .08); }
+    .profit-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 14px; align-items: end; padding: 18px; margin: 20px 0; }
+    .profit-filters label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    .profit-filters input, .profit-filters select { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 6px; }
+    .profit-filters button { width: 100%; padding: 10px; border: 0; border-radius: 6px; background: #2563eb; color: #fff; font-weight: 700; cursor: pointer; }
+    .profit-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin: 20px 0; }
+    .profit-card { padding: 18px; }
+    .profit-card span { display: block; color: #64748b; font-size: 13px; }
+    .profit-card strong { display: block; margin-top: 8px; font-size: 24px; }
+    .profit-table-wrap { overflow-x: auto; }
+    .profit-table { width: 100%; border-collapse: collapse; min-width: 1050px; }
+    .profit-table th, .profit-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: right; white-space: nowrap; }
+    .profit-table th { background: #f1f5f9; font-size: 13px; }
+    .profit-summary { margin: 20px 0; }
+    .profit-summary h2 { font-size: 19px; margin: 0 0 10px; }
+    .profit-table th:first-child, .profit-table td:first-child,
+    .profit-table th:nth-child(2), .profit-table td:nth-child(2),
+    .profit-table th:nth-child(3), .profit-table td:nth-child(3),
+    .profit-table th:nth-child(4), .profit-table td:nth-child(4) { text-align: left; }
+    .profit-positive { color: #047857; font-weight: 700; }
+    .profit-negative { color: #b91c1c; font-weight: 700; }
+    .profit-pending { color: #b45309; white-space: normal !important; min-width: 180px; }
+    @media (max-width: 640px) { .profit-page { padding: 16px; } }
+</style>
+
+<main class="profit-page">
+    <h1>Rentabilidad por Orden de Trabajo</h1>
+    <p class="profit-muted">Período: {{ fecha_inicio|date:"d/m/Y" }} – {{ fecha_fin|date:"d/m/Y" }}</p>
+
+    <div class="profit-note">
+        El ingreso suma los materiales con su precio aplicado y el valor manual registrado para mano de obra / servicios prestados. Los servicios de precio fijo deben incluirse en ese valor manual; no se les aplica el factor 0.7.
+        El costo de nómina es una estimación con la configuración de pago vigente y las horas del cierre: pago diario / 7 horas, salario mensual / 210 horas o tarifa horaria normal para pago mixto.
+    </div>
+
+    {% if cantidad_pendiente %}
+        <div class="profit-warning">
+            {{ cantidad_pendiente }} OT(s) no tienen horas de cierre o configuración de pago; no se incluyen en los totales de rentabilidad. Hay {{ cantidad_calculable }} OT(s) calculables.
+        </div>
+    {% endif %}
+
+    <form method="get" class="profit-filters">
+        <div>
+            <label for="profit-from">Desde</label>
+            <input id="profit-from" type="date" name="desde" value="{{ fecha_inicio|date:'Y-m-d' }}" required>
+        </div>
+        <div>
+            <label for="profit-to">Hasta</label>
+            <input id="profit-to" type="date" name="hasta" value="{{ fecha_fin|date:'Y-m-d' }}" required>
+        </div>
+        <div>
+            <label for="profit-technician">Técnico</label>
+            <select id="profit-technician" name="tecnico">
+                <option value="">Todos</option>
+                {% for tecnico in tecnicos %}
+                    <option value="{{ tecnico.id }}" {% if tecnico_seleccionado == tecnico.id|stringformat:"s" %}selected{% endif %}>
+                        {{ tecnico.get_full_name|default:tecnico.username }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div><button type="submit">Aplicar filtros</button></div>
+    </form>
+
+    <p class="profit-muted">Totales correspondientes a {{ cantidad_calculable }} OT(s) con costo de nómina calculable.</p>
+    <section class="profit-kpis" aria-label="Totales de rentabilidad calculables">
+        <div class="profit-card"><span>Ingreso total</span><strong>${{ totales.ingresos|floatformat:2 }}</strong></div>
+        <div class="profit-card"><span>Mano de obra facturada</span><strong>${{ totales.valor_mano_obra|floatformat:2 }}</strong></div>
+        <div class="profit-card"><span>Costo de materiales</span><strong>${{ totales.costo_materiales|floatformat:2 }}</strong></div>
+        <div class="profit-card"><span>Nómina estimada</span><strong>${{ totales.costo_nomina|floatformat:2 }}</strong></div>
+        <div class="profit-card"><span>Ganancia estimada</span><strong>${{ totales.ganancia|floatformat:2 }}</strong></div>
+    </section>
+
+    <section class="profit-summary">
+        <h2>Rentabilidad por técnico</h2>
+        <div class="profit-table-wrap">
+            <table class="profit-table">
+                <thead><tr><th>Técnico</th><th>OTs</th><th>Ingreso total</th><th>Mano de obra</th><th>Costos materiales</th><th>Nómina estimada</th><th>Ganancia estimada</th></tr></thead>
+                <tbody>
+                    {% for resumen in por_tecnico %}
+                        <tr>
+                            <td>{{ resumen.nombre }}</td>
+                            <td>{{ resumen.cantidad_ots }}</td>
+                            <td>${{ resumen.ingresos|floatformat:2 }}</td>
+                            <td>${{ resumen.valor_mano_obra|floatformat:2 }}</td>
+                            <td>${{ resumen.costo_materiales|floatformat:2 }}</td>
+                            <td>${{ resumen.costo_nomina|floatformat:2 }}</td>
+                            <td>${{ resumen.ganancia|floatformat:2 }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="7" class="profit-muted" style="text-align:center;">No hay OTs calculables para agrupar.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="profit-summary">
+        <h2>Rentabilidad por cliente</h2>
+        <div class="profit-table-wrap">
+            <table class="profit-table">
+                <thead><tr><th>Cliente</th><th>OTs</th><th>Ingreso total</th><th>Mano de obra</th><th>Costos materiales</th><th>Nómina estimada</th><th>Ganancia estimada</th></tr></thead>
+                <tbody>
+                    {% for resumen in por_cliente %}
+                        <tr>
+                            <td>{{ resumen.nombre }}</td>
+                            <td>{{ resumen.cantidad_ots }}</td>
+                            <td>${{ resumen.ingresos|floatformat:2 }}</td>
+                            <td>${{ resumen.valor_mano_obra|floatformat:2 }}</td>
+                            <td>${{ resumen.costo_materiales|floatformat:2 }}</td>
+                            <td>${{ resumen.costo_nomina|floatformat:2 }}</td>
+                            <td>${{ resumen.ganancia|floatformat:2 }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="7" class="profit-muted" style="text-align:center;">No hay OTs calculables para agrupar.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="profit-table-wrap">
+        <table class="profit-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>OT</th>
+                    <th>Técnico</th>
+                    <th>Cliente</th>
+                    <th>Ingreso materiales</th>
+                    <th>Mano de obra</th>
+                    <th>Ingreso total</th>
+                    <th>Costo materiales</th>
+                    <th>Nómina estimada</th>
+                    <th>Ganancia estimada</th>
+                    <th>Margen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in filas %}
+                    <tr>
+                        <td>{{ fila.fecha|date:"d/m/Y" }}</td>
+                        <td>OT-{{ fila.ot.solicitud.consecutivo }}</td>
+                        <td>{{ fila.ot.tecnico_display|default:fila.ot.tecnico_asignado }}</td>
+                        <td>{{ fila.ot.solicitud.ubicacion_nombre|default:"—" }}</td>
+                        <td>${{ fila.ingreso_materiales|floatformat:2 }}</td>
+                        <td>${{ fila.valor_mano_obra|floatformat:2 }}</td>
+                        <td>${{ fila.ingreso_total|floatformat:2 }}</td>
+                        <td>${{ fila.costo_materiales|floatformat:2 }}</td>
+                        {% if fila.costo_nomina != None %}
+                            <td>${{ fila.costo_nomina|floatformat:2 }}<br><small>{{ fila.horas|floatformat:2 }} h</small></td>
+                            <td class="{% if fila.ganancia < 0 %}profit-negative{% else %}profit-positive{% endif %}">${{ fila.ganancia|floatformat:2 }}</td>
+                            <td>{% if fila.margen != None %}{{ fila.margen|floatformat:2 }}%{% else %}—{% endif %}</td>
+                        {% else %}
+                            <td class="profit-pending">Pendiente</td>
+                            <td class="profit-pending" colspan="3">{{ fila.motivo_sin_calculo }}</td>
+                        {% endif %}
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="11" class="profit-muted" style="text-align:center;">No hay OTs cerradas en este período.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</main>
+{% endblock %}

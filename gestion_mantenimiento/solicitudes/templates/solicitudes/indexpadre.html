@@ -50,6 +50,16 @@
                 </li>
 
                 {% if user.is_authenticated %}
+                    {% if is_admin %}
+                        <li>
+                            <a href="{% url 'rentabilidad_admin' %}" class="{% if 'rentabilidad' in request.path %}active{% endif %}">
+                                <span class="icon">
+                                    <ion-icon name="stats-chart-outline"></ion-icon>
+                                </span>
+                                <span class="title">Rentabilidad</span>
+                            </a>
+                        </li>
+                    {% endif %}
                     {% if request.session.tipo_cuenta == 'administrador' %}
                         <!-- Elementos accesibles solo para administradores -->
                         <li>

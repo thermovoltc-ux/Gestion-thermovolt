@@ -746,3 +746,128 @@ class GoogleDriveMediaStorageTests(TestCase):
                 reverse('drive_media', args=['private-file-id'])
             )
             self.assertEqual(response.status_code, 404)
+
+
+class RentabilidadAdminTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from gestion_mantenimiento.users.models import ConfiguracionPago
+
+        self.user_model = get_user_model()
+        self.tecnico = self.user_model.objects.create_user(
+            username='tecnico-rentabilidad',
+            password='test-password',
+        )
+        self.tecnico.groups.add(Group.objects.get_or_create(name='Tecnico')[0])
+        self.admin = self.user_model.objects.create_user(
+            username='supervisor-rentabilidad',
+            password='test-password',
+        )
+        self.admin.groups.add(Group.objects.get_or_create(name='Supervisor')[0])
+        self.ubicacion = Ubicacion.objects.create(
+            nombre='Cliente rentabilidad',
+            codigo='UBI-RENT',
+        )
+        self.equipo = Equipo.objects.create(
+            nombre='Equipo rentabilidad',
+            codigo='EQ-RENT',
+            ubicacion=self.ubicacion,
+        )
+        self.estado, _ = Estado.objects.get_or_create(nombre='finalizada')
+        solicitud = Solicitud.objects.create(
+            creado_por=self.tecnico.username,
+            descripcion_problema='Prueba rentabilidad',
+            equipo=self.equipo,
+            ubicacion=self.ubicacion,
+            estado=self.estado,
+        )
+        self.ot = OrdenTrabajo.objects.create(
+            solicitud=solicitud,
+            tecnico_asignado=self.tecnico.username,
+            estado=self.estado,
+        )
+        hoy = timezone.localdate()
+        fecha_cierre = timezone.make_aware(
+            datetime.combine(hoy, datetime.min.time().replace(hour=11))
+        )
+        CierreOt.objects.create(
+            orden_trabajo=self.ot,
+            fecha_inicio_actividad=fecha_cierre,
+            hora_inicio=datetime.min.time().replace(hour=9),
+            hora_fin=datetime.min.time().replace(hour=11),
+            valor_mano_obra=Decimal('60.00'),
+        )
+        self.material = Material.objects.create(
+            codigo='MAT-RENT-001',
+            nombre='Material rentabilidad',
+            costo_base=Decimal('50.00'),
+            precio_venta_sugerido=Decimal('100.00'),
+        )
+        MaterialOT.objects.create(
+            orden_trabajo=self.ot,
+            material=self.material,
+            cantidad=Decimal('2.00'),
+            costo_real=Decimal('50.00'),
+            precio_venta_aplicado=Decimal('100.00'),
+        )
+        ConfiguracionPago.objects.create(
+            usuario=self.tecnico,
+            tipo_pago='por_dia',
+            valor_dia=Decimal('700.00'),
+        )
+
+    def test_supervisor_can_access_and_sees_rentabilidad_link(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('rentabilidad_admin'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Rentabilidad por Orden de Trabajo')
+        self.assertContains(response, reverse('rentabilidad_admin'))
+
+    def test_technician_is_redirected_without_access(self):
+        self.client.force_login(self.tecnico)
+
+        response = self.client.get(reverse('rentabilidad_admin'))
+
+        self.assertRedirects(response, reverse('dashboard'))
+
+    def test_calculates_material_and_manual_labor_income_payroll_and_gain(self):
+        self.client.force_login(self.admin)
+        hoy = timezone.localdate().isoformat()
+        response = self.client.get(
+            reverse('rentabilidad_admin'),
+            {'desde': hoy, 'hasta': hoy, 'tecnico': self.tecnico.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['cantidad_calculable'], 1)
+        self.assertEqual(response.context['totales']['ingreso_materiales'], Decimal('200.00'))
+        self.assertEqual(response.context['totales']['valor_mano_obra'], Decimal('60.00'))
+        self.assertEqual(response.context['totales']['ingresos'], Decimal('260.00'))
+        self.assertEqual(response.context['totales']['costo_materiales'], Decimal('100.00'))
+        self.assertEqual(response.context['totales']['costo_nomina'], Decimal('200.00'))
+        self.assertEqual(response.context['totales']['ganancia'], Decimal('-40.00'))
+        self.assertEqual(response.context['por_tecnico'][0]['cantidad_ots'], 1)
+        self.assertEqual(response.context['por_cliente'][0]['ganancia'], Decimal('-40.00'))
+        self.assertContains(response, 'Ingreso total')
+        self.assertContains(response, 'Mano de obra facturada')
+
+    def test_manual_labor_form_field_is_optional_and_defaults_to_zero(self):
+        from gestion_mantenimiento.Gestion_ot.forms import CierreOtForm
+
+        cierre = self.ot.cierreot
+        form = CierreOtForm(data={}, instance=cierre)
+        form.full_clean()
+
+        self.assertFalse(form.fields['valor_mano_obra'].required)
+        self.assertEqual(form.cleaned_data['valor_mano_obra'], Decimal('0.00'))
+
+    def test_invalid_date_range_is_rejected(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('rentabilidad_admin'),
+            {'desde': '2026-10-20', 'hasta': '2026-10-01'},
+        )
+
+        self.assertEqual(response.status_code, 400)

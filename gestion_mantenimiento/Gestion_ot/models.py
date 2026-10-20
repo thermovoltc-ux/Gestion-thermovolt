@@ -51,6 +51,12 @@ class CierreOt(models.Model):
     correo_tecnico = models.EmailField(null=True, blank=True)
     descripcion_falla = models.TextField(null=True, blank=True)
     fecha_inicio_actividad = models.DateTimeField(null=True, blank=True)
+    valor_mano_obra = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text='Valor total cobrado por servicios prestados / mano de obra.',
+    )
     observaciones = models.TextField(null=True, blank=True)
     nombre_tecnico = models.CharField(max_length=255, null=True, blank=True)
     firma_tecnico = models.TextField(null=True, blank=True)  # Firma del técnico en base64
