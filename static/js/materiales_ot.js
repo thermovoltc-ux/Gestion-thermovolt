@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const addButton = document.getElementById('btn-guardar-material');
     const createButton = document.getElementById('btn-crear-nuevo');
     let activeTrigger = null;
+    let returnToAddModal = false;
 
     function showModal(modal) {
         modal.hidden = false;
@@ -105,12 +106,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('btn-abrir-modal-nuevo-material').addEventListener('click', function () {
         createError.textContent = '';
+        returnToAddModal = !addModal.hidden;
+        hideModal(addModal);
         showModal(createModal);
         document.getElementById('nuevo-categoria').focus();
     });
 
     document.getElementById('btn-cancelar-nuevo').addEventListener('click', function () {
         hideModal(createModal);
+        if (returnToAddModal) {
+            showModal(addModal);
+            select.focus();
+        }
     });
 
     select.addEventListener('change', function () {
@@ -200,6 +207,10 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('nuevo-nombre').value = '';
             document.getElementById('nuevo-costo').value = '';
             hideModal(createModal);
+            if (returnToAddModal) {
+                showModal(addModal);
+            }
+            returnToAddModal = false;
             select.focus();
         } catch (error) {
             displayErrors(createError, error);
@@ -208,17 +219,22 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    [addModal, createModal].forEach(function (modal) {
-        modal.addEventListener('click', function (event) {
-            if (event.target === modal) {
-                hideModal(modal);
-            }
-        });
+    addModal.addEventListener('click', function (event) {
+        if (event.target === addModal) hideModal(addModal);
+    });
+    createModal.addEventListener('click', function (event) {
+        if (event.target === createModal) {
+            hideModal(createModal);
+            if (returnToAddModal) showModal(addModal);
+        }
     });
 
     document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape') {
+        if (event.key === 'Escape' && !createModal.hidden) {
             hideModal(createModal);
+            if (returnToAddModal) showModal(addModal);
+            returnToAddModal = false;
+        } else if (event.key === 'Escape' && !addModal.hidden) {
             hideModal(addModal);
         }
     });

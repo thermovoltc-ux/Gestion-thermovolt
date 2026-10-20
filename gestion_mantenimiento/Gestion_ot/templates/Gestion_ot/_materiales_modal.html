@@ -44,9 +44,11 @@
         <div class="materiales-ot-field">
             <label for="nuevo-categoria">Categoría</label>
             <select id="nuevo-categoria" class="form-control" required>
-                {% for valor, etiqueta in material_catalogo_form.fields.categoria.choices %}
-                <option value="{{ valor }}">{{ etiqueta }}</option>
-                {% endfor %}
+                <option value="repuestos">Repuestos</option>
+                <option value="servicios">Servicios</option>
+                <option value="maquinaria">Maquinaria</option>
+                <option value="frio">Frío / Refrigeración</option>
+                <option value="locativos">Locativos</option>
             </select>
         </div>
         <div class="materiales-ot-field">

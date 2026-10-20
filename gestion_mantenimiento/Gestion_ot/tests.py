@@ -584,6 +584,18 @@ class MaterialOTAjaxTests(TestCase):
         self.assertContains(response, 'Rodamiento')
         self.assertContains(response, 'materiales_ot.js')
         self.assertContains(response, 'nuevo-categoria')
+        for value, label in (
+            ('repuestos', 'Repuestos'),
+            ('servicios', 'Servicios'),
+            ('maquinaria', 'Maquinaria'),
+            ('frio', 'Frío / Refrigeración'),
+            ('locativos', 'Locativos'),
+        ):
+            self.assertContains(
+                response,
+                f'<option value="{value}">{label}</option>',
+                html=True,
+            )
         self.assertNotContains(response, 'nuevo-codigo')
 
     def test_ot_list_shows_quick_material_button_only_for_assigned_in_process_orders(self):
@@ -1095,6 +1107,18 @@ class RentabilidadAdminTests(TestCase):
         self.assertContains(response, 'admin-open-create-material')
         self.assertContains(response, 'admin-create-material-modal')
         self.assertContains(response, reverse('crear_material_ajax', args=[self.ot.pk]))
+        for value, label in (
+            ('repuestos', 'Repuestos'),
+            ('servicios', 'Servicios'),
+            ('maquinaria', 'Maquinaria'),
+            ('frio', 'Frío / Refrigeración'),
+            ('locativos', 'Locativos'),
+        ):
+            self.assertContains(
+                response,
+                f'<option value="{value}">{label}</option>',
+                html=True,
+            )
 
     def test_admin_can_correct_or_delete_order_material(self):
         material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
