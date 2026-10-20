@@ -924,6 +924,7 @@ class RentabilidadAdminTests(TestCase):
             {
                 'valor_mano_obra': '500000.00',
                 'estado': self.estado_revision.pk,
+                'estado_facturacion': 'facturada',
             },
             HTTP_X_REQUESTED_WITH='XMLHttpRequest',
         )
@@ -934,10 +935,13 @@ class RentabilidadAdminTests(TestCase):
         self.assertEqual(response.json()['total_facturado'], '500200.00')
         self.assertEqual(response.json()['costo_nomina'], '200.00')
         self.assertEqual(response.json()['ganancia'], '499900.00')
+        self.assertEqual(response.json()['margen'], '99.94')
+        self.assertEqual(response.json()['estado_facturacion'], 'facturada')
         self.ot.refresh_from_db()
         self.assertEqual(self.ot.estado, self.estado_revision)
         self.ot.cierreot.refresh_from_db()
         self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('500000.00'))
+        self.assertEqual(self.ot.cierreot.estado_facturacion, 'facturada')
 
     def test_admin_can_correct_or_delete_order_material(self):
         material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
@@ -984,7 +988,7 @@ class RentabilidadAdminTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'Valor cobrado por mano de obra')
 
-    def test_supervisor_list_uses_admin_management_link(self):
+    def test_supervisor_list_keeps_the_original_closure_link(self):
         self.client.force_login(self.admin)
 
         response = self.client.get(reverse('listar_ot'))
@@ -992,5 +996,34 @@ class RentabilidadAdminTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
+            reverse('cierre_ot', args=[self.ot.pk]),
+        )
+        self.assertNotContains(response, reverse('gestionar_ot_admin', args=[self.ot.pk]))
+        self.assertContains(response, reverse('facturacion_admin'))
+
+    def test_invoice_queue_only_shows_closed_orders_not_yet_invoiced(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('facturacion_admin'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Facturación pendiente')
+        self.assertContains(
+            response,
             reverse('gestionar_ot_admin', args=[self.ot.pk]),
         )
+        self.assertContains(response, 'Pendiente de facturar')
+
+        self.ot.cierreot.estado_facturacion = 'facturada'
+        self.ot.cierreot.save(update_fields=['estado_facturacion'])
+        response = self.client.get(reverse('facturacion_admin'))
+        self.assertNotContains(
+            response,
+            reverse('gestionar_ot_admin', args=[self.ot.pk]),
+        )
+
+    def test_technician_cannot_access_invoice_queue(self):
+        self.client.force_login(self.tecnico)
+
+        response = self.client.get(reverse('facturacion_admin'))
+
+        self.assertRedirects(response, reverse('dashboard'))

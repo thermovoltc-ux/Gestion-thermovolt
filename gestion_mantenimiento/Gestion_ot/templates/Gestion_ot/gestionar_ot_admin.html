@@ -114,7 +114,12 @@
             <div>
                 <label for="{{ form.estado.id_for_label }}"><strong>Estado de la OT</strong></label>
                 {{ form.estado }}
-                <small>Opciones disponibles del flujo actual.</small>
+                <small>Estado operativo de la orden.</small>
+            </div>
+            <div>
+                <label for="{{ form.estado_facturacion.id_for_label }}"><strong>Estado de facturación</strong></label>
+                {{ form.estado_facturacion }}
+                <small>Este estado es independiente del flujo del técnico.</small>
             </div>
         </div>
         <button type="submit" class="admin-ot-btn" style="margin-top:14px;">Guardar facturación y estado</button>
@@ -126,13 +131,15 @@
         <div class="admin-ot-financials"
              data-total-materiales="{{ resumen.ingreso_materiales }}"
              data-costo-materiales="{{ resumen.costo_materiales }}"
-             data-costo-nomina="{{ resumen.costo_nomina|default_if_none:'' }}">
+             data-costo-nomina="{{ resumen.costo_nomina|default_if_none:'' }}"
+             data-ingreso-total="{{ resumen.ingreso_total }}">
             <div class="admin-ot-kpi"><span>Total venta de materiales</span><strong id="admin-material-total">${{ resumen.ingreso_materiales|floatformat:2 }}</strong></div>
             <div class="admin-ot-kpi"><span>Mano de obra</span><strong id="admin-labor-total">${{ resumen.valor_mano_obra|floatformat:2 }}</strong></div>
             <div class="admin-ot-kpi"><span>Total facturado</span><strong id="admin-invoice-total">${{ resumen.ingreso_total|floatformat:2 }}</strong></div>
-            <div class="admin-ot-kpi"><span>Costo de materiales</span><strong>${{ resumen.costo_materiales|floatformat:2 }}</strong></div>
+            <div class="admin-ot-kpi"><span>Costo de materiales</span><strong id="admin-material-cost">${{ resumen.costo_materiales|floatformat:2 }}</strong></div>
             <div class="admin-ot-kpi"><span>Nómina estimada</span><strong id="admin-payroll-total">{% if resumen.costo_nomina != None %}${{ resumen.costo_nomina|floatformat:2 }}{% else %}Sin datos de horas o nómina{% endif %}</strong></div>
             <div class="admin-ot-kpi"><span>Ganancia estimada</span><strong id="admin-profit-total">{% if resumen.ganancia != None %}${{ resumen.ganancia|floatformat:2 }}{% else %}No calculable{% endif %}</strong></div>
+            <div class="admin-ot-kpi"><span>Margen estimado</span><strong id="admin-margin-total">{% if resumen.margen != None %}{{ resumen.margen|floatformat:2 }}%{% else %}—{% endif %}</strong></div>
         </div>
     </section>
 </main>
@@ -146,10 +153,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const laborInput = document.getElementById('{{ form.valor_mano_obra.id_for_label }}');
     const finance = document.querySelector('.admin-ot-financials');
     const totalMaterialsEl = document.getElementById('admin-material-total');
+    const materialCostEl = document.getElementById('admin-material-cost');
     const laborEl = document.getElementById('admin-labor-total');
     const invoiceEl = document.getElementById('admin-invoice-total');
     const payrollEl = document.getElementById('admin-payroll-total');
     const profitEl = document.getElementById('admin-profit-total');
+    const marginEl = document.getElementById('admin-margin-total');
     const messageEl = document.getElementById('admin-ot-save-message');
     const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
     const money = value => '$' + Number(value || 0).toLocaleString('es-CO', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -164,16 +173,32 @@ document.addEventListener('DOMContentLoaded', function () {
         return total;
     }
 
+    function materialCostTotal() {
+        let total = 0;
+        document.querySelectorAll('.admin-ot-material-form').forEach(function (materialForm) {
+            const quantity = Number(materialForm.querySelector('[name=cantidad]').value || 0);
+            const cost = Number(materialForm.querySelector('[name=costo_real]').value || 0);
+            total += quantity * cost;
+        });
+        return total;
+    }
+
     function updatePreview() {
         const materials = materialTotal();
+        const materialCost = materialCostTotal();
         const labor = Number(laborInput.value || 0);
         const invoice = materials + labor;
         const payrollRaw = finance.dataset.costoNomina;
         totalMaterialsEl.textContent = money(materials);
+        materialCostEl.textContent = money(materialCost);
         laborEl.textContent = money(labor);
         invoiceEl.textContent = money(invoice);
+        finance.dataset.ingresoTotal = invoice;
+        finance.dataset.costoMateriales = materialCost;
         if (payrollRaw !== '') {
-            profitEl.textContent = money(invoice - Number(finance.dataset.costoMateriales || 0) - Number(payrollRaw));
+            const profit = invoice - Number(finance.dataset.costoMateriales || 0) - Number(payrollRaw);
+            profitEl.textContent = money(profit);
+            marginEl.textContent = invoice ? ((profit * 100 / invoice).toFixed(2) + '%') : '—';
         }
     }
 
@@ -199,8 +224,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             finance.dataset.totalMateriales = data.total_materiales;
             if (data.costo_nomina !== null) finance.dataset.costoNomina = data.costo_nomina;
+            if (data.estado_facturacion === 'facturada') {
+                messageEl.textContent = 'Facturación guardada y OT marcada como facturada. Ya no aparecerá en pendientes.';
+            }
             messageEl.classList.remove('error');
-            messageEl.textContent = 'Facturación y estado guardados.';
+            if (data.estado_facturacion !== 'facturada') {
+                messageEl.textContent = 'Facturación y estado guardados.';
+            }
             updatePreview();
         } catch (error) {
             messageEl.classList.add('error');

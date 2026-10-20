@@ -44,8 +44,19 @@ class OrdenTrabajo(models.Model):
         return ''
 
 class CierreOt(models.Model):
+    ESTADO_FACTURACION_CHOICES = [
+        ('pendiente', 'Pendiente de facturar'),
+        ('facturada', 'Facturada'),
+    ]
+
     orden_trabajo = models.OneToOneField(OrdenTrabajo, on_delete=models.CASCADE)
     estado = models.ForeignKey(Estado, on_delete=models.SET_NULL, null=True, default=1)
+    estado_facturacion = models.CharField(
+        max_length=20,
+        choices=ESTADO_FACTURACION_CHOICES,
+        default='pendiente',
+        db_index=True,
+    )
     tipo_mantenimiento = models.CharField(max_length=255, null=True, blank=True)
     materiales_utilizados = models.TextField(null=True, blank=True)
     correo_tecnico = models.EmailField(null=True, blank=True)

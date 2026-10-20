@@ -67,11 +67,7 @@
                             style="border:none; background:none; cursor:pointer; padding:0; margin-right:8px;">
                             <ion-icon name="eye-outline" style="font-size:1.3em; vertical-align:middle;"></ion-icon>
                         </button>
-                        {% if puede_gestionar_ot %}
-                        <a class="action-link" href="{% url 'gestionar_ot_admin' ot.id %}" data-gestionar-url="{% url 'gestionar_ot_admin' ot.id %}">Gestionar</a>
-                        {% else %}
                         <a class="action-link" href="{% url 'cierre_ot' ot.id %}" data-gestionar-url="{% url 'cierre_ot' ot.id %}">Gestionar</a>
-                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

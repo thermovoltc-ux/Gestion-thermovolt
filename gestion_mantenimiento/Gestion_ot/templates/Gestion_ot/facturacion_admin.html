@@ -1,0 +1,54 @@
+{% extends "solicitudes/indexpadre.html" %}
+
+{% block title %}Facturación de órdenes de trabajo{% endblock %}
+
+{% block content %}
+<style>
+    .billing-queue { max-width: 1400px; margin: 0 auto; padding: 24px; color: #1e293b; }
+    .billing-queue h1 { margin: 0 0 8px; }
+    .billing-queue .muted { color: #64748b; }
+    .billing-queue-card { background: #fff; border-radius: 12px; overflow-x: auto; margin-top: 20px; box-shadow: 0 2px 8px rgba(15,23,42,.08); }
+    .billing-queue table { width: 100%; min-width: 820px; border-collapse: collapse; }
+    .billing-queue th, .billing-queue td { padding: 13px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+    .billing-queue th { background: #f1f5f9; }
+    .billing-queue .status { display: inline-block; border-radius: 999px; background: #fff7ed; color: #9a3412; padding: 4px 10px; font-size: 13px; }
+    .billing-queue .action { display: inline-block; border-radius: 6px; background: #2563eb; color: #fff; padding: 8px 12px; text-decoration: none; font-weight: 600; }
+    @media (max-width: 640px) { .billing-queue { padding: 14px; } }
+</style>
+
+<main class="billing-queue">
+    <h1>Facturación pendiente</h1>
+    <p class="muted">Órdenes en revisión o finalizadas que todavía no tienen estado de facturación “Facturada”.</p>
+
+    <div class="billing-queue-card">
+        <table>
+            <thead>
+                <tr>
+                    <th>OT</th>
+                    <th>Técnico</th>
+                    <th>Cliente</th>
+                    <th>Fecha</th>
+                    <th>Estado de OT</th>
+                    <th>Facturación</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ot in ots %}
+                    <tr>
+                        <td>OT-{{ ot.solicitud.consecutivo }}</td>
+                        <td>{{ ot.tecnico_display|default:ot.tecnico_asignado }}</td>
+                        <td>{{ ot.solicitud.ubicacion_nombre|default:"—" }}</td>
+                        <td>{{ ot.cierreot.fecha_inicio_actividad|date:"d/m/Y"|default:"—" }}</td>
+                        <td>{{ ot.estado }}</td>
+                        <td><span class="status">{{ ot.cierreot.get_estado_facturacion_display }}</span></td>
+                        <td><a class="action" href="{% url 'gestionar_ot_admin' ot.pk %}">Facturar / Gestionar</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="muted" style="text-align:center;padding:24px;">No hay órdenes pendientes de facturar.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</main>
+{% endblock %}

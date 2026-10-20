@@ -980,10 +980,7 @@ def listar_ot(request):
             calendar_events.append({
                 'title': f"OT-{ot.solicitud.consecutivo} - {ot.tecnico_asignado}",
                 'start': ot.fecha_actividad.date().isoformat(),
-                'url': reverse(
-                    'gestionar_ot_admin' if _es_admin_rentabilidad(request.user) else 'cierre_ot',
-                    args=[ot.id],
-                ),
+                'url': reverse('cierre_ot', args=[ot.id]),
                 'backgroundColor': event_color,
                 'borderColor': event_color,
                 'textColor': '#ffffff',
@@ -997,7 +994,6 @@ def listar_ot(request):
         'calendar_events_json': json.dumps(calendar_events),
         'vista_calendario': vista_calendario,
         'puede_cargar_materiales': es_tecnico,
-        'puede_gestionar_ot': _es_admin_rentabilidad(request.user),
         'materiales_catalogo': Material.objects.order_by('nombre') if es_tecnico else Material.objects.none(),
     })
 
@@ -1069,8 +1065,14 @@ def _calcular_costos_ot(ot, cierre):
                     )
 
     ganancia = None
+    margen = None
     if costo_nomina is not None:
         ganancia = ingreso_total - costo_materiales - costo_nomina
+        if ingreso_total:
+            margen = (ganancia * Decimal('100') / ingreso_total).quantize(
+                Decimal('0.01'),
+                rounding=ROUND_HALF_UP,
+            )
 
     return {
         'ingreso_materiales': ingreso_materiales,
@@ -1080,7 +1082,30 @@ def _calcular_costos_ot(ot, cierre):
         'horas': horas,
         'costo_nomina': costo_nomina,
         'ganancia': ganancia,
+        'margen': margen,
     }
+
+
+@login_required
+def facturacion_admin(request):
+    if not _es_admin_rentabilidad(request.user):
+        messages.error(request, 'No tenés permiso para acceder a Facturación.')
+        return redirect('dashboard')
+
+    ots = OrdenTrabajo.objects.filter(
+        estado__nombre__in=['en revision', 'finalizada'],
+        cierreot__estado_facturacion='pendiente',
+    ).select_related(
+        'estado',
+        'solicitud__equipo',
+        'solicitud__ubicacion',
+        'cierreot',
+    ).order_by('-cierreot__fecha_inicio_actividad', '-pk')
+    return render(
+        request,
+        'Gestion_ot/facturacion_admin.html',
+        {'ots': ots},
+    )
 
 
 @login_required
@@ -1163,6 +1188,8 @@ def actualizar_mano_obra(request, ot_id):
         'total_facturado': resumen['ingreso_total'],
         'costo_nomina': resumen['costo_nomina'],
         'ganancia': resumen['ganancia'],
+        'margen': resumen['margen'],
+        'estado_facturacion': cierre.estado_facturacion,
         'estado': cierre.orden_trabajo.estado.get_nombre_display()
         if hasattr(cierre.orden_trabajo.estado, 'get_nombre_display')
         else str(cierre.orden_trabajo.estado or ''),

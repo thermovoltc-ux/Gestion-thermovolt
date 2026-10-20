@@ -95,7 +95,7 @@ class CierreOtFacturacionForm(forms.ModelForm):
 
     class Meta:
         model = CierreOt
-        fields = ['valor_mano_obra']
+        fields = ['valor_mano_obra', 'estado_facturacion']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -9,6 +9,7 @@ urlpatterns = [
     path('actualizar_estado_solicitud/', views.actualizar_estado_solicitud, name='actualizar_estado_solicitud'),
     path('listar_ot/', views.listar_ot, name='listar_ot'),
     path('rentabilidad/', views.rentabilidad_admin, name='rentabilidad_admin'),
+    path('facturacion/', views.facturacion_admin, name='facturacion_admin'),
     path('gestionar_ot/<int:ot_id>/', views.gestionar_ot_admin, name='gestionar_ot_admin'),
     path('gestionar_ot/<int:ot_id>/mano-obra/', views.actualizar_mano_obra, name='actualizar_mano_obra'),
     path(
