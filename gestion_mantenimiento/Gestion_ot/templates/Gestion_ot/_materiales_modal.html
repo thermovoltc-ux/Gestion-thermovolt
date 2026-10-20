@@ -42,8 +42,12 @@
     <div class="materiales-ot-modal-content">
         <h3 id="titulo-modal-nuevo-material">Crear nuevo repuesto</h3>
         <div class="materiales-ot-field">
-            <label for="nuevo-codigo">Código (SKU)</label>
-            <input type="text" id="nuevo-codigo" class="form-control" maxlength="50" required>
+            <label for="nuevo-categoria">Categoría</label>
+            <select id="nuevo-categoria" class="form-control" required>
+                {% for valor, etiqueta in material_catalogo_form.fields.categoria.choices %}
+                <option value="{{ valor }}">{{ etiqueta }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="materiales-ot-field">
             <label for="nuevo-nombre">Nombre</label>

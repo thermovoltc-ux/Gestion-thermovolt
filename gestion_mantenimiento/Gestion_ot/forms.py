@@ -256,15 +256,14 @@ class MaterialForm(forms.ModelForm):
 
     class Meta:
         model = Material
-        fields = ['codigo', 'nombre', 'costo_base']
+        fields = ['categoria', 'nombre', 'costo_base']
         widgets = {
-            'codigo': forms.TextInput(attrs={
+            'categoria': forms.Select(attrs={
                 'class': 'form-control',
-                'placeholder': 'Ej: RCT001',
             }),
             'nombre': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Ej: Rodamiento 6205',
+                'placeholder': 'Ej: Pulsador Verde',
             }),
         }
 

@@ -2,6 +2,7 @@ from datetime import datetime, timezone as datetime_timezone
 from decimal import Decimal
 from io import BytesIO
 from io import StringIO
+import json
 import os
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -493,7 +494,7 @@ class MaterialOTAjaxTests(TestCase):
 
         response = self.client.post(
             reverse('crear_material_ajax', args=[self.ot.pk]),
-            data='{"codigo":"MAT-READONLY","nombre":"Material no permitido","costo_base":"10.00"}',
+            data='{"categoria":"repuestos","nombre":"Material no permitido","costo_base":"10.00"}',
             content_type='application/json',
         )
         self.assertEqual(response.status_code, 400)
@@ -502,27 +503,78 @@ class MaterialOTAjaxTests(TestCase):
     def test_creates_catalog_material_with_suggested_markup(self):
         response = self.client.post(
             reverse('crear_material_ajax', args=[self.ot.pk]),
-            data='{"codigo":"MAT-002","nombre":"Correa","costo_base":"7.00"}',
+            data='{"categoria":"servicios","nombre":"Correa","costo_base":"7.00"}',
             content_type='application/json',
         )
 
         self.assertEqual(response.status_code, 201)
-        material = Material.objects.get(codigo='MAT-002')
+        material = Material.objects.get(codigo='SCOR01')
         self.assertEqual(material.precio_venta_sugerido, Decimal('10.00'))
+        self.assertEqual(material.categoria, 'servicios')
 
     def test_catalog_price_field_fits_the_full_supported_base_cost(self):
         response = self.client.post(
             reverse('crear_material_ajax', args=[self.ot.pk]),
-            data='{"codigo":"MAT-MAX","nombre":"Material costo alto","costo_base":"9999999999.99"}',
+            data='{"categoria":"repuestos","nombre":"Material costo alto","costo_base":"9999999999.99"}',
             content_type='application/json',
         )
 
         self.assertEqual(response.status_code, 201)
-        material = Material.objects.get(codigo='MAT-MAX')
+        material = Material.objects.get(codigo='RMC01')
         self.assertEqual(
             material.precio_venta_sugerido,
             Decimal('14285714285.70'),
         )
+
+    def test_catalog_codes_use_category_name_initials_and_increment(self):
+        from gestion_mantenimiento.Gestion_ot.forms import MaterialForm
+
+        def crear_material():
+            return self.client.post(
+                reverse('crear_material_ajax', args=[self.ot.pk]),
+                data='{"categoria":"repuestos","nombre":"Pulsador Verde","costo_base":"7.00"}',
+                content_type='application/json',
+            )
+
+        primera_respuesta = crear_material()
+        segunda_respuesta = crear_material()
+
+        self.assertEqual(primera_respuesta.status_code, 201)
+        self.assertEqual(primera_respuesta.json()['codigo'], 'RPV01')
+        self.assertEqual(segunda_respuesta.status_code, 201)
+        self.assertEqual(segunda_respuesta.json()['codigo'], 'RPV02')
+        self.assertFalse(MaterialForm().fields.get('codigo'))
+
+    def test_catalog_codes_follow_other_category_prefixes_and_skip_collisions(self):
+        Material.objects.create(
+            codigo='RPV01',
+            categoria='repuestos',
+            nombre='Código preexistente',
+            costo_base=Decimal('1.00'),
+            precio_venta_sugerido=Decimal('1.43'),
+        )
+        casos = [
+            ('repuestos', 'Pulsador Verde', 'RPV02'),
+            ('servicios', 'Rectificación de buje', 'SRB01'),
+            ('frio', 'Cambio de compresor', 'FCC01'),
+            ('maquinaria', 'Motor', 'MMOT01'),
+            ('locativos', 'Pintura pared', 'LPP01'),
+        ]
+
+        for categoria, nombre, codigo_esperado in casos:
+            with self.subTest(categoria=categoria, nombre=nombre):
+                response = self.client.post(
+                    reverse('crear_material_ajax', args=[self.ot.pk]),
+                    data=json.dumps({
+                        'categoria': categoria,
+                        'nombre': nombre,
+                        'costo_base': '7.00',
+                    }),
+                    content_type='application/json',
+                )
+
+                self.assertEqual(response.status_code, 201)
+                self.assertEqual(response.json()['codigo'], codigo_esperado)
 
     def test_closure_page_renders_material_catalog_and_table(self):
         response = self.client.get(reverse('cierre_ot', args=[self.ot.pk]))
@@ -531,6 +583,8 @@ class MaterialOTAjaxTests(TestCase):
         self.assertContains(response, 'Agregar Material / Repuesto')
         self.assertContains(response, 'Rodamiento')
         self.assertContains(response, 'materiales_ot.js')
+        self.assertContains(response, 'nuevo-categoria')
+        self.assertNotContains(response, 'nuevo-codigo')
 
     def test_ot_list_shows_quick_material_button_only_for_assigned_in_process_orders(self):
         self.ot.estado = self.estado_en_proceso
@@ -559,7 +613,7 @@ class MaterialOTAjaxTests(TestCase):
     def test_cannot_create_catalog_material_for_another_technicians_order(self):
         response = self.client.post(
             reverse('crear_material_ajax', args=[self.ot_ajena.pk]),
-            data='{"codigo":"MAT-002","nombre":"Correa","costo_base":"7.00"}',
+            data='{"categoria":"repuestos","nombre":"Correa","costo_base":"7.00"}',
             content_type='application/json',
         )
 
@@ -1020,13 +1074,13 @@ class RentabilidadAdminTests(TestCase):
 
         response = self.client.post(
             reverse('crear_material_ajax', args=[self.ot.pk]),
-            data='{"codigo":"MAT-ADMIN-NEW","nombre":"Repuesto admin nuevo","costo_base":"70.00"}',
+            data='{"categoria":"repuestos","nombre":"Repuesto admin nuevo","costo_base":"70.00"}',
             content_type='application/json',
         )
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()['codigo'], 'MAT-ADMIN-NEW')
-        material = Material.objects.get(codigo='MAT-ADMIN-NEW')
+        self.assertEqual(response.json()['codigo'], 'RRA01')
+        material = Material.objects.get(codigo='RRA01')
         self.assertEqual(
             material.precio_venta_sugerido,
             Decimal('100.00'),

@@ -1265,6 +1265,7 @@ def gestionar_ot_admin(request, ot_id):
             'cierre': cierre,
             'form': form,
             'material_admin_form': MaterialOTForm(),
+            'material_catalogo_form': MaterialForm(),
             'filas_materiales': filas_materiales,
             'resumen': resumen,
             'material_total_inicial': sum(
@@ -1791,6 +1792,7 @@ def cierre_ot(request, ot_id):
     cierre_ot, created = CierreOt.objects.get_or_create(orden_trabajo=ot)
     read_only = _ot_es_solo_lectura(ot)
     materiales_catalogo = Material.objects.order_by('nombre')
+    material_catalogo_form = MaterialForm()
     existing_proceso = _get_active_proceso_para_cierre(cierre_ot)
     operation_id = existing_proceso.operation_id if existing_proceso else ''
     if not operation_id:
@@ -1823,6 +1825,7 @@ def cierre_ot(request, ot_id):
                 'form_despues': form_despues,
                 'ot': ot,
                 'materiales_catalogo': materiales_catalogo,
+                'material_catalogo_form': material_catalogo_form,
                 'read_only': read_only,
                 'operation_id': operation_id
             })
@@ -1850,6 +1853,7 @@ def cierre_ot(request, ot_id):
                 'form_despues': form_despues,
                 'ot': ot,
                 'materiales_catalogo': materiales_catalogo,
+                'material_catalogo_form': material_catalogo_form,
                 'operation_id': operation_id
             })
 
@@ -1958,6 +1962,7 @@ def cierre_ot(request, ot_id):
         'form_despues': form_despues,
         'ot': ot,
         'materiales_catalogo': materiales_catalogo,
+        'material_catalogo_form': material_catalogo_form,
         'read_only': read_only,
         'operation_id': operation_id
     })

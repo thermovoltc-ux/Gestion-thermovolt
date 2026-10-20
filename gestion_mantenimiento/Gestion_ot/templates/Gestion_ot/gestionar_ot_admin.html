@@ -152,8 +152,12 @@
         <div id="admin-create-material-modal" class="admin-material-modal" role="dialog" aria-modal="true" aria-labelledby="admin-create-material-title" hidden>
             <form id="admin-create-material-form" class="admin-material-modal-content">
                 <h3 id="admin-create-material-title">Crear nuevo repuesto</h3>
-                <label for="admin-new-material-code">Código (SKU)
-                    <input id="admin-new-material-code" name="codigo" maxlength="50" required>
+                <label for="admin-new-material-category">Categoría
+                    <select id="admin-new-material-category" name="categoria" required>
+                        {% for value, label in material_catalogo_form.fields.categoria.choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
                 </label>
                 <label for="admin-new-material-name">Nombre
                     <input id="admin-new-material-name" name="nombre" maxlength="150" required>
@@ -249,7 +253,7 @@ document.addEventListener('DOMContentLoaded', function () {
         createMaterialMessage.textContent = '';
         createMaterialMessage.classList.remove('error');
         createMaterialModal.hidden = false;
-        document.getElementById('admin-new-material-code').focus();
+        document.getElementById('admin-new-material-category').focus();
     });
     createMaterialCancel.addEventListener('click', closeCreateMaterialModal);
     createMaterialModal.addEventListener('click', function (event) {
@@ -274,7 +278,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 credentials: 'same-origin',
                 body: JSON.stringify({
-                    codigo: document.getElementById('admin-new-material-code').value,
+                    categoria: document.getElementById('admin-new-material-category').value,
                     nombre: document.getElementById('admin-new-material-name').value,
                     costo_base: document.getElementById('admin-new-material-cost').value
                 })

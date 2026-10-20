@@ -1,9 +1,11 @@
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 from django.contrib.auth.models import User
 from mptt.models import MPTTModel, TreeForeignKey
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
+import re
+import unicodedata
 import uuid
 from .storage import GoogleDriveMediaStorage
 
@@ -345,10 +347,83 @@ class TareaMantenimiento(models.Model):
 
 
 class Material(models.Model):
+    CATEGORIA_CHOICES = [
+        ('repuestos', 'Repuestos'),
+        ('servicios', 'Servicios'),
+        ('maquinaria', 'Maquinaria'),
+        ('frio', 'Frío / Refrigeración'),
+        ('locativos', 'Locativos'),
+    ]
+    CATEGORIA_PREFIJOS = {
+        'repuestos': 'R',
+        'servicios': 'S',
+        'maquinaria': 'M',
+        'frio': 'F',
+        'locativos': 'L',
+    }
+
     codigo = models.CharField(max_length=50, unique=True)
+    categoria = models.CharField(
+        max_length=20,
+        choices=CATEGORIA_CHOICES,
+        default='repuestos',
+    )
     nombre = models.CharField(max_length=150)
     costo_base = models.DecimalField(max_digits=12, decimal_places=2)
     precio_venta_sugerido = models.DecimalField(max_digits=14, decimal_places=2)
+
+    def generar_codigo(self):
+        prefijo = self.CATEGORIA_PREFIJOS.get(self.categoria)
+        if not prefijo:
+            raise ValueError(f'Categoría de material no válida: {self.categoria}')
+
+        nombre_normalizado = unicodedata.normalize('NFKD', self.nombre)
+        nombre_ascii = nombre_normalizado.encode('ascii', 'ignore').decode('ascii')
+        palabras = re.findall(r'[A-Za-z0-9]+', nombre_ascii.upper())
+        palabras_utiles = [
+            palabra
+            for palabra in palabras
+            if palabra not in {'DE', 'DEL', 'LA', 'LAS', 'EL', 'LOS', 'Y', 'EN'}
+        ]
+        if len(palabras_utiles) >= 2:
+            iniciales = ''.join(palabra[0] for palabra in palabras_utiles[:2])
+        else:
+            palabra = palabras_utiles[0] if palabras_utiles else (palabras[0] if palabras else '')
+            iniciales = palabra[:3]
+        if not iniciales:
+            raise ValueError('El nombre del material debe contener letras o números.')
+
+        base = f'{prefijo}{iniciales}'
+        codigos_existentes = type(self).objects.filter(
+            codigo__startswith=base,
+        ).values_list('codigo', flat=True)
+        consecutivo_maximo = 0
+        for codigo_existente in codigos_existentes:
+            sufijo = codigo_existente[len(base):]
+            if sufijo.isdigit():
+                consecutivo_maximo = max(consecutivo_maximo, int(sufijo))
+
+        consecutivo = consecutivo_maximo + 1
+        while True:
+            codigo = f'{base}{consecutivo:02d}'
+            if not type(self).objects.filter(codigo=codigo).exists():
+                return codigo
+            consecutivo += 1
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding or self.codigo:
+            return super().save(*args, **kwargs)
+
+        while True:
+            self.codigo = self.generar_codigo()
+            try:
+                with transaction.atomic():
+                    return super().save(*args, **kwargs)
+            except IntegrityError:
+                if type(self).objects.filter(codigo=self.codigo).exists():
+                    self.codigo = ''
+                    continue
+                raise
 
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"

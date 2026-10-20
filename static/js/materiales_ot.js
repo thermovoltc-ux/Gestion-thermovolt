@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('btn-abrir-modal-nuevo-material').addEventListener('click', function () {
         createError.textContent = '';
         showModal(createModal);
-        document.getElementById('nuevo-codigo').focus();
+        document.getElementById('nuevo-categoria').focus();
     });
 
     document.getElementById('btn-cancelar-nuevo').addEventListener('click', function () {
@@ -182,7 +182,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 credentials: 'same-origin',
                 body: JSON.stringify({
-                    codigo: document.getElementById('nuevo-codigo').value,
+                    categoria: document.getElementById('nuevo-categoria').value,
                     nombre: document.getElementById('nuevo-nombre').value,
                     costo_base: document.getElementById('nuevo-costo').value,
                 }),
@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', function () {
             select.value = String(material.id);
             costInput.value = material.costo_base;
             searchInput.value = '';
-            document.getElementById('nuevo-codigo').value = '';
+            document.getElementById('nuevo-categoria').selectedIndex = 0;
             document.getElementById('nuevo-nombre').value = '';
             document.getElementById('nuevo-costo').value = '';
             hideModal(createModal);
