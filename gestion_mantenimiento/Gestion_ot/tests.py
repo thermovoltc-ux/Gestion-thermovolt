@@ -1021,6 +1021,59 @@ class RentabilidadAdminTests(TestCase):
             reverse('gestionar_ot_admin', args=[self.ot.pk]),
         )
 
+    def test_invoice_queue_filters_orders_and_sorts_latest_closures_first(self):
+        solicitud_reciente = Solicitud.objects.create(
+            creado_por=self.tecnico.username,
+            descripcion_problema='Cierre más reciente',
+            equipo=self.equipo,
+            ubicacion=self.ubicacion,
+            estado=self.estado,
+        )
+        ot_reciente = OrdenTrabajo.objects.create(
+            solicitud=solicitud_reciente,
+            tecnico_asignado=self.tecnico.username,
+            estado=self.estado,
+        )
+        CierreOt.objects.create(
+            orden_trabajo=ot_reciente,
+            fecha_inicio_actividad=(
+                self.ot.cierreot.fecha_inicio_actividad + relativedelta(days=1)
+            ),
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('facturacion_admin'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            list(response.context['ots'].values_list('pk', flat=True)),
+            [ot_reciente.pk, self.ot.pk],
+        )
+        self.assertEqual(len(response.context['eventos_calendario']), 2)
+        self.assertEqual(
+            response.context['eventos_calendario'][0]['url'],
+            reverse('gestionar_ot_admin', args=[ot_reciente.pk]),
+        )
+
+        fecha_cierre = self.ot.cierreot.fecha_inicio_actividad.date().isoformat()
+        response = self.client.get(
+            reverse('facturacion_admin'),
+            {
+                'tecnico': self.tecnico.username,
+                'cliente': 'Cliente renta',
+                'fecha_inicio': fecha_cierre,
+                'fecha_fin': fecha_cierre,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            list(response.context['ots'].values_list('pk', flat=True)),
+            [self.ot.pk],
+        )
+        self.assertEqual(len(response.context['eventos_calendario']), 1)
+        self.assertContains(response, 'billing-calendar')
+
     def test_technician_cannot_access_invoice_queue(self):
         self.client.force_login(self.tecnico)
 

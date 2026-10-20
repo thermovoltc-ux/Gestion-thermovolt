@@ -36,6 +36,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse
 from django.core.serializers.json import DjangoJSONEncoder
+from django.utils.dateparse import parse_date
 from docx import Document
 try:
     from docx2pdf import convert
@@ -1100,11 +1101,79 @@ def facturacion_admin(request):
         'solicitud__equipo',
         'solicitud__ubicacion',
         'cierreot',
-    ).order_by('-cierreot__fecha_inicio_actividad', '-pk')
+    )
+
+    tecnico = request.GET.get('tecnico', '').strip()
+    cliente = request.GET.get('cliente', '').strip()
+    fecha_inicio = request.GET.get('fecha_inicio', '').strip()
+    fecha_fin = request.GET.get('fecha_fin', '').strip()
+
+    tecnicos = ots.order_by().values_list('tecnico_asignado', flat=True).distinct()
+    if tecnico:
+        ots = ots.filter(tecnico_asignado__iexact=tecnico)
+    if cliente:
+        ots = ots.filter(
+            Q(solicitud__ubicacion__nombre__icontains=cliente)
+            | Q(solicitud__PDV__icontains=cliente)
+        )
+
+    fecha_inicio_parseada = parse_date(fecha_inicio) if fecha_inicio else None
+    fecha_fin_parseada = parse_date(fecha_fin) if fecha_fin else None
+    fechas_invalidas = (
+        (fecha_inicio and fecha_inicio_parseada is None)
+        or (fecha_fin and fecha_fin_parseada is None)
+    )
+    if fechas_invalidas:
+        messages.error(request, 'Ingresá las fechas con un formato válido.')
+        ots = ots.none()
+    elif fecha_inicio_parseada and fecha_fin_parseada and fecha_inicio_parseada > fecha_fin_parseada:
+        messages.error(request, 'La fecha inicial no puede ser posterior a la fecha final.')
+        ots = ots.none()
+    else:
+        if fecha_inicio_parseada:
+            ots = ots.filter(
+                cierreot__fecha_inicio_actividad__date__gte=fecha_inicio_parseada,
+            )
+        if fecha_fin_parseada:
+            ots = ots.filter(
+                cierreot__fecha_inicio_actividad__date__lte=fecha_fin_parseada,
+            )
+
+    ots = ots.order_by('-cierreot__fecha_inicio_actividad', '-pk')
+    eventos_calendario = []
+    for ot in ots:
+        fecha_cierre = ot.cierreot.fecha_inicio_actividad
+        if fecha_cierre:
+            fecha_local = (
+                timezone.localtime(fecha_cierre).date()
+                if timezone.is_aware(fecha_cierre)
+                else fecha_cierre.date()
+            )
+            eventos_calendario.append({
+                'title': (
+                    f"OT-{ot.solicitud.consecutivo} - "
+                    f"{ot.solicitud.ubicacion_nombre or 'Sin cliente'} - "
+                    f"{ot.tecnico_display or ot.tecnico_asignado}"
+                ),
+                'start': fecha_local.isoformat(),
+                'url': reverse('gestionar_ot_admin', args=[ot.pk]),
+                'backgroundColor': '#f59e0b',
+                'borderColor': '#d97706',
+                'textColor': '#ffffff',
+            })
+
     return render(
         request,
         'Gestion_ot/facturacion_admin.html',
-        {'ots': ots},
+        {
+            'ots': ots,
+            'tecnicos': tecnicos,
+            'filtro_tecnico': tecnico,
+            'filtro_cliente': cliente,
+            'filtro_fecha_inicio': fecha_inicio,
+            'filtro_fecha_fin': fecha_fin,
+            'eventos_calendario': eventos_calendario,
+        },
     )
 
 
