@@ -17,7 +17,7 @@ import os
 from django.contrib import messages
 import os
 import smtplib
-from .models import OrdenTrabajo, Estado, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad, InformeDriveArchivo, ProcesoInforme, Material, MaterialOT
+from .models import OrdenTrabajo, Estado, CierreOt, ImagenCierreOt, PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento, CierreOtActividad, InformeDriveArchivo, ProcesoInforme, Material, MaterialOT, ServicioOT
 from .forms import (
     OrdenTrabajoForm,
     CierreOtForm,
@@ -28,6 +28,7 @@ from .forms import (
     CierreOtActividadFormSet,
     MaterialForm,
     MaterialOTForm,
+    ServicioOTForm,
 )
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.users.access import obtener_scope_ubicacion_ids
@@ -1266,6 +1267,11 @@ def gestionar_ot_admin(request, ot_id):
             'form': form,
             'material_admin_form': MaterialOTForm(),
             'material_catalogo_form': MaterialForm(),
+            'materiales_catalogo': Material.objects.order_by('nombre'),
+            'servicios_catalogo': Material.objects.filter(
+                categoria='servicios',
+            ).order_by('nombre'),
+            'servicios_ot': ot.servicios_facturados.all(),
             'filas_materiales': filas_materiales,
             'resumen': resumen,
             'material_total_inicial': sum(
@@ -1288,7 +1294,32 @@ def agregar_material_ot_admin(request, ot_id):
         return redirect('dashboard')
 
     ot = get_object_or_404(OrdenTrabajo, pk=ot_id)
-    form = MaterialOTForm(request.POST, request.FILES)
+    post_data = request.POST.copy()
+    material_name = post_data.get('material_name', '').strip()
+    form = MaterialOTForm(post_data, request.FILES)
+    if not form.is_valid() and not post_data.get('material') and material_name:
+        validation_errors = set(form.errors) - {'material'}
+        if not validation_errors and len(material_name) <= 150:
+            existing_material = Material.objects.filter(
+                nombre__iexact=material_name,
+            ).order_by('pk').first()
+            if existing_material:
+                post_data['material'] = str(existing_material.pk)
+            else:
+                costo_real = form.cleaned_data.get('costo_real')
+                if costo_real is not None:
+                    material = Material(
+                        categoria='repuestos',
+                        nombre=material_name,
+                        costo_base=costo_real,
+                        precio_venta_sugerido=(
+                            costo_real / Decimal('0.7')
+                        ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
+                    )
+                    material.save()
+                    post_data['material'] = str(material.pk)
+            if post_data.get('material'):
+                form = MaterialOTForm(post_data, request.FILES)
     if not form.is_valid():
         messages.error(
             request,
@@ -1306,6 +1337,57 @@ def agregar_material_ot_admin(request, ot_id):
         request,
         'Se agregó el material a la OT; el resumen financiero fue actualizado.',
     )
+    return redirect('gestionar_ot_admin', ot_id=ot.pk)
+
+
+@login_required
+@require_POST
+def agregar_servicio_ot_admin(request, ot_id):
+    if not _es_admin_rentabilidad(request.user):
+        messages.error(request, 'No tenés permiso para agregar servicios a esta OT.')
+        return redirect('dashboard')
+
+    ot = get_object_or_404(OrdenTrabajo, pk=ot_id)
+    form = ServicioOTForm(request.POST)
+    if not form.is_valid():
+        messages.error(
+            request,
+            f'No se pudo agregar el servicio: {form.errors.as_text()}',
+        )
+        return redirect('gestionar_ot_admin', ot_id=ot.pk)
+
+    nombre = form.cleaned_data['nombre'].strip()
+    cantidad = form.cleaned_data['cantidad']
+    precio_unitario = form.cleaned_data['precio_unitario']
+    total_servicio = (cantidad * precio_unitario).quantize(Decimal('0.01'))
+    with transaction.atomic():
+        servicio_catalogo = Material.objects.filter(
+            categoria='servicios',
+            nombre__iexact=nombre,
+        ).order_by('pk').first()
+        if servicio_catalogo is None:
+            servicio_catalogo = Material(
+                categoria='servicios',
+                nombre=nombre,
+                costo_base=Decimal('0.00'),
+                precio_venta_sugerido=precio_unitario,
+            )
+            servicio_catalogo.save()
+
+        ServicioOT.objects.create(
+            orden_trabajo=ot,
+            nombre=nombre,
+            cantidad=cantidad,
+            precio_unitario=precio_unitario,
+        )
+        cierre, _ = CierreOt.objects.get_or_create(orden_trabajo=ot)
+        cierre.valor_mano_obra = (
+            (cierre.valor_mano_obra or Decimal('0.00'))
+            + total_servicio
+        )
+        cierre.save(update_fields=['valor_mano_obra'])
+
+    messages.success(request, 'Se agregó el servicio y se actualizó el valor de mano de obra.')
     return redirect('gestionar_ot_admin', ot_id=ot.pk)
 
 

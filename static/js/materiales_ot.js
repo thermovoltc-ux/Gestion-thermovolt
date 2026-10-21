@@ -20,6 +20,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const createButton = document.getElementById('btn-crear-nuevo');
     let activeTrigger = null;
     let returnToAddModal = false;
+    const numberFormat = new Intl.NumberFormat('es-CO', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
 
     function showModal(modal) {
         modal.hidden = false;
@@ -70,8 +74,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const invoiceCell = document.createElement('td');
         const observationCell = document.createElement('td');
         nameCell.textContent = material.material;
-        quantityCell.textContent = material.cantidad;
-        costCell.textContent = `$${material.costo_real}`;
+        quantityCell.textContent = numberFormat.format(Number(material.cantidad));
+        costCell.textContent = `$ ${numberFormat.format(Number(material.costo_real))}`;
 
         if (material.foto_url) {
             const link = document.createElement('a');

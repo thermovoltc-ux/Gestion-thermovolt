@@ -27,6 +27,7 @@ from gestion_mantenimiento.Gestion_ot.models import (
     MaterialOT,
     OrdenTrabajo,
     ProcesoInforme,
+    ServicioOT,
 )
 from gestion_mantenimiento.Gestion_ot import views
 from gestion_mantenimiento.Gestion_ot.plantilla_utils import _obtener_imagen_temporal
@@ -974,9 +975,11 @@ class RentabilidadAdminTests(TestCase):
         self.assertContains(response, 'OT Finalizada')
         self.assertNotContains(response, 'Estado de la OT</strong>')
         self.assertContains(response, 'Agregar material (Admin)')
-        self.assertContains(response, 'id="admin-new-material-category" name="categoria">')
-        self.assertContains(response, 'id="admin-new-material-name" name="nombre" maxlength="150">')
-        self.assertContains(response, 'id="admin-new-material-cost" name="costo_base" type="number" min="0" step="0.01">')
+        self.assertContains(response, 'id="admin-material-search" list="admin-materials-datalist"')
+        self.assertNotContains(response, 'admin-open-create-material')
+        self.assertContains(response, 'id="admin-service-name" name="nombre"')
+        self.assertContains(response, 'id="admin-service-quantity" name="cantidad"')
+        self.assertContains(response, 'id="admin-service-price" name="precio_unitario"')
 
     def test_technician_cannot_access_admin_management_or_update_materials(self):
         material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
@@ -1113,21 +1116,63 @@ class RentabilidadAdminTests(TestCase):
             response.context['material_admin_form'].fields['material']
             .queryset.filter(pk=material.pk).exists()
         )
-        self.assertContains(response, 'admin-open-create-material')
-        self.assertContains(response, 'admin-create-material-modal')
-        self.assertContains(response, reverse('crear_material_ajax', args=[self.ot.pk]))
-        for value, label in (
-            ('repuestos', 'Repuestos'),
-            ('servicios', 'Servicios'),
-            ('maquinaria', 'Maquinaria'),
-            ('frio', 'Frío / Refrigeración'),
-            ('locativos', 'Locativos'),
-        ):
-            self.assertContains(
-                response,
-                f'<option value="{value}">{label}</option>',
-                html=True,
-            )
+        self.assertContains(response, 'id="admin-material-search"')
+        self.assertContains(response, 'data-material-id="')
+        self.assertContains(response, 'id="servicios-datalist"')
+
+    def test_admin_can_add_a_new_service_line_and_save_it_to_the_catalog(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('agregar_servicio_ot_admin', args=[self.ot.pk]),
+            {
+                'nombre': 'Servicio de mantenimiento especial',
+                'cantidad': '2.00',
+                'precio_unitario': '150000.00',
+            },
+        )
+
+        self.assertRedirects(response, reverse('gestionar_ot_admin', args=[self.ot.pk]))
+        service_line = ServicioOT.objects.get(orden_trabajo=self.ot)
+        self.assertEqual(service_line.nombre, 'Servicio de mantenimiento especial')
+        self.assertEqual(service_line.total, Decimal('300000.00'))
+        catalog_service = Material.objects.get(
+            categoria='servicios',
+            nombre='Servicio de mantenimiento especial',
+        )
+        self.assertEqual(catalog_service.costo_base, Decimal('0.00'))
+        self.assertEqual(
+            catalog_service.precio_venta_sugerido,
+            Decimal('150000.00'),
+        )
+        self.ot.cierreot.refresh_from_db()
+        self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('300060.00'))
+        response = self.client.get(reverse('gestionar_ot_admin', args=[self.ot.pk]))
+        self.assertContains(response, '$ 300.000,00')
+        self.assertContains(response, '$ 300.060,00')
+
+    def test_admin_can_add_free_text_material_with_real_cost_as_catalog_base_cost(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('agregar_material_ot_admin', args=[self.ot.pk]),
+            {
+                'material_name': 'Material de texto libre',
+                'cantidad': '2.00',
+                'costo_real': '70000.00',
+            },
+        )
+
+        self.assertRedirects(response, reverse('gestionar_ot_admin', args=[self.ot.pk]))
+        material = Material.objects.get(nombre='Material de texto libre')
+        self.assertEqual(material.costo_base, Decimal('70000.00'))
+        self.assertEqual(material.precio_venta_sugerido, Decimal('100000.00'))
+        material_ot = MaterialOT.objects.get(
+            orden_trabajo=self.ot,
+            material=material,
+        )
+        self.assertEqual(material_ot.costo_real, Decimal('70000.00'))
+        self.assertEqual(material_ot.precio_venta_aplicado, Decimal('100000.00'))
 
     def test_admin_can_correct_or_delete_order_material(self):
         material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)

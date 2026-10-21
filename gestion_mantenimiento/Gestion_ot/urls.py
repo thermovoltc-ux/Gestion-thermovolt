@@ -13,6 +13,11 @@ urlpatterns = [
     path('gestionar_ot/<int:ot_id>/', views.gestionar_ot_admin, name='gestionar_ot_admin'),
     path('gestionar_ot/<int:ot_id>/mano-obra/', views.actualizar_mano_obra, name='actualizar_mano_obra'),
     path(
+        'gestionar_ot/<int:ot_id>/servicio/agregar/',
+        views.agregar_servicio_ot_admin,
+        name='agregar_servicio_ot_admin',
+    ),
+    path(
         'gestionar_ot/<int:ot_id>/material/<int:material_ot_id>/actualizar/',
         views.actualizar_material_ot_admin,
         name='actualizar_material_ot_admin',

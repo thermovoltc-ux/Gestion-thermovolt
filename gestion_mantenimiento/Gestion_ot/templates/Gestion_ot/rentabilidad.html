@@ -1,4 +1,5 @@
 {% extends "solicitudes/indexpadre.html" %}
+{% load humanize %}
 
 {% block title %}Rentabilidad{% endblock %}
 
@@ -75,11 +76,11 @@
 
     <p class="profit-muted">Totales correspondientes a {{ cantidad_calculable }} OT(s) con costo de nómina calculable.</p>
     <section class="profit-kpis" aria-label="Totales de rentabilidad calculables">
-        <div class="profit-card"><span>Ingreso total</span><strong>${{ totales.ingresos|floatformat:2 }}</strong></div>
-        <div class="profit-card"><span>Mano de obra facturada</span><strong>${{ totales.valor_mano_obra|floatformat:2 }}</strong></div>
-        <div class="profit-card"><span>Costo de materiales</span><strong>${{ totales.costo_materiales|floatformat:2 }}</strong></div>
-        <div class="profit-card"><span>Nómina estimada</span><strong>${{ totales.costo_nomina|floatformat:2 }}</strong></div>
-        <div class="profit-card"><span>Ganancia estimada</span><strong>${{ totales.ganancia|floatformat:2 }}</strong></div>
+        <div class="profit-card"><span>Ingreso total</span><strong>$ {{ totales.ingresos|intcomma }}</strong></div>
+        <div class="profit-card"><span>Mano de obra facturada</span><strong>$ {{ totales.valor_mano_obra|intcomma }}</strong></div>
+        <div class="profit-card"><span>Costo de materiales</span><strong>$ {{ totales.costo_materiales|intcomma }}</strong></div>
+        <div class="profit-card"><span>Nómina estimada</span><strong>$ {{ totales.costo_nomina|intcomma }}</strong></div>
+        <div class="profit-card"><span>Ganancia estimada</span><strong>$ {{ totales.ganancia|intcomma }}</strong></div>
     </section>
 
     <section class="profit-summary">
@@ -92,11 +93,11 @@
                         <tr>
                             <td>{{ resumen.nombre }}</td>
                             <td>{{ resumen.cantidad_ots }}</td>
-                            <td>${{ resumen.ingresos|floatformat:2 }}</td>
-                            <td>${{ resumen.valor_mano_obra|floatformat:2 }}</td>
-                            <td>${{ resumen.costo_materiales|floatformat:2 }}</td>
-                            <td>${{ resumen.costo_nomina|floatformat:2 }}</td>
-                            <td>${{ resumen.ganancia|floatformat:2 }}</td>
+                            <td>$ {{ resumen.ingresos|intcomma }}</td>
+                            <td>$ {{ resumen.valor_mano_obra|intcomma }}</td>
+                            <td>$ {{ resumen.costo_materiales|intcomma }}</td>
+                            <td>$ {{ resumen.costo_nomina|intcomma }}</td>
+                            <td>$ {{ resumen.ganancia|intcomma }}</td>
                         </tr>
                     {% empty %}
                         <tr><td colspan="7" class="profit-muted" style="text-align:center;">No hay OTs calculables para agrupar.</td></tr>
@@ -116,11 +117,11 @@
                         <tr>
                             <td>{{ resumen.nombre }}</td>
                             <td>{{ resumen.cantidad_ots }}</td>
-                            <td>${{ resumen.ingresos|floatformat:2 }}</td>
-                            <td>${{ resumen.valor_mano_obra|floatformat:2 }}</td>
-                            <td>${{ resumen.costo_materiales|floatformat:2 }}</td>
-                            <td>${{ resumen.costo_nomina|floatformat:2 }}</td>
-                            <td>${{ resumen.ganancia|floatformat:2 }}</td>
+                            <td>$ {{ resumen.ingresos|intcomma }}</td>
+                            <td>$ {{ resumen.valor_mano_obra|intcomma }}</td>
+                            <td>$ {{ resumen.costo_materiales|intcomma }}</td>
+                            <td>$ {{ resumen.costo_nomina|intcomma }}</td>
+                            <td>$ {{ resumen.ganancia|intcomma }}</td>
                         </tr>
                     {% empty %}
                         <tr><td colspan="7" class="profit-muted" style="text-align:center;">No hay OTs calculables para agrupar.</td></tr>
@@ -154,13 +155,13 @@
                         <td>OT-{{ fila.ot.solicitud.consecutivo }}</td>
                         <td>{{ fila.ot.tecnico_display|default:fila.ot.tecnico_asignado }}</td>
                         <td>{{ fila.ot.solicitud.ubicacion_nombre|default:"—" }}</td>
-                        <td>${{ fila.ingreso_materiales|floatformat:2 }}</td>
-                        <td>${{ fila.valor_mano_obra|floatformat:2 }}</td>
-                        <td>${{ fila.ingreso_total|floatformat:2 }}</td>
-                        <td>${{ fila.costo_materiales|floatformat:2 }}</td>
+                        <td>$ {{ fila.ingreso_materiales|intcomma }}</td>
+                        <td>$ {{ fila.valor_mano_obra|intcomma }}</td>
+                        <td>$ {{ fila.ingreso_total|intcomma }}</td>
+                        <td>$ {{ fila.costo_materiales|intcomma }}</td>
                         {% if fila.costo_nomina != None %}
-                            <td>${{ fila.costo_nomina|floatformat:2 }}<br><small>{{ fila.horas|floatformat:2 }} h</small></td>
-                            <td class="{% if fila.ganancia < 0 %}profit-negative{% else %}profit-positive{% endif %}">${{ fila.ganancia|floatformat:2 }}</td>
+                            <td>$ {{ fila.costo_nomina|intcomma }}<br><small>{{ fila.horas|floatformat:2 }} h</small></td>
+                            <td class="{% if fila.ganancia < 0 %}profit-negative{% else %}profit-positive{% endif %}">$ {{ fila.ganancia|intcomma }}</td>
                             <td>{% if fila.margen != None %}{{ fila.margen|floatformat:2 }}%{% else %}—{% endif %}</td>
                         {% else %}
                             <td class="profit-pending">Pendiente</td>

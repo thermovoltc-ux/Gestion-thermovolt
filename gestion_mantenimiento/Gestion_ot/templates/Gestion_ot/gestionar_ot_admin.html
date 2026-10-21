@@ -1,5 +1,5 @@
 {% extends "solicitudes/indexpadre.html" %}
-{% load static %}
+{% load static l10n humanize %}
 
 {% block title %}Gestión y facturación de OT{% endblock %}
 
@@ -22,17 +22,9 @@
     .admin-ot-add-material label { display: block; font-weight: 600; }
     .admin-ot-add-material input, .admin-ot-add-material select, .admin-ot-add-material textarea { box-sizing: border-box; width: 100%; margin-top: 5px; padding: 9px; border: 1px solid #cbd5e1; border-radius: 6px; }
     .admin-ot-add-material .field-errors { color: #b91c1c; }
-    .admin-material-picker { display: flex; align-items: end; gap: 8px; }
-    .admin-material-picker select { flex: 1; }
-    .admin-material-modal[hidden] { display: none !important; }
-    .admin-material-modal { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; overflow-y: auto; padding: 1rem; background: rgb(15 23 42 / 60%); }
-    .admin-material-modal-content { box-sizing: border-box; width: min(100%, 32rem); max-height: calc(100vh - 2rem); overflow-y: auto; padding: 1.5rem; border-radius: 0.75rem; background: #fff; box-shadow: 0 1rem 3rem rgb(15 23 42 / 25%); }
-    .admin-material-modal-content label { display: block; margin: 12px 0; font-weight: 600; }
-    .admin-material-modal-content input, .admin-material-modal-content select { box-sizing: border-box; width: 100%; min-height: 42px; margin-top: 5px; padding: 9px 11px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #1e293b; font: inherit; }
-    .admin-material-modal-content input:focus, .admin-material-modal-content select:focus { outline: 2px solid #93c5fd; border-color: #2563eb; }
-    .admin-material-modal-content input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
-    .admin-material-modal-content input[type="number"]::-webkit-inner-spin-button, .admin-material-modal-content input[type="number"]::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
-    .admin-material-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+    .admin-service-form { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 12px; align-items: end; padding: 16px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; }
+    .admin-service-form label { display: block; font-weight: 600; }
+    .admin-service-form input { box-sizing: border-box; width: 100%; margin-top: 5px; padding: 9px; border: 1px solid #cbd5e1; border-radius: 6px; }
     .admin-ot-actions { display: flex; gap: 8px; }
     .admin-ot-btn { display: inline-block; border: 0; border-radius: 6px; padding: 9px 13px; background: #2563eb; color: #fff; text-decoration: none; font-weight: 600; cursor: pointer; }
     .admin-ot-btn-danger { background: #dc2626; }
@@ -48,7 +40,7 @@
     @media (max-width: 640px) { .admin-ot-page { padding: 14px; } }
 </style>
 
-<main class="admin-ot-page" data-ot-admin data-update-url="{{ actualizar_mano_obra_url }}" data-create-material-url="{% url 'crear_material_ajax' ot.pk %}">
+<main class="admin-ot-page" data-ot-admin data-update-url="{{ actualizar_mano_obra_url }}">
     <div class="admin-ot-header">
         <div>
             <h1>Gestión y facturación — OT-{{ ot.solicitud.consecutivo }}</h1>
@@ -122,12 +114,14 @@
             {% csrf_token %}
             <h3 style="grid-column:1/-1;margin:0;">Agregar material (Admin)</h3>
             <div>
-                <label for="{{ material_admin_form.material.id_for_label }}">Material</label>
-                <div class="admin-material-picker">
-                    {{ material_admin_form.material }}
-                    <button type="button" id="admin-open-create-material" class="admin-ot-btn admin-ot-btn-secondary">➕ Crear nuevo repuesto</button>
-                </div>
-                <span id="admin-material-created-feedback" class="admin-ot-live" role="status" aria-live="polite"></span>
+                <label for="admin-material-search">Material</label>
+                <input type="hidden" name="material" id="admin-material-id">
+                <input type="search" name="material_name" id="admin-material-search" list="admin-materials-datalist" autocomplete="off" required>
+                <datalist id="admin-materials-datalist">
+                    {% for material in materiales_catalogo %}
+                        <option value="{{ material.nombre }}" data-material-id="{{ material.pk }}" data-costo-base="{{ material.costo_base|unlocalize }}" label="{{ material.codigo }} — {{ material.nombre }}"></option>
+                    {% endfor %}
+                </datalist>
                 {% if material_admin_form.material.errors %}<div class="field-errors">{{ material_admin_form.material.errors }}</div>{% endif %}
             </div>
             <div>
@@ -152,31 +146,49 @@
             </div>
             <button type="submit" class="admin-ot-btn">➕ Agregar material (Admin)</button>
         </form>
-        <div id="admin-create-material-modal" class="admin-material-modal" role="dialog" aria-modal="true" aria-labelledby="admin-create-material-title" hidden>
-            <form id="admin-create-material-form" class="admin-material-modal-content">
-                <h3 id="admin-create-material-title">Crear nuevo repuesto</h3>
-                <label for="admin-new-material-category">Categoría
-                    <select id="admin-new-material-category" name="categoria">
-                        <option value="repuestos">Repuestos</option>
-                        <option value="servicios">Servicios</option>
-                        <option value="maquinaria">Maquinaria</option>
-                        <option value="frio">Frío / Refrigeración</option>
-                        <option value="locativos">Locativos</option>
-                    </select>
-                </label>
-                <label for="admin-new-material-name">Nombre
-                    <input id="admin-new-material-name" name="nombre" maxlength="150">
-                </label>
-                <label for="admin-new-material-cost">Costo base
-                    <input id="admin-new-material-cost" name="costo_base" type="number" min="0" step="0.01">
-                </label>
-                <div id="admin-create-material-message" class="admin-ot-message" role="status" aria-live="polite"></div>
-                <div class="admin-material-modal-actions">
-                    <button type="button" id="admin-cancel-create-material" class="admin-ot-btn admin-ot-btn-secondary">Cancelar</button>
-                    <button type="submit" id="admin-submit-create-material" class="admin-ot-btn">Crear y seleccionar</button>
-                </div>
-            </form>
-        </div>
+    </section>
+
+    <section class="admin-ot-card">
+        <h2>Servicios y mano de obra</h2>
+        <p class="admin-ot-muted">Selecciona un servicio para completar su precio o escribe uno nuevo. Los servicios nuevos quedan disponibles en el catálogo.</p>
+        {% if servicios_ot %}
+            <div class="admin-ot-table-wrap">
+                <table class="admin-ot-table" style="min-width:600px;">
+                    <thead><tr><th>Servicio</th><th>Cantidad</th><th>Precio unitario</th><th>Total</th></tr></thead>
+                    <tbody>
+                        {% for servicio in servicios_ot %}
+                            <tr>
+                                <td>{{ servicio.nombre }}</td>
+                                <td>{{ servicio.cantidad|intcomma }}</td>
+                                <td>$ {{ servicio.precio_unitario|intcomma }}</td>
+                                <td>$ {{ servicio.total|intcomma }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+        <form method="post" action="{% url 'agregar_servicio_ot_admin' ot.pk %}" class="admin-service-form">
+            {% csrf_token %}
+            <div>
+                <label for="admin-service-name">Servicio</label>
+                <input type="search" id="admin-service-name" name="nombre" list="servicios-datalist" autocomplete="off" required maxlength="150">
+                <datalist id="servicios-datalist">
+                    {% for servicio in servicios_catalogo %}
+                        <option value="{{ servicio.nombre }}" data-precio="{{ servicio.precio_venta_sugerido|unlocalize }}"></option>
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div>
+                <label for="admin-service-quantity">Cantidad</label>
+                <input type="number" id="admin-service-quantity" name="cantidad" min="0.01" step="0.01" value="1" required>
+            </div>
+            <div>
+                <label for="admin-service-price">Precio unitario</label>
+                <input type="number" id="admin-service-price" name="precio_unitario" min="0" step="0.01" required>
+            </div>
+            <button type="submit" class="admin-ot-btn">Agregar servicio</button>
+        </form>
     </section>
 
     <form method="post" class="admin-ot-card admin-ot-billing" id="admin-ot-billing-form">
@@ -210,12 +222,12 @@
              data-costo-materiales="{{ resumen.costo_materiales }}"
              data-costo-nomina="{{ resumen.costo_nomina|default_if_none:'' }}"
              data-ingreso-total="{{ resumen.ingreso_total }}">
-            <div class="admin-ot-kpi"><span>Total venta de materiales</span><strong id="admin-material-total">${{ resumen.ingreso_materiales|floatformat:2 }}</strong></div>
-            <div class="admin-ot-kpi"><span>Mano de obra</span><strong id="admin-labor-total">${{ resumen.valor_mano_obra|floatformat:2 }}</strong></div>
-            <div class="admin-ot-kpi"><span>Total facturado</span><strong id="admin-invoice-total">${{ resumen.ingreso_total|floatformat:2 }}</strong></div>
-            <div class="admin-ot-kpi"><span>Costo de materiales</span><strong id="admin-material-cost">${{ resumen.costo_materiales|floatformat:2 }}</strong></div>
-            <div class="admin-ot-kpi"><span>Nómina estimada</span><strong id="admin-payroll-total">{% if resumen.costo_nomina != None %}${{ resumen.costo_nomina|floatformat:2 }}{% else %}Sin datos de horas o nómina{% endif %}</strong></div>
-            <div class="admin-ot-kpi"><span>Ganancia estimada</span><strong id="admin-profit-total">{% if resumen.ganancia != None %}${{ resumen.ganancia|floatformat:2 }}{% else %}No calculable{% endif %}</strong></div>
+            <div class="admin-ot-kpi"><span>Total venta de materiales</span><strong id="admin-material-total">$ {{ resumen.ingreso_materiales|intcomma }}</strong></div>
+            <div class="admin-ot-kpi"><span>Mano de obra</span><strong id="admin-labor-total">$ {{ resumen.valor_mano_obra|intcomma }}</strong></div>
+            <div class="admin-ot-kpi"><span>Total facturado</span><strong id="admin-invoice-total">$ {{ resumen.ingreso_total|intcomma }}</strong></div>
+            <div class="admin-ot-kpi"><span>Costo de materiales</span><strong id="admin-material-cost">$ {{ resumen.costo_materiales|intcomma }}</strong></div>
+            <div class="admin-ot-kpi"><span>Nómina estimada</span><strong id="admin-payroll-total">{% if resumen.costo_nomina != None %}$ {{ resumen.costo_nomina|intcomma }}{% else %}Sin datos de horas o nómina{% endif %}</strong></div>
+            <div class="admin-ot-kpi"><span>Ganancia estimada</span><strong id="admin-profit-total">{% if resumen.ganancia != None %}$ {{ resumen.ganancia|intcomma }}{% else %}No calculable{% endif %}</strong></div>
             <div class="admin-ot-kpi"><span>Margen estimado</span><strong id="admin-margin-total">{% if resumen.margen != None %}{{ resumen.margen|floatformat:2 }}%{% else %}—{% endif %}</strong></div>
         </div>
     </section>
@@ -238,108 +250,84 @@ document.addEventListener('DOMContentLoaded', function () {
     const marginEl = document.getElementById('admin-margin-total');
     const messageEl = document.getElementById('admin-ot-save-message');
     const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
-    const money = value => '$' + Number(value || 0).toLocaleString('es-CO', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    const createMaterialButton = document.getElementById('admin-open-create-material');
-    const createMaterialModal = document.getElementById('admin-create-material-modal');
-    const createMaterialForm = document.getElementById('admin-create-material-form');
-    const createMaterialMessage = document.getElementById('admin-create-material-message');
-    const materialSelect = document.querySelector('.admin-ot-add-material [name=material]');
+    const money = value => '$ ' + Number(value || 0).toLocaleString('es-CO', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const materialSearch = document.getElementById('admin-material-search');
+    const materialId = document.getElementById('admin-material-id');
+    const materialOptions = Array.from(document.querySelectorAll('#admin-materials-datalist option'));
     const materialCostInput = document.querySelector('.admin-ot-add-material [name=costo_real]');
-    const createMaterialCancel = document.getElementById('admin-cancel-create-material');
-    const createMaterialSubmit = document.getElementById('admin-submit-create-material');
-    const createMaterialFeedback = document.getElementById('admin-material-created-feedback');
+    const serviceName = document.getElementById('admin-service-name');
+    const servicePrice = document.getElementById('admin-service-price');
+    const serviceOptions = Array.from(document.querySelectorAll('#servicios-datalist option'));
 
-    function closeCreateMaterialModal() {
-        createMaterialModal.hidden = true;
-        createMaterialButton.focus();
+    function parseLocalizedNumber(value) {
+        const cleaned = value.trim().replace('$', '').replace(/\s/g, '');
+        const normalized = cleaned.includes(',')
+            ? cleaned.replace(/\./g, '').replace(',', '.')
+            : cleaned;
+        return normalized ? Number(normalized) : NaN;
     }
 
-    createMaterialButton.addEventListener('click', function () {
-        createMaterialMessage.textContent = '';
-        createMaterialMessage.classList.remove('error');
-        createMaterialModal.hidden = false;
-        document.getElementById('admin-new-material-category').focus();
-    });
-    createMaterialCancel.addEventListener('click', closeCreateMaterialModal);
-    createMaterialModal.addEventListener('click', function (event) {
-        if (event.target === createMaterialModal) closeCreateMaterialModal();
-    });
-    document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && !createMaterialModal.hidden) closeCreateMaterialModal();
-    });
+    function formatLocalizedNumber(value, currency) {
+        const number = parseLocalizedNumber(String(value));
+        if (!Number.isFinite(number)) return value;
+        const formatted = number.toLocaleString('es-CO', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        return currency ? '$ ' + formatted : formatted;
+    }
 
-    createMaterialForm.addEventListener('submit', async function (event) {
-        event.preventDefault();
-        createMaterialMessage.classList.remove('error');
-        createMaterialMessage.textContent = '';
-        const categoryInput = document.getElementById('admin-new-material-category');
-        const nameInput = document.getElementById('admin-new-material-name');
-        const baseCostInput = document.getElementById('admin-new-material-cost');
-        const baseCost = baseCostInput.value.trim();
-        const parsedBaseCost = Number(baseCost);
-        if (!categoryInput.value) {
-            createMaterialMessage.textContent = 'Selecciona una categoría.';
-            categoryInput.focus();
-            return;
-        }
-        if (!nameInput.value.trim()) {
-            createMaterialMessage.textContent = 'Ingresa el nombre del material.';
-            nameInput.focus();
-            return;
-        }
-        if (!baseCost || !Number.isFinite(parsedBaseCost) || parsedBaseCost < 0) {
-            createMaterialMessage.textContent = 'Ingresa un costo base válido (cero o mayor).';
-            baseCostInput.focus();
-            return;
-        }
-        createMaterialMessage.textContent = 'Creando material…';
-        createMaterialMessage.textContent = 'Creando material…';
-        createMaterialSubmit.disabled = true;
-        try {
-            const response = await fetch(root.dataset.createMaterialUrl, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrf,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify({
-                    categoria: categoryInput.value,
-                    nombre: nameInput.value.trim(),
-                    costo_base: baseCost
-                })
+    function formatNumberInput(input, currency) {
+        input.type = 'text';
+        input.inputMode = 'decimal';
+        const unformat = () => {
+            const number = parseLocalizedNumber(input.value);
+            if (Number.isFinite(number)) input.value = String(number);
+        };
+        input.addEventListener('focus', unformat);
+        input.addEventListener('blur', function () {
+            if (input.value.trim()) input.value = formatLocalizedNumber(input.value, currency);
+        });
+        const parentForm = input.closest('form');
+        if (parentForm) {
+            parentForm.addEventListener('submit', function () {
+                unformat();
             });
-            const data = await response.json();
-            if (!response.ok || !data.ok) {
-                const fieldErrors = data.errors
-                    ? Object.values(data.errors).flat().join(' ')
-                    : '';
-                throw new Error(fieldErrors || data.error || 'No se pudo crear el material.');
-            }
-
-            const option = new Option(`${data.codigo} - ${data.nombre}`, String(data.id));
-            option.dataset.costoBase = data.costo_base;
-            materialSelect.add(option);
-            materialSelect.value = String(data.id);
-            materialCostInput.value = data.costo_base;
-            createMaterialForm.reset();
-            createMaterialModal.hidden = true;
-            createMaterialFeedback.textContent = `${data.nombre} se creó y quedó seleccionado.`;
-            createMaterialFeedback.classList.remove('error');
-        } catch (error) {
-            createMaterialMessage.textContent = error.message || 'No se pudo crear el material. Inténtalo de nuevo.';
-            createMaterialMessage.classList.add('error');
-        } finally {
-            createMaterialSubmit.disabled = false;
         }
+        if (input.value.trim()) input.value = formatLocalizedNumber(input.value, currency);
+    }
+
+    document.querySelectorAll(
+        '.admin-ot-material-form [name=cantidad], .admin-ot-add-material [name=cantidad], ' +
+        '.admin-service-form [name=cantidad]'
+    ).forEach(input => formatNumberInput(input, false));
+    document.querySelectorAll(
+        '.admin-ot-material-form [name=costo_real], .admin-ot-material-form [name=precio_venta_aplicado], ' +
+        '.admin-ot-add-material [name=costo_real], .admin-service-form [name=precio_unitario], ' +
+        '#admin-ot-billing-form [name=valor_mano_obra]'
+    ).forEach(input => formatNumberInput(input, true));
+
+    materialSearch.addEventListener('input', function () {
+        const match = materialOptions.find(option =>
+            option.value.toLocaleLowerCase() === materialSearch.value.trim().toLocaleLowerCase()
+        );
+        materialId.value = match ? match.dataset.materialId : '';
+        materialCostInput.value = match
+            ? formatLocalizedNumber(match.dataset.costoBase, true)
+            : '';
+    });
+
+    serviceName.addEventListener('input', function () {
+        const match = serviceOptions.find(option =>
+            option.value.toLocaleLowerCase() === serviceName.value.trim().toLocaleLowerCase()
+        );
+        servicePrice.value = match
+            ? formatLocalizedNumber(match.dataset.precio, true)
+            : '';
     });
 
     function materialTotal() {
         let total = 0;
         document.querySelectorAll('.admin-ot-material-form').forEach(function (materialForm) {
-            const quantity = Number(materialForm.querySelector('[name=cantidad]').value || 0);
-            const sale = Number(materialForm.querySelector('[name=precio_venta_aplicado]').value || 0);
+            const quantity = parseLocalizedNumber(materialForm.querySelector('[name=cantidad]').value) || 0;
+            const sale = parseLocalizedNumber(materialForm.querySelector('[name=precio_venta_aplicado]').value) || 0;
             total += quantity * sale;
         });
         return total;
@@ -348,8 +336,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function materialCostTotal() {
         let total = 0;
         document.querySelectorAll('.admin-ot-material-form').forEach(function (materialForm) {
-            const quantity = Number(materialForm.querySelector('[name=cantidad]').value || 0);
-            const cost = Number(materialForm.querySelector('[name=costo_real]').value || 0);
+            const quantity = parseLocalizedNumber(materialForm.querySelector('[name=cantidad]').value) || 0;
+            const cost = parseLocalizedNumber(materialForm.querySelector('[name=costo_real]').value) || 0;
             total += quantity * cost;
         });
         return total;
@@ -358,7 +346,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function updatePreview() {
         const materials = materialTotal();
         const materialCost = materialCostTotal();
-        const labor = Number(laborInput.value || 0);
+        const labor = parseLocalizedNumber(laborInput.value) || 0;
         const invoice = materials + labor;
         const payrollRaw = finance.dataset.costoNomina;
         totalMaterialsEl.textContent = money(materials);

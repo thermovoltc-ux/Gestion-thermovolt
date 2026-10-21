@@ -307,3 +307,17 @@ class MaterialOTForm(forms.ModelForm):
                 'maxlength': '5000',
             }),
         }
+
+
+class ServicioOTForm(forms.Form):
+    nombre = forms.CharField(max_length=150)
+    cantidad = forms.DecimalField(
+        min_value=Decimal('0.01'),
+        max_digits=10,
+        decimal_places=2,
+    )
+    precio_unitario = forms.DecimalField(
+        min_value=Decimal('0'),
+        max_digits=12,
+        decimal_places=2,
+    )

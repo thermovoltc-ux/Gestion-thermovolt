@@ -1,0 +1,208 @@
+﻿categoria,codigo,nombre,costo_base
+R,RCT001,cinta teflon,21000.00
+R,RAR002,Aceite reductor,63000.00
+R,RAC003,Aceite 100,40000.00
+R,RAT004,Aceite 32,42000.00
+R,RRS005,Resistencia 6mm,70000.00
+R,RRS006,Rodamiento 6206,114000.00
+R,RRS007,Rodamiento 6205,114000.00
+R,RRS008,Rodamiento 6204,114000.00
+R,RGS009,Guia sierra sin fin 98,19000.00
+R,RRV010,Rele 24 DC,40000.00
+R,RFA011,Filtro de aceite 3/4 x16( no dejo resjistrar el / en la dian),30000.00
+R,RSD012,Selector 2 posiciones,70000.00
+R,RCT013,Clavija y toma aerea steck,210200.00
+R,REP014,Empaque perimetral tapa empacadora pequeña,80000.00
+R,RIE015,Insumos electricos,21000.00
+R,RVC016,varilla al 5%,12000.00
+R,RRP017,filtro de piedra 1/4 rgc,20000.00
+R,RFR018,Fleje para reja,40000.00
+R,RMI019,Mano de obra instalacion de fleje,118000.00
+R,RRS020,Refrigerante 507,45000.00
+R,RDC021,Desincrustante,30000.00
+R,RCT022,Contactor,55000.00
+R,RRT023,Retenedores,37200.00
+R,RLR024,Luminaria 90cm rosada,23000.00
+R,RNG025,Nitrogeno,50000.00
+R,RFL026,limpiador ECOFLUSH,45000.00
+R,RBD027,Banda,36000.00
+R,RMD028,Mecanizado,303000.00
+R,RPB029,Pintura de base,83000.00
+R,RRS030,Rodamiento 6000,34000.00
+R,RPA031,PIntura aerosol anticorrosivo,18000.00
+R,RCM032,Capasitor de marcha,26200.00
+R,RCA033,Capasitor de arranque,31500.00
+R,RCA034,centrifugo automatico motor,35000.00
+R,RRS035,Rodamiento 6300 inox,22130.00
+R,RRS036,Rodamiento 6200 inox,18084.00
+R,RRS037,Rodamiento 6203,25000.00
+R,RRS038,Rodamiento 6202,21000.00
+R,RCI039,Chumasera inoxidable 1pulgada,164446.00
+R,RSM040,Suministro de molino,16816.00
+R,RRR041,recubrimiento para rodillo,185000.00
+R,RLB042,Luminaria 120cm blanca,16000.00
+R,CBL043,Bandas rodamientos y lubricante laminadora,350000.00
+R,RTL044,tubo led t8,24000.00
+R,RVE045,Ventilador tipo panela evaporador,67500.00
+R,RIM046,Insumos mecanicos,21000.00
+R,RBT047,Banda de transmisión,63000.00
+R,RRK048,Rodamiento y kit de encendido,240000.00
+R,RDT049,Rueda nylon 3 pul,22500.00
+R,RFB050,Fabricacion de buje bronce,55000.00
+R,RTI051,Tubo inoxidable 1 y media,230000.00
+R,RRS052,Rodamiento 6214,395000.00
+R,RKA053,kit de arranque,61000.00
+R,RCL054,Cuchilla molino #32,90000.00
+R,RFP055,Filtro de piedra 3/8,48000.00
+R,RLI056,Lamina inoxidable,110000.00
+R,RSP057,Spigot,230000.00
+R,RCH058,CHAZIS HERMETICA,64569.00
+R,RTL059,TUBO LED T8 24W 6500K POLICARBONATO MERCURY/TITANIUM/ZAFIRO,26036.00
+R,RBE060,BREAKER ENCHUFABLE 3X30 STECK/MERCURY/TERCOL,65089.00
+R,RCA061,CABLE 10AWG AMARILLO,7811.00
+R,RCA062,CABLE 10AWG AZUL,7811.00
+R,RCR063,CABLE 10AWG ROJO,7811.00
+R,RBR064,BREAKER RIEL 3X32A 230/400V 6KA CHINT,85571.00
+R,RTL065,tubo led 18w,9500.00
+R,RCE066,Cable encauchetado 3por18,5857.00
+R,RPL067,Panel led de incrustar,20000.00
+R,RCT068,Clavija y toma aerea IP 44,86000.00
+R,RVT069,Ventilador elco 10w 220v,50000.00
+R,RCP070,CAPERUZA,43000.00
+R,RCT071,CAPACITOR 60MF,86000.00
+R,RLP072,LAMPARAS 100W,43000.00
+R,RBS073,Bisagra Vaiven,317142.00
+R,RTC074,Cable encauchetado tomas y clavijas.,294418.00
+R,RPT075,Fabricacion de base en acero inoxidable,325000.00
+R,RST076,Switch final de carrera,68000.00
+R,RBM077,Rebobinado Motor,935000.00
+R,REI078,Breake,0.00
+R,RSD079,Resistencia para drenaje,92900.00
+R,RTE080,Tapa para empacadora al vacio,900000.00
+R,REP081,Empaque perimetral tapa empacadora torrey,150000.00
+R,REB082,Bisel para empaque vaivén,43500.00
+R,RVE083,Valvula de expancion para 507,198000.00
+R,ROR084,Orificio 00,30000.00
+M,MAM000,Alquiler molino 12,50000.00
+M,MPE001,MTTO Preventivo Empacadora al vacio,336320.00
+M,MPM002,MTTO Preventivo Molino de carne,441420.00
+M,MPS003,MTTO Preventivo Sierra sin fin,515000.00
+M,MSC004,Sustitucion cinta teflon,80000.00
+M,MSR005,Sustitucion de relay 8 pines,80000.00
+M,MCS006,MTTO correctivo sistema electrico,126000.00
+M,MSI007,Sustitucion de interructor principal,80000.00
+M,MCS008,MTTO correctivo sierra sin fin poleas,168200.00
+M,MCS009,MTTO correctivo soldadura,168200.00
+M,MSR010,Sustitucion de resistencia sis sellado,120000.00
+M,MSC011,Sustitucion de clavija o punto electrico,94600.00
+M,MST012,Sustitución de temporizador,73600.00
+M,MFE013,Fabricacion de empaques,47300.00
+M,MRR014,Rectificacion de roscas,63100.00
+M,MFP015,"Fabricación de piñones, reparación de bujes y ajuste tornillo sin fin para molino de carne.",900000.00
+M,MRV016,Revision,60000.00
+M,MFA017,Fabricacion de Arandela molino,36000.00
+M,MCB018,Cambio de bobina solenoide,90000.00
+M,MRE019,Ratificacion de eje,149200.00
+M,MSS020,Suministro de sierra 63 pulgadas,20000.00
+M,MSP021,suministro de polea superior,360000.00
+M,MFE022,Fabricacion de ejes y tornillos inoxidables,247000.00
+M,MCM023,MTTO correctivo molino,194435.00
+M,MRE024,Ratificacion de eje,240000.00
+M,MBE025,Barnizado motor electrico,452000.00
+M,MFT026,Fabricacion de tensor y sustitucion de piezas oxidadas,325000.00
+M,MCC027,cambio de cableado de control,78900.00
+M,MPV028,Programacion de variador de frecuencia,215000.00
+M,MME029,Modificacion de estructura para banda trasnportadora,1200000.00
+M,MBD030,Adicion de Banda trasnportadora,968000.00
+M,MIR031,instalacion de remaches,95000.00
+M,HST032,Hora de servico tecnico,116000.00
+M,RPT033,REPARACION DE TARJETA ELECTRONICA,350000.00
+M,FDC034,Fabricacion de ejes embolvedor,602000.00
+M,FAC035,Fabricacion de amortiguador corte longitudinal,142800.00
+M,MME032,MTTO motor electrico,199700.00
+M,MVF033,Variador de frecuencia 3HP,977000.00
+M,MIP034,Instalacion y programacion  de variador,488500.00
+M,MME035,Modificacion de espigot molino,143000.00
+M,MCR036,Cambio de retenedores,180000.00
+M,MFE037,Fabricacion de eje posterior templado,760000.00
+M,MRA038,Ratificacion de ajuste para retenedor,220000.00
+M,MFS039,Fabricacion de spigot,422400.00
+M,MFA040,Fabricacion de acople trasero templado,800000.00
+M,MSP041,suministro de polea,443000.00
+M,MSL042,Sustitucion de lampara,54666.00
+M,MEJ043,Rectififcacion de Empujador de carne,70000.00
+M,MRC044,Rectificacin de cuhilla molino #32,40000.00
+M,MCT045,Cambio de tubo led o panel led,28000.00
+M,MFC046,Fabricacion de cortina,105000.00
+M,MCT047,Cambio de cableado trifasico por metro,21500.00
+M,MPM048,Mantenimeint preventivo basico molino,126500.00
+M,MFP049,Fabricacin de pisador de carne molino,160000.00
+M,MRG050,Rodamiento 7202,77300.00
+M,MBR051,BALINERA 6201,21300.00
+M,MBR052,BALINERA 5120,100300.00
+M,MBR053,BALINERA6203,51700.00
+F,FPV000,MTTO Preven nevera vertical 1 o 2 puertas,94600.00
+F,FPV001,MTTO Preven vitrina exibidora de carne Horizontal,115600.00
+F,FPA002,MTTO Preven Aire Acondicionado de 9.000 btu/h a 18.000 btu/h,90000.00
+F,FPA003,MTTO Preven Aire Acondicionado de 24.000 btu/h a 36.000 btu/h,110000.00
+F,FPA004,MTTO Preven Aire Acondicionado de 48.000 btu/h a 60.000 btu/h,170000.00
+F,FPA005,MTTO Preven Autoservicio de 1 unidad,89000.00
+F,FPC006,MTTO Preven Congelador horizontal,80000.00
+F,FPC007,MTTO Preven Cava modular,210200.00
+F,FPN008,MTTO Preven Nevera vertical 3 puertas,120000.00
+F,FCK009,Cambio kit arranque,120000.00
+F,FCC010,Cambio de compresor de 0 a 1 hp,239000.00
+F,FCC011,Cambio de compresor de 2 a 5 hp,289880.00
+F,FCC012,Corrección de corto eléctrico,136630.00
+F,FCV013,Cambio válvula solenoide,187400.00
+F,FCC014,Cambio de contactor,120000.00
+F,FCV015,Cambio de válvula de expansión,298000.00
+F,FCC016,Cambio y configuración de control de temperatura,145000.00
+F,FRF017,Reparación de fuga,220000.00
+F,FCV018,Cambio ventilador del evaporador,147000.00
+F,FVK019,Valor kilómetro fuera área metropolitana,1500.00
+F,FCV020,Cambio de ventilador del condensador,169720.00
+F,FDC021,Diagnóstico correctivo,153000.00
+F,FCP022,Calibracion de parametros y temperatura (Programacion controlador),74000.00
+F,FRC023,Repuestos Instalacion Compresor,171500.00
+F,FAV024,Ajuste de valvula de expansion,100000.00
+F,FCP025,Cambio de presostato,158000.00
+F,FVU026,Ventilador unidad condesadora,260000.00
+F,FBR027,Barrido de sistema de refrigeracion,200000.00
+F,FLV028,Limpieza de vitrina,100000.00
+F,FCT029,Controlador de temperatura FULL GAUGE,406000.00
+F,FMI031,"MTTO correctivo en estructura de vitrina, nevera, o cava",145000.00
+F,FBC032,Instalacion de bisagras Puerta de cava,142857.00
+F,FIE033,Instalacion de empaque perimetral puerta de cava,198000.00
+F,FRO034,Reparacion de parte oxidada en puerta y chapa,115000.00
+F,FRF035,Correcion de fuga en cava modular,348200.00
+L,LPB000,Puertas y bizagras,84000.00
+L,LLT001,Luminarias y tomas,84000.00
+L,LIL002,instalaciones locativas,170000.00
+L,LIL003,Insumos locativos,40000.00
+L,LMC004,MTTO correctivos en infraestructura o zona comunes,85000.00
+R,RTE054,Targeta electronica,989140.00
+R,RTC055,toma y clavija bcp ip44,87200.00
+R,RCL056,Cuchilla molino #32,90000.00
+R,RDC057,Disco 4.5 #32,100000.00
+R,RRC058,Valvula reguladora con antiretorno,245000.00
+R,RLE059,Lampara Hermetica 60w,194300.00
+R,RRS060,Resistencia de 140cm vitrina,168400.00
+R,RMT061,Motor 3 hp,1200000.00
+R,RPL062,Polea inferior 98,660000.00
+R,RCE063,Cable encauchetado,12142.00
+R,RLI064,Lampara ip 67,68600.00
+R,RAD065,Arrancador directo,235714.00
+R,RCP066,Cinta para sierra 78,45000.00
+R,RFP067,Recuperacion de sin fin,971428.00
+R,RSP068,Spigot para molino 32,285714.00
+R,RVS069,Bloque de valvulas sistema de vacio,786000.00
+R,RRD070,Rodamiento 6205 SKF,36622.00
+M,MRT042,reparacion targeta electronica,989140.00
+M,MCF043,Correcion de fuga en cava de refrigeracion o congelacion,657000.00
+M,MIC044,Instalacion de cortina,75000.00
+M,MRP045,recargo por empacadora doble campana,65000.00
+M,MRP46,Reparación de rosca cabezal,450000.00
+M,MRF047,Rectificacion de cilindro Bomba de vacio,380000.00
+M,MTC048,Mtto Correctivo Empacadora al vacio,236000.00
+L,LCL005,Sustitucion de lampara,54666.00

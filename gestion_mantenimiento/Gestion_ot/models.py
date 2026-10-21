@@ -3,6 +3,7 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from mptt.models import MPTTModel, TreeForeignKey
 from datetime import timedelta
+from decimal import Decimal
 from dateutil.relativedelta import relativedelta
 import re
 import unicodedata
@@ -462,6 +463,28 @@ class MaterialOT(models.Model):
 
     def __str__(self):
         return f"{self.material} x {self.cantidad} - OT-{self.orden_trabajo_id}"
+
+
+class ServicioOT(models.Model):
+    orden_trabajo = models.ForeignKey(
+        OrdenTrabajo,
+        on_delete=models.CASCADE,
+        related_name='servicios_facturados',
+    )
+    nombre = models.CharField(max_length=150)
+    cantidad = models.DecimalField(max_digits=10, decimal_places=2)
+    precio_unitario = models.DecimalField(max_digits=12, decimal_places=2)
+    fecha_registro = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['fecha_registro', 'pk']
+
+    @property
+    def total(self):
+        return (self.cantidad * self.precio_unitario).quantize(Decimal('0.01'))
+
+    def __str__(self):
+        return f"{self.nombre} x {self.cantidad} - OT-{self.orden_trabajo_id}"
 
 
 # ============================================================================

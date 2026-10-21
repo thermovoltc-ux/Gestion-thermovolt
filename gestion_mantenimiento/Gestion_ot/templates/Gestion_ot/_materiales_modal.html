@@ -1,3 +1,4 @@
+{% load l10n humanize %}
 <div class="materiales-ot-modal" id="modal-agregar-material" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-material" hidden>
     <div class="materiales-ot-modal-content">
         {% csrf_token %}
@@ -9,7 +10,7 @@
             <select id="select-material" class="form-control">
                 <option value="">Seleccionar material...</option>
                 {% for m in materiales_catalogo %}
-                <option value="{{ m.id }}" data-costo="{{ m.costo_base }}">{{ m.codigo }} — {{ m.nombre }}</option>
+                <option value="{{ m.id }}" data-costo="{{ m.costo_base|unlocalize }}">{{ m.codigo }} — {{ m.nombre }} — $ {{ m.costo_base|intcomma }}</option>
                 {% endfor %}
             </select>
             <button type="button" class="cierre-ot-btn cierre-ot-btn-secondary" id="btn-abrir-modal-nuevo-material">Crear nuevo repuesto</button>

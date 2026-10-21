@@ -1,6 +1,6 @@
 {% extends "solicitudes/indexpadre.html" %}
 
-{% load static %}
+{% load static humanize %}
 
 {% block title %}Cierre de OT{% endblock %}
 
@@ -119,8 +119,8 @@
                                     {% for mat_ot in ot.materiales.all %}
                                     <tr>
                                         <td>{{ mat_ot.material.nombre }}</td>
-                                        <td>{{ mat_ot.cantidad }}</td>
-                                        <td>${{ mat_ot.costo_real }}</td>
+                                        <td>{{ mat_ot.cantidad|intcomma }}</td>
+                                        <td>$ {{ mat_ot.costo_real|intcomma }}</td>
                                         <td>
                                             {% if mat_ot.foto_factura %}
                                             <a href="{{ mat_ot.foto_factura.url }}" target="_blank" rel="noopener">Ver factura</a>
