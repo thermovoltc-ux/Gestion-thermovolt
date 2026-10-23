@@ -182,7 +182,7 @@
                 <input type="search" id="admin-service-name" name="nombre" list="servicios-datalist" autocomplete="off" required maxlength="150">
                 <datalist id="servicios-datalist">
                     {% for servicio in servicios_catalogo %}
-                        <option value="{{ servicio.nombre }}" data-categoria="{{ servicio.categoria }}" data-precio="{{ servicio.precio_venta_sugerido|unlocalize }}"></option>
+                        <option value="{{ servicio.nombre }}" data-categoria="{{ servicio.categoria }}" data-precio="{% if servicio.categoria == 'servicios' %}{{ servicio.precio_venta_sugerido|unlocalize }}{% else %}{{ servicio.costo_base|unlocalize }}{% endif %}"></option>
                     {% endfor %}
                 </datalist>
             </div>

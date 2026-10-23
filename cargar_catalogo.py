@@ -92,7 +92,7 @@ def import_catalog(csv_path, dry_run=False):
                     nombre__iexact=name,
                 ).order_by('pk').first()
             suggested_sale_price = cost
-            if category == 'repuestos':
+            if category in {'repuestos', 'maquinaria', 'frio', 'locativos'}:
                 suggested_sale_price = (cost / SALE_MARGIN_FACTOR).quantize(
                     Decimal('0.01'),
                     rounding=ROUND_HALF_UP,

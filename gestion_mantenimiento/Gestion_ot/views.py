@@ -1229,7 +1229,7 @@ def facturacion_admin(request):
 
 
 def _precio_venta_desde_costo(costo, categoria):
-    if categoria != 'repuestos':
+    if categoria not in {'repuestos', 'maquinaria', 'frio', 'locativos'}:
         return costo
     return (costo / Decimal('0.7')).quantize(
         Decimal('0.01'),
