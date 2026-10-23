@@ -1686,6 +1686,30 @@ def rentabilidad_admin(request):
     por_cliente = agrupar_filas(
         lambda fila: fila['ot'].solicitud.ubicacion_nombre
     )
+    costos_totales = totales['costo_materiales'] + totales['costo_nomina']
+    margen_total = None
+    if totales['ingresos']:
+        margen_total = (
+            totales['ganancia'] * Decimal('100') / totales['ingresos']
+        ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    datos_graficos = {
+        'tecnicos': [
+            {
+                'nombre': resumen['nombre'],
+                'ingresos': resumen['ingresos'],
+                'costos': resumen['costo_materiales'] + resumen['costo_nomina'],
+            }
+            for resumen in por_tecnico
+        ],
+        'clientes': [
+            {
+                'nombre': resumen['nombre'],
+                'ingresos': resumen['ingresos'],
+            }
+            for resumen in por_cliente
+        ],
+    }
     return render(
         request,
         'Gestion_ot/rentabilidad.html',
@@ -1696,6 +1720,9 @@ def rentabilidad_admin(request):
             'tecnicos': tecnicos,
             'tecnico_seleccionado': tecnico_id,
             'totales': totales,
+            'costos_totales': costos_totales,
+            'margen_total': margen_total,
+            'datos_graficos': datos_graficos,
             'por_tecnico': por_tecnico,
             'por_cliente': por_cliente,
             'cantidad_calculable': len(filas_calculables),

@@ -931,7 +931,9 @@ class RentabilidadAdminTests(TestCase):
         response = self.client.get(reverse('rentabilidad_admin'))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Rentabilidad por Orden de Trabajo')
+        self.assertContains(response, 'Panel de rentabilidad')
+        self.assertContains(response, 'profit-technician-chart')
+        self.assertContains(response, 'profit-client-chart')
         self.assertContains(response, reverse('rentabilidad_admin'))
 
     def test_technician_is_redirected_without_access(self):
@@ -959,8 +961,22 @@ class RentabilidadAdminTests(TestCase):
         self.assertEqual(response.context['totales']['ganancia'], Decimal('-40.00'))
         self.assertEqual(response.context['por_tecnico'][0]['cantidad_ots'], 1)
         self.assertEqual(response.context['por_cliente'][0]['ganancia'], Decimal('-40.00'))
+        self.assertEqual(response.context['costos_totales'], Decimal('300.00'))
+        self.assertEqual(response.context['margen_total'], Decimal('-15.38'))
+        self.assertEqual(
+            response.context['datos_graficos']['tecnicos'],
+            [{
+                'nombre': self.ot.tecnico_display,
+                'ingresos': Decimal('260.00'),
+                'costos': Decimal('300.00'),
+            }],
+        )
+        self.assertEqual(
+            response.context['datos_graficos']['clientes'][0]['ingresos'],
+            Decimal('260.00'),
+        )
         self.assertContains(response, 'Ingreso total')
-        self.assertContains(response, 'Mano de obra facturada')
+        self.assertContains(response, 'Mano de obra')
 
     def test_invoice_detail_includes_items_and_reconciles_to_rentabilidad_total(self):
         servicio_material = Material.objects.create(

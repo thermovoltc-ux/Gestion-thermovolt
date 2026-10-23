@@ -5,27 +5,54 @@
 
 {% block content %}
 <style>
-    .profit-page { max-width: 1500px; margin: 0 auto; padding: 24px; color: #1e293b; }
-    .profit-page h1 { margin: 0 0 8px; }
-    .profit-muted { color: #64748b; }
-    .profit-note, .profit-warning { padding: 14px 16px; border-radius: 8px; margin: 16px 0; }
-    .profit-note { background: #eff6ff; color: #1e40af; }
-    .profit-warning { background: #fff7ed; color: #9a3412; }
-    .profit-filters, .profit-card, .profit-table-wrap { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(15, 23, 42, .08); }
-    .profit-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 14px; align-items: end; padding: 18px; margin: 20px 0; }
-    .profit-filters label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-    .profit-filters input, .profit-filters select { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 6px; }
-    .profit-filters button { width: 100%; padding: 10px; border: 0; border-radius: 6px; background: #2563eb; color: #fff; font-weight: 700; cursor: pointer; }
-    .profit-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin: 20px 0; }
-    .profit-card { padding: 18px; }
-    .profit-card span { display: block; color: #64748b; font-size: 13px; }
-    .profit-card strong { display: block; margin-top: 8px; font-size: 24px; }
-    .profit-table-wrap { overflow-x: auto; }
-    .profit-table { width: 100%; border-collapse: collapse; min-width: 1050px; }
-    .profit-table th, .profit-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: right; white-space: nowrap; }
-    .profit-table th { background: #f1f5f9; font-size: 13px; }
-    .profit-summary { margin: 20px 0; }
-    .profit-summary h2 { font-size: 19px; margin: 0 0 10px; }
+    .profit-page { --profit-ink: #172554; --profit-muted: #64748b; --profit-border: #e2e8f0; max-width: 1600px; margin: 0 auto; padding: 28px; color: #1e293b; }
+    .profit-page h1 { margin: 0; color: var(--profit-ink); font-size: clamp(25px, 3vw, 34px); letter-spacing: -.04em; }
+    .profit-muted { color: var(--profit-muted); }
+    .profit-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 8px 0 18px; }
+    .profit-header p { margin: 8px 0 0; }
+    .profit-period { padding: 10px 14px; border: 1px solid #dbeafe; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: 13px; font-weight: 700; white-space: nowrap; }
+    .profit-note, .profit-warning { padding: 14px 16px; border-radius: 10px; margin: 16px 0; }
+    .profit-note { background: #eff6ff; color: #1e40af; border: 1px solid #dbeafe; }
+    .profit-warning { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
+    .profit-filters, .profit-card, .profit-panel, .profit-table-wrap { background: #fff; border: 1px solid #e8edf5; border-radius: 14px; box-shadow: 0 8px 24px rgba(15, 23, 42, .045); }
+    .profit-filters { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 14px; align-items: end; padding: 18px; margin: 16px 0 22px; }
+    .profit-filters label { display: block; color: #475569; font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+    .profit-filters input, .profit-filters select { width: 100%; box-sizing: border-box; padding: 10px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #0f172a; }
+    .profit-filters button { width: 100%; padding: 11px; border: 0; border-radius: 8px; background: #1d4ed8; color: #fff; font-weight: 700; cursor: pointer; transition: background .15s ease, transform .15s ease; }
+    .profit-filters button:hover, .profit-action:hover { background: #1e40af; transform: translateY(-1px); }
+    .profit-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 16px 0; }
+    .profit-card { position: relative; overflow: hidden; min-height: 115px; padding: 18px 19px; }
+    .profit-card::after { position: absolute; top: -34px; right: -28px; width: 96px; height: 96px; border-radius: 50%; background: var(--card-tint, #eff6ff); content: ""; opacity: .8; }
+    .profit-card span, .profit-card strong, .profit-card small { position: relative; z-index: 1; display: block; }
+    .profit-card span { color: #64748b; font-size: 12px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+    .profit-card strong { margin-top: 12px; color: #0f172a; font-size: clamp(20px, 2vw, 27px); line-height: 1.15; overflow-wrap: anywhere; }
+    .profit-card small { margin-top: 8px; color: #64748b; font-size: 12px; }
+    .profit-card-blue { --card-tint: #dbeafe; border-top: 3px solid #3b82f6; }
+    .profit-card-violet { --card-tint: #ede9fe; border-top: 3px solid #8b5cf6; }
+    .profit-card-green { --card-tint: #dcfce7; border-top: 3px solid #22c55e; }
+    .profit-card-amber { --card-tint: #fef3c7; border-top: 3px solid #f59e0b; }
+    .profit-card-slate { --card-tint: #e2e8f0; border-top: 3px solid #64748b; }
+    .profit-card-red { --card-tint: #fee2e2; border-top: 3px solid #ef4444; }
+    .profit-charts { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, 1fr); gap: 16px; margin: 22px 0; }
+    .profit-panel { min-width: 0; padding: 20px; }
+    .profit-panel-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; margin-bottom: 16px; }
+    .profit-panel h2, .profit-summary h2, .profit-detail-heading h2 { margin: 0; color: #172554; font-size: 18px; letter-spacing: -.02em; }
+    .profit-panel-heading p { margin: 5px 0 0; color: #64748b; font-size: 13px; }
+    .profit-chart-box { position: relative; height: 300px; }
+    .profit-chart-fallback { display: none; padding: 28px 12px; color: #64748b; text-align: center; }
+    .profit-table-wrap { overflow: auto; }
+    .profit-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1050px; }
+    .profit-table th, .profit-table td { padding: 12px 14px; border-bottom: 1px solid #eef2f7; text-align: right; white-space: nowrap; }
+    .profit-table th { position: sticky; top: 0; z-index: 1; background: #f8fafc; color: #475569; font-size: 11px; font-weight: 800; letter-spacing: .055em; text-transform: uppercase; }
+    .profit-table tbody tr { transition: background .12s ease; }
+    .profit-table tbody tr:hover { background: #f8fbff; }
+    .profit-table tbody tr:last-child td { border-bottom: 0; }
+    .profit-summary { margin: 22px 0; }
+    .profit-summary h2 { font-size: 19px; margin: 0 0 11px; }
+    .profit-detail-heading { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin: 28px 0 12px; }
+    .profit-detail-heading p { margin: 5px 0 0; color: #64748b; font-size: 13px; }
+    .profit-name { color: #0f172a; font-weight: 700; }
+    .profit-ot-number { display: inline-flex; padding: 4px 8px; border-radius: 6px; background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 800; }
     .profit-table th:first-child, .profit-table td:first-child,
     .profit-table th:nth-child(2), .profit-table td:nth-child(2),
     .profit-table th:nth-child(3), .profit-table td:nth-child(3),
@@ -33,7 +60,11 @@
     .profit-positive { color: #047857; font-weight: 700; }
     .profit-negative { color: #b91c1c; font-weight: 700; }
     .profit-pending { color: #b45309; white-space: normal !important; min-width: 180px; }
-    .profit-action { display: inline-block; border: 0; border-radius: 6px; padding: 8px 12px; background: #2563eb; color: #fff; font-weight: 700; text-decoration: none; cursor: pointer; }
+    .profit-margin { display: inline-block; min-width: 66px; padding: 5px 8px; border-radius: 999px; text-align: center; font-size: 12px; font-weight: 800; }
+    .profit-margin-high { background: #dcfce7; color: #166534; }
+    .profit-margin-mid { background: #fef3c7; color: #92400e; }
+    .profit-margin-low { background: #fee2e2; color: #991b1b; }
+    .profit-action { display: inline-block; border: 0; border-radius: 7px; padding: 8px 12px; background: #2563eb; color: #fff; font-weight: 700; text-decoration: none; cursor: pointer; transition: background .15s ease, transform .15s ease; }
     .invoice-modal[hidden] { display: none; }
     .invoice-modal { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 20px; background: rgba(15, 23, 42, .65); }
     .invoice-document { width: min(900px, 100%); max-height: 90vh; overflow: auto; padding: 36px; background: #fff; color: #1e293b; border-radius: 12px; box-shadow: 0 20px 60px rgba(0, 0, 0, .25); }
@@ -50,7 +81,9 @@
     .invoice-grand-total { padding-top: 12px; border-top: 2px solid #1e293b; font-size: 20px; }
     .invoice-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 28px; }
     .invoice-message { padding: 18px 0; color: #b91c1c; }
-    @media (max-width: 640px) { .invoice-document { padding: 20px; } .invoice-header { grid-template-columns: 1fr; } }
+    @media (max-width: 900px) { .profit-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .profit-charts { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) { .profit-page { padding: 15px; } .profit-header { align-items: start; flex-direction: column; } .profit-period { white-space: normal; } .profit-filters { grid-template-columns: 1fr 1fr; padding: 14px; } .profit-kpis { gap: 10px; } .profit-card { min-height: 105px; padding: 14px; } .profit-card strong { font-size: 19px; } .profit-panel { padding: 15px; } .profit-chart-box { height: 260px; } .profit-detail-heading { align-items: start; flex-direction: column; } .invoice-document { padding: 20px; } .invoice-header { grid-template-columns: 1fr; } }
+    @media (max-width: 380px) { .profit-kpis { grid-template-columns: 1fr; } .profit-filters { grid-template-columns: 1fr; } }
     @media print {
         body * { visibility: hidden !important; }
         .invoice-modal, .invoice-modal * { visibility: visible !important; }
@@ -58,12 +91,17 @@
         .invoice-document { width: 100%; max-height: none; overflow: visible; padding: 0; border-radius: 0; box-shadow: none; }
         .invoice-actions { display: none !important; }
     }
-    @media (max-width: 640px) { .profit-page { padding: 16px; } }
+    @media print { .profit-header, .profit-filters, .profit-kpis, .profit-charts, .profit-summary, .profit-note, .profit-warning { break-inside: avoid; } }
 </style>
 
 <main class="profit-page">
-    <h1>Rentabilidad por Orden de Trabajo</h1>
-    <p class="profit-muted">Período: {{ fecha_inicio|date:"d/m/Y" }} – {{ fecha_fin|date:"d/m/Y" }}</p>
+    <header class="profit-header">
+        <div>
+            <h1>Panel de rentabilidad</h1>
+            <p class="profit-muted">Resumen ejecutivo de ingresos, costos y desempeño.</p>
+        </div>
+        <div class="profit-period">Período · {{ fecha_inicio|date:"d/m/Y" }} — {{ fecha_fin|date:"d/m/Y" }}</div>
+    </header>
 
     <div class="profit-note">
         El ingreso suma los materiales con su precio aplicado y el valor manual registrado para mano de obra / servicios prestados. Los servicios de precio fijo deben incluirse en ese valor manual; no se les aplica el factor 0.7.
@@ -99,19 +137,38 @@
         <div><button type="submit">Aplicar filtros</button></div>
     </form>
 
-    <p class="profit-muted">Totales correspondientes a {{ cantidad_calculable }} OT(s) con costo de nómina calculable.</p>
+    <p class="profit-muted">Indicadores calculados sobre {{ cantidad_calculable }} OT(s) con costo de nómina calculable.</p>
     <section class="profit-kpis" aria-label="Totales de rentabilidad calculables">
-        <div class="profit-card"><span>Ingreso total</span><strong>$ {{ totales.ingresos|intcomma }}</strong></div>
-        <div class="profit-card"><span>Mano de obra facturada</span><strong>$ {{ totales.valor_mano_obra|intcomma }}</strong></div>
-        <div class="profit-card"><span>Costo de materiales</span><strong>$ {{ totales.costo_materiales|intcomma }}</strong></div>
-        <div class="profit-card"><span>Nómina estimada</span><strong>$ {{ totales.costo_nomina|intcomma }}</strong></div>
-        <div class="profit-card"><span>Ganancia estimada</span><strong>$ {{ totales.ganancia|intcomma }}</strong></div>
+        <article class="profit-card profit-card-blue"><span>Ingresos</span><strong>$ {{ totales.ingresos|intcomma }}</strong><small>Ingresos de OT calculables</small></article>
+        <article class="profit-card profit-card-slate"><span>Costos totales</span><strong>$ {{ costos_totales|intcomma }}</strong><small>Materiales + nómina estimada</small></article>
+        <article class="profit-card {% if totales.ganancia < 0 %}profit-card-red{% else %}profit-card-green{% endif %}"><span>Ganancia estimada</span><strong>$ {{ totales.ganancia|intcomma }}</strong><small>Ingresos menos costos totales</small></article>
+        <article class="profit-card profit-card-violet"><span>Margen global</span><strong>{% if margen_total != None %}{{ margen_total|floatformat:2 }}%{% else %}—{% endif %}</strong><small>Ganancia / ingresos calculables</small></article>
+        <article class="profit-card profit-card-amber"><span>Mano de obra</span><strong>$ {{ totales.valor_mano_obra|intcomma }}</strong><small>Servicios facturados</small></article>
+        <article class="profit-card profit-card-blue"><span>OTs calculables</span><strong>{{ cantidad_calculable }}</strong><small>Incluidas en los indicadores</small></article>
+        <article class="profit-card profit-card-red"><span>OTs pendientes</span><strong>{{ cantidad_pendiente }}</strong><small>No incluidas en rentabilidad</small></article>
+    </section>
+
+    <section class="profit-charts" aria-label="Gráficos de rentabilidad">
+        <article class="profit-panel">
+            <div class="profit-panel-heading">
+                <div><h2>Ingresos vs. costos por técnico</h2><p>Comparación del período filtrado.</p></div>
+            </div>
+            <div class="profit-chart-box"><canvas id="profit-technician-chart" role="img" aria-label="Gráfico de barras de ingresos y costos por técnico"></canvas></div>
+            <p class="profit-chart-fallback" id="profit-technician-fallback">No se pudo cargar el gráfico. Los datos detallados siguen disponibles en las tablas.</p>
+        </article>
+        <article class="profit-panel">
+            <div class="profit-panel-heading">
+                <div><h2>Ingresos por cliente</h2><p>Distribución de ingresos de OTs calculables.</p></div>
+            </div>
+            <div class="profit-chart-box"><canvas id="profit-client-chart" role="img" aria-label="Gráfico de dona de ingresos por cliente"></canvas></div>
+            <p class="profit-chart-fallback" id="profit-client-fallback">No se pudo cargar el gráfico. Los datos detallados siguen disponibles en las tablas.</p>
+        </article>
     </section>
 
     <section class="profit-summary">
         <h2>Rentabilidad por técnico</h2>
         <div class="profit-table-wrap">
-            <table class="profit-table">
+            <table class="profit-table table-hover">
                 <thead><tr><th>Técnico</th><th>OTs</th><th>Ingreso total</th><th>Mano de obra</th><th>Costos materiales</th><th>Nómina estimada</th><th>Ganancia estimada</th></tr></thead>
                 <tbody>
                     {% for resumen in por_tecnico %}
@@ -135,7 +192,7 @@
     <section class="profit-summary">
         <h2>Rentabilidad por cliente</h2>
         <div class="profit-table-wrap">
-            <table class="profit-table">
+            <table class="profit-table table-hover">
                 <thead><tr><th>Cliente</th><th>OTs</th><th>Ingreso total</th><th>Mano de obra</th><th>Costos materiales</th><th>Nómina estimada</th><th>Ganancia estimada</th></tr></thead>
                 <tbody>
                     {% for resumen in por_cliente %}
@@ -156,8 +213,12 @@
         </div>
     </section>
 
-    <div class="profit-table-wrap">
-        <table class="profit-table">
+    <section class="profit-detail">
+        <div class="profit-detail-heading">
+            <div><h2>Detalle de órdenes de trabajo</h2><p>{{ filas|length }} OT(s) en el período seleccionado.</p></div>
+        </div>
+        <div class="profit-table-wrap">
+        <table class="profit-table table-hover">
             <thead>
                 <tr>
                     <th>Fecha</th>
@@ -178,8 +239,8 @@
                 {% for fila in filas %}
                     <tr>
                         <td>{{ fila.fecha|date:"d/m/Y" }}</td>
-                        <td>OT-{{ fila.ot.solicitud.consecutivo }}</td>
-                        <td>{{ fila.ot.tecnico_display|default:fila.ot.tecnico_asignado }}</td>
+                        <td><span class="profit-ot-number">OT-{{ fila.ot.solicitud.consecutivo }}</span></td>
+                        <td class="profit-name">{{ fila.ot.tecnico_display|default:fila.ot.tecnico_asignado }}</td>
                         <td>{{ fila.ot.solicitud.ubicacion_nombre|default:"—" }}</td>
                         <td>$ {{ fila.ingreso_materiales|intcomma }}</td>
                         <td>$ {{ fila.valor_mano_obra|intcomma }}</td>
@@ -188,7 +249,7 @@
                         {% if fila.costo_nomina != None %}
                             <td>$ {{ fila.costo_nomina|intcomma }}<br><small>{{ fila.horas|floatformat:2 }} h</small></td>
                             <td class="{% if fila.ganancia < 0 %}profit-negative{% else %}profit-positive{% endif %}">$ {{ fila.ganancia|intcomma }}</td>
-                            <td>{% if fila.margen != None %}{{ fila.margen|floatformat:2 }}%{% else %}—{% endif %}</td>
+                            <td>{% if fila.margen != None %}<span class="profit-margin {% if fila.margen < 0 %}profit-margin-low{% elif fila.margen < 20 %}profit-margin-mid{% else %}profit-margin-high{% endif %}">{{ fila.margen|floatformat:2 }}%</span>{% else %}—{% endif %}</td>
                         {% else %}
                             <td class="profit-pending">Pendiente</td>
                             <td class="profit-pending" colspan="2">{{ fila.motivo_sin_calculo }}</td>
@@ -200,8 +261,95 @@
                 {% endfor %}
             </tbody>
         </table>
-    </div>
+        </div>
+    </section>
 </main>
+
+{{ datos_graficos|json_script:"profit-chart-data" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"
+        onerror="document.querySelectorAll('.profit-chart-fallback').forEach(function (item) { item.style.display = 'block'; }); document.querySelectorAll('.profit-chart-box').forEach(function (item) { item.style.display = 'none'; });"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof Chart === 'undefined') return;
+    const chartData = JSON.parse(document.getElementById('profit-chart-data').textContent);
+    const palette = ['#2563eb', '#14b8a6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#84cc16', '#ec4899', '#6366f1', '#64748b'];
+    const money = value => '$ ' + Number(value || 0).toLocaleString('es-CO', {
+        maximumFractionDigits: 0,
+    });
+    const technicians = chartData.tecnicos;
+    if (technicians.length) {
+        new Chart(document.getElementById('profit-technician-chart'), {
+            type: 'bar',
+            data: {
+                labels: technicians.map(item => item.nombre),
+                datasets: [
+                    {
+                        label: 'Ingresos',
+                        data: technicians.map(item => Number(item.ingresos)),
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 6,
+                        maxBarThickness: 36,
+                    },
+                    {
+                        label: 'Costos',
+                        data: technicians.map(item => Number(item.costos)),
+                        backgroundColor: '#cbd5e1',
+                        borderRadius: 6,
+                        maxBarThickness: 36,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {mode: 'index', intersect: false},
+                plugins: {
+                    legend: {position: 'bottom', labels: {usePointStyle: true, padding: 18}},
+                    tooltip: {callbacks: {label: context => `${context.dataset.label}: ${money(context.raw)}`}},
+                },
+                scales: {
+                    x: {grid: {display: false}, ticks: {color: '#64748b'}},
+                    y: {beginAtZero: true, grid: {color: '#eef2f7'}, ticks: {color: '#64748b', callback: money}},
+                },
+            },
+        });
+    } else {
+        document.getElementById('profit-technician-chart').style.display = 'none';
+        document.getElementById('profit-technician-fallback').textContent = 'No hay OTs calculables para mostrar en este período.';
+        document.getElementById('profit-technician-fallback').style.display = 'block';
+    }
+
+    const clients = chartData.clientes.filter(item => Number(item.ingresos) > 0);
+    if (clients.length) {
+        new Chart(document.getElementById('profit-client-chart'), {
+            type: 'doughnut',
+            data: {
+                labels: clients.map(item => item.nombre),
+                datasets: [{
+                    data: clients.map(item => Number(item.ingresos)),
+                    backgroundColor: clients.map((_, index) => palette[index % palette.length]),
+                    borderColor: '#fff',
+                    borderWidth: 3,
+                    hoverOffset: 7,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '62%',
+                plugins: {
+                    legend: {position: 'bottom', labels: {usePointStyle: true, padding: 14}},
+                    tooltip: {callbacks: {label: context => `${context.label}: ${money(context.raw)}`}},
+                },
+            },
+        });
+    } else {
+        document.getElementById('profit-client-chart').style.display = 'none';
+        document.getElementById('profit-client-fallback').textContent = 'No hay ingresos por cliente que graficar en este período.';
+        document.getElementById('profit-client-fallback').style.display = 'block';
+    }
+});
+</script>
 
 <div id="modal-factura" class="invoice-modal" role="dialog" aria-modal="true" aria-labelledby="factura-titulo" hidden>
     <section class="invoice-document">
