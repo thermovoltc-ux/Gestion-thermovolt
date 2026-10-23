@@ -996,7 +996,10 @@ def listar_ot(request):
         'calendar_events_json': json.dumps(calendar_events),
         'vista_calendario': vista_calendario,
         'puede_cargar_materiales': es_tecnico,
-        'materiales_catalogo': Material.objects.order_by('nombre') if es_tecnico else Material.objects.none(),
+        'materiales_catalogo': (
+            Material.objects.filter(categoria='repuestos').order_by('nombre')
+            if es_tecnico else Material.objects.none()
+        ),
     })
 
 
@@ -1242,7 +1245,9 @@ def gestionar_ot_admin(request, ot_id):
     cierre, _ = CierreOt.objects.get_or_create(orden_trabajo=ot)
 
     if request.method == 'POST':
-        form = CierreOtFacturacionForm(request.POST, instance=cierre)
+        post_data = request.POST.copy()
+        post_data.setdefault('valor_mano_obra', str(cierre.valor_mano_obra or Decimal('0.00')))
+        form = CierreOtFacturacionForm(post_data, instance=cierre)
         if form.is_valid():
             form.save()
             messages.success(request, 'Se guardaron los datos de facturación de la OT.')
@@ -1401,7 +1406,12 @@ def actualizar_mano_obra(request, ot_id):
         OrdenTrabajo.objects.select_related('cierreot').prefetch_related('materiales'),
         pk=ot_id,
     )
-    form = CierreOtFacturacionForm(request.POST, instance=ot.cierreot)
+    post_data = request.POST.copy()
+    post_data.setdefault(
+        'valor_mano_obra',
+        str(ot.cierreot.valor_mano_obra or Decimal('0.00')),
+    )
+    form = CierreOtFacturacionForm(post_data, instance=ot.cierreot)
     if not form.is_valid():
         return JsonResponse(
             {'ok': False, 'errors': form.errors.get_json_data()},
@@ -1873,7 +1883,9 @@ def cierre_ot(request, ot_id):
     ot = get_object_or_404(_ordenes_visibles_para_usuario(request), id=ot_id)
     cierre_ot, created = CierreOt.objects.get_or_create(orden_trabajo=ot)
     read_only = _ot_es_solo_lectura(ot)
-    materiales_catalogo = Material.objects.order_by('nombre')
+    materiales_catalogo = Material.objects.filter(
+        categoria='repuestos',
+    ).order_by('nombre')
     material_catalogo_form = MaterialForm()
     existing_proceso = _get_active_proceso_para_cierre(cierre_ot)
     operation_id = existing_proceso.operation_id if existing_proceso else ''

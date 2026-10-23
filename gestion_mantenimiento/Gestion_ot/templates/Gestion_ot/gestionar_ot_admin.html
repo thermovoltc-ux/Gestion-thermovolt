@@ -25,6 +25,7 @@
     .admin-service-form { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 12px; align-items: end; padding: 16px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; }
     .admin-service-form label { display: block; font-weight: 600; }
     .admin-service-form input { box-sizing: border-box; width: 100%; margin-top: 5px; padding: 9px; border: 1px solid #cbd5e1; border-radius: 6px; }
+    .admin-service-form > button { width: auto; padding: 8px 20px; justify-self: start; }
     .admin-ot-actions { display: flex; gap: 8px; }
     .admin-ot-btn { display: inline-block; border: 0; border-radius: 6px; padding: 9px 13px; background: #2563eb; color: #fff; text-decoration: none; font-weight: 600; cursor: pointer; }
     .admin-ot-btn-danger { background: #dc2626; }
@@ -170,7 +171,7 @@
         <form method="post" action="{% url 'agregar_servicio_ot_admin' ot.pk %}" class="admin-service-form">
             {% csrf_token %}
             <div>
-                <label for="admin-service-name">Servicio, maquinaria, equipo de frío o locativo</label>
+                <label for="admin-service-name">Servicio</label>
                 <input type="search" id="admin-service-name" name="nombre" list="servicios-datalist" autocomplete="off" required maxlength="150">
                 <datalist id="servicios-datalist">
                     {% for servicio in servicios_catalogo %}
@@ -193,11 +194,6 @@
             {% csrf_token %}
             <div class="admin-ot-meta">
                 <div>
-                    <label for="{{ form.valor_mano_obra.id_for_label }}"><strong>Valor manual de mano de obra / servicio</strong></label>
-                    {{ form.valor_mano_obra }}
-                    <small>No se aplica el factor de materiales a este importe.</small>
-                </div>
-                <div>
                     <label for="{{ form.estado_facturacion.id_for_label }}"><strong>Estado de facturación</strong></label>
                     {{ form.estado_facturacion }}
                     <small>Este estado es independiente del flujo del técnico.</small>
@@ -214,6 +210,7 @@
              data-total-materiales="{{ resumen.ingreso_materiales }}"
              data-costo-materiales="{{ resumen.costo_materiales }}"
              data-costo-nomina="{{ resumen.costo_nomina|default_if_none:'' }}"
+             data-mano-obra="{{ resumen.valor_mano_obra }}"
              data-ingreso-total="{{ resumen.ingreso_total }}">
             <div class="admin-ot-kpi"><span>Total venta de materiales</span><strong id="admin-material-total">$ {{ resumen.ingreso_materiales|intcomma }}</strong></div>
             <div class="admin-ot-kpi"><span>Mano de obra</span><strong id="admin-labor-total">$ {{ resumen.valor_mano_obra|intcomma }}</strong></div>
@@ -232,7 +229,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('admin-ot-billing-form');
     if (!root || !form) return;
 
-    const laborInput = document.getElementById('{{ form.valor_mano_obra.id_for_label }}');
     const finance = document.querySelector('.admin-ot-financials');
     const totalMaterialsEl = document.getElementById('admin-material-total');
     const materialCostEl = document.getElementById('admin-material-cost');
@@ -247,10 +243,24 @@ document.addEventListener('DOMContentLoaded', function () {
     const materialSearch = document.getElementById('admin-material-search');
     const materialId = document.getElementById('admin-material-id');
     const materialOptions = Array.from(document.querySelectorAll('#admin-materials-datalist option'));
+    const materialDatalist = document.getElementById('admin-materials-datalist');
     const materialCostInput = document.querySelector('.admin-ot-add-material [name=costo_real]');
     const serviceName = document.getElementById('admin-service-name');
     const servicePrice = document.getElementById('admin-service-price');
     const serviceOptions = Array.from(document.querySelectorAll('#servicios-datalist option'));
+    const serviceDatalist = document.getElementById('servicios-datalist');
+
+    function normalizeSearchText(text) {
+        return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
+    }
+
+    function updateDatalist(datalist, options, query) {
+        const normalizedQuery = normalizeSearchText(query.trim());
+        const matches = options.filter(option =>
+            normalizeSearchText(option.value).includes(normalizedQuery)
+        );
+        datalist.replaceChildren(...matches.map(option => option.cloneNode(true)));
+    }
 
     function parseLocalizedNumber(value) {
         const cleaned = value.trim().replace('$', '').replace(/\s/g, '');
@@ -293,13 +303,13 @@ document.addEventListener('DOMContentLoaded', function () {
     ).forEach(input => formatNumberInput(input, false));
     document.querySelectorAll(
         '.admin-ot-material-form [name=costo_real], .admin-ot-material-form [name=precio_venta_aplicado], ' +
-        '.admin-ot-add-material [name=costo_real], .admin-service-form [name=precio_unitario], ' +
-        '#admin-ot-billing-form [name=valor_mano_obra]'
+        '.admin-ot-add-material [name=costo_real], .admin-service-form [name=precio_unitario]'
     ).forEach(input => formatNumberInput(input, true));
 
     materialSearch.addEventListener('input', function () {
+        updateDatalist(materialDatalist, materialOptions, materialSearch.value);
         const match = materialOptions.find(option =>
-            option.value.toLocaleLowerCase() === materialSearch.value.trim().toLocaleLowerCase()
+            normalizeSearchText(option.value.trim()) === normalizeSearchText(materialSearch.value.trim())
         );
         materialId.value = match ? match.dataset.materialId : '';
         materialCostInput.value = match
@@ -308,12 +318,17 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     serviceName.addEventListener('input', function () {
+        updateDatalist(serviceDatalist, serviceOptions, serviceName.value);
         const match = serviceOptions.find(option =>
-            option.value.toLocaleLowerCase() === serviceName.value.trim().toLocaleLowerCase()
+            normalizeSearchText(option.value.trim()) === normalizeSearchText(serviceName.value.trim())
         );
-        servicePrice.value = match
-            ? formatLocalizedNumber(match.dataset.precio, true)
-            : '';
+        if (match) {
+            serviceName.value = match.value;
+            servicePrice.value = formatLocalizedNumber(match.dataset.precio, true);
+            updateDatalist(serviceDatalist, serviceOptions, serviceName.value);
+        } else {
+            servicePrice.value = '';
+        }
     });
 
     function materialTotal() {
@@ -339,7 +354,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function updatePreview() {
         const materials = materialTotal();
         const materialCost = materialCostTotal();
-        const labor = parseLocalizedNumber(laborInput.value) || 0;
+        const labor = Number(finance.dataset.manoObra || 0);
         const invoice = materials + labor;
         const payrollRaw = finance.dataset.costoNomina;
         totalMaterialsEl.textContent = money(materials);
@@ -356,7 +371,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.querySelectorAll('.admin-ot-material-form input').forEach(input => input.addEventListener('input', updatePreview));
-    laborInput.addEventListener('input', updatePreview);
     updatePreview();
 
     form.addEventListener('submit', async function (event) {
@@ -376,6 +390,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
             finance.dataset.totalMateriales = data.total_materiales;
+            finance.dataset.manoObra = data.mano_obra;
             if (data.costo_nomina !== null) finance.dataset.costoNomina = data.costo_nomina;
             if (data.estado_facturacion === 'facturada') {
                 messageEl.textContent = 'Facturación guardada y OT marcada como facturada. Ya no aparecerá en pendientes.';

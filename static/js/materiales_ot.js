@@ -20,6 +20,19 @@ document.addEventListener('DOMContentLoaded', function () {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     });
+    const catalogOptions = Array.from(materialsList.options);
+
+    function normalizeSearchText(text) {
+        return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
+    }
+
+    function updateMaterialSuggestions() {
+        const query = normalizeSearchText(searchInput.value.trim());
+        const matchingOptions = catalogOptions.filter(function (option) {
+            return normalizeSearchText(option.value).includes(query);
+        });
+        materialsList.replaceChildren(...matchingOptions.map(option => option.cloneNode(true)));
+    }
 
     function showModal(modal) {
         modal.hidden = false;
@@ -115,13 +128,14 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     function findMaterialOption(name) {
-        const normalizedName = name.trim().toLocaleLowerCase();
-        return Array.from(materialsList.options).find(function (option) {
-            return option.value.trim().toLocaleLowerCase() === normalizedName;
+        const normalizedName = normalizeSearchText(name.trim());
+        return catalogOptions.find(function (option) {
+            return normalizeSearchText(option.value.trim()) === normalizedName;
         });
     }
 
     searchInput.addEventListener('input', function () {
+        updateMaterialSuggestions();
         const option = findMaterialOption(searchInput.value);
         costInput.value = option ? option.dataset.costo : '';
     });
@@ -180,7 +194,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 createdOption.dataset.id = materialId;
                 createdOption.dataset.costo = createdMaterial.costo_base;
                 createdOption.label = `${createdMaterial.codigo} — ${createdMaterial.nombre}`;
-                materialsList.appendChild(createdOption);
+                catalogOptions.push(createdOption);
+                updateMaterialSuggestions();
             }
 
             const formData = new FormData();
@@ -210,6 +225,7 @@ document.addEventListener('DOMContentLoaded', function () {
             photoInput.value = '';
             observationInput.value = '';
             searchInput.value = '';
+            updateMaterialSuggestions();
             hideModal(addModal);
         } catch (error) {
             displayErrors(addError, error);

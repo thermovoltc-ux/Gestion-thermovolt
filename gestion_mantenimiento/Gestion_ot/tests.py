@@ -578,6 +578,20 @@ class MaterialOTAjaxTests(TestCase):
                 self.assertEqual(response.json()['codigo'], codigo_esperado)
 
     def test_closure_page_renders_material_catalog_and_table(self):
+        Material.objects.create(
+            codigo='MAQ-TECN-01',
+            categoria='maquinaria',
+            nombre='Maquinaria solo admin',
+            costo_base=Decimal('20.00'),
+            precio_venta_sugerido=Decimal('30.00'),
+        )
+        Material.objects.create(
+            codigo='FRI-TECN-01',
+            categoria='frio',
+            nombre='Equipo frío solo admin',
+            costo_base=Decimal('20.00'),
+            precio_venta_sugerido=Decimal('30.00'),
+        )
         response = self.client.get(reverse('cierre_ot', args=[self.ot.pk]))
 
         self.assertEqual(response.status_code, 200)
@@ -587,6 +601,12 @@ class MaterialOTAjaxTests(TestCase):
         self.assertContains(response, 'id="buscar-material-unificado" class="form-control" list="materiales-catalogo"')
         self.assertContains(response, 'data-id="')
         self.assertContains(response, 'data-costo="')
+        self.assertNotContains(response, 'Maquinaria solo admin')
+        self.assertNotContains(response, 'Equipo frío solo admin')
+        self.assertSetEqual(
+            set(response.context['materiales_catalogo'].values_list('categoria', flat=True)),
+            {'repuestos'},
+        )
         self.assertNotContains(response, 'id="buscar-material"')
         self.assertNotContains(response, 'id="select-material"')
         self.assertNotContains(response, 'btn-abrir-modal-nuevo-material')
@@ -601,6 +621,13 @@ class MaterialOTAjaxTests(TestCase):
         self.ot.save(update_fields=['estado'])
         self.ot_ajena.estado = self.estado_en_proceso
         self.ot_ajena.save(update_fields=['estado'])
+        Material.objects.create(
+            codigo='MAQ-LISTA-01',
+            categoria='maquinaria',
+            nombre='Maquinaria fuera de catálogo técnico',
+            costo_base=Decimal('20.00'),
+            precio_venta_sugerido=Decimal('30.00'),
+        )
 
         response = self.client.get(reverse('listar_ot'))
 
@@ -608,6 +635,11 @@ class MaterialOTAjaxTests(TestCase):
         self.assertContains(
             response,
             reverse('agregar_material_rapido_ot', args=[self.ot.pk]),
+        )
+        self.assertNotContains(response, 'Maquinaria fuera de catálogo técnico')
+        self.assertSetEqual(
+            set(response.context['materiales_catalogo'].values_list('categoria', flat=True)),
+            {'repuestos'},
         )
         self.assertNotContains(
             response,
@@ -971,8 +1003,10 @@ class RentabilidadAdminTests(TestCase):
         self.assertNotContains(response, 'admin-open-create-material')
         self.assertNotContains(response, 'Servicios y mano de obra')
         self.assertEqual(response.content.count(b'Facturaci\xc3\xb3n del servicio'), 1)
-        self.assertContains(response, 'Valor manual de mano de obra / servicio')
-        self.assertContains(response, 'name="valor_mano_obra"')
+        self.assertContains(response, 'for="admin-service-name">Servicio</label>')
+        self.assertContains(response, '.admin-service-form > button { width: auto; padding: 8px 20px; justify-self: start; }')
+        self.assertNotContains(response, 'Valor manual de mano de obra / servicio')
+        self.assertNotContains(response, 'name="valor_mano_obra"')
         self.assertContains(response, 'id="admin-service-name" name="nombre"')
         self.assertContains(response, 'id="admin-service-quantity" name="cantidad"')
         self.assertContains(response, 'id="admin-service-price" name="precio_unitario"')
@@ -1007,6 +1041,34 @@ class RentabilidadAdminTests(TestCase):
         for _, _, name in catalog_materials:
             self.assertContains(response, name)
         self.assertContains(response, 'data-precio="150.00"')
+
+    def test_admin_billing_post_without_manual_labor_preserves_existing_total(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('gestionar_ot_admin', args=[self.ot.pk]),
+            {'estado_facturacion': 'facturada'},
+        )
+
+        self.assertRedirects(response, reverse('gestionar_ot_admin', args=[self.ot.pk]))
+        self.ot.cierreot.refresh_from_db()
+        self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('60.00'))
+        self.assertEqual(self.ot.cierreot.estado_facturacion, 'facturada')
+
+    def test_billing_ajax_without_manual_labor_preserves_existing_total(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('actualizar_mano_obra', args=[self.ot.pk]),
+            {'estado_facturacion': 'facturada'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['mano_obra'], '60.00')
+        self.ot.cierreot.refresh_from_db()
+        self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('60.00'))
+
 
     def test_technician_cannot_access_admin_management_or_update_materials(self):
         material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
