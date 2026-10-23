@@ -964,6 +964,54 @@ class RentabilidadAdminTests(TestCase):
         self.assertContains(response, 'Ingreso total')
         self.assertContains(response, 'Mano de obra facturada')
 
+    def test_invoice_detail_includes_items_and_reconciles_to_rentabilidad_total(self):
+        servicio_material = Material.objects.create(
+            codigo='S001',
+            categoria='servicios',
+            nombre='Mano de obra - Diagnóstico',
+            costo_base=Decimal('50.00'),
+            precio_venta_sugerido=Decimal('50.00'),
+        )
+        ServicioOT.objects.create(
+            orden_trabajo=self.ot,
+            nombre=servicio_material.nombre,
+            cantidad=Decimal('1.00'),
+            precio_unitario=Decimal('50.00'),
+        )
+        cierre = self.ot.cierreot
+        cierre.valor_mano_obra = Decimal('60.00')
+        cierre.descripcion_falla = 'Mantenimiento preventivo'
+        cierre.save(update_fields=['valor_mano_obra', 'descripcion_falla'])
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('detalle_factura_ot', args=[self.ot.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        factura = response.json()['factura']
+        self.assertEqual(factura['cliente'], self.ubicacion.nombre)
+        self.assertEqual(factura['equipo'], self.equipo.nombre)
+        self.assertEqual(factura['descripcion'], 'Mantenimiento preventivo')
+        self.assertEqual(factura['materiales'][0]['codigo'], self.material.codigo)
+        self.assertEqual(factura['materiales'][0]['total'], '200.00')
+        self.assertEqual(factura['servicios'][0]['codigo'], 'S001')
+        self.assertEqual(factura['servicios'][0]['total'], '50.00')
+        self.assertEqual(factura['servicios'][1]['descripcion'], 'Mano de obra / ajuste registrado')
+        self.assertEqual(factura['servicios'][1]['total'], '10.00')
+        self.assertEqual(factura['subtotal'], '260.00')
+        self.assertEqual(factura['total'], '260.00')
+        self.assertEqual(factura['impuestos'], '0.00')
+
+    def test_invoice_detail_is_forbidden_to_technician(self):
+        self.client.force_login(self.tecnico)
+
+        response = self.client.get(
+            reverse('detalle_factura_ot', args=[self.ot.pk])
+        )
+
+        self.assertEqual(response.status_code, 403)
+
     def test_manual_labor_form_field_is_optional_and_defaults_to_zero(self):
         from gestion_mantenimiento.Gestion_ot.forms import CierreOtFacturacionForm
 

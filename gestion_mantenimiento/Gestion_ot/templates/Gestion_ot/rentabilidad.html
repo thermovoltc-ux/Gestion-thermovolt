@@ -33,6 +33,31 @@
     .profit-positive { color: #047857; font-weight: 700; }
     .profit-negative { color: #b91c1c; font-weight: 700; }
     .profit-pending { color: #b45309; white-space: normal !important; min-width: 180px; }
+    .profit-action { display: inline-block; border: 0; border-radius: 6px; padding: 8px 12px; background: #2563eb; color: #fff; font-weight: 700; text-decoration: none; cursor: pointer; }
+    .invoice-modal[hidden] { display: none; }
+    .invoice-modal { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 20px; background: rgba(15, 23, 42, .65); }
+    .invoice-document { width: min(900px, 100%); max-height: 90vh; overflow: auto; padding: 36px; background: #fff; color: #1e293b; border-radius: 12px; box-shadow: 0 20px 60px rgba(0, 0, 0, .25); }
+    .invoice-header { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; padding-bottom: 20px; border-bottom: 2px solid #1e293b; }
+    .invoice-header h2 { grid-column: 1 / -1; margin: 0 0 8px; }
+    .invoice-header p { margin: 0; }
+    .invoice-description { padding: 18px 0; border-bottom: 1px solid #cbd5e1; }
+    .invoice-table-wrap { overflow-x: auto; margin: 20px 0; }
+    .invoice-table { width: 100%; border-collapse: collapse; }
+    .invoice-table th, .invoice-table td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+    .invoice-table th:nth-child(n+3), .invoice-table td:nth-child(n+3) { text-align: right; }
+    .invoice-totals { width: min(360px, 100%); margin: 0 0 0 auto; }
+    .invoice-totals p { display: flex; justify-content: space-between; gap: 20px; margin: 8px 0; }
+    .invoice-grand-total { padding-top: 12px; border-top: 2px solid #1e293b; font-size: 20px; }
+    .invoice-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 28px; }
+    .invoice-message { padding: 18px 0; color: #b91c1c; }
+    @media (max-width: 640px) { .invoice-document { padding: 20px; } .invoice-header { grid-template-columns: 1fr; } }
+    @media print {
+        body * { visibility: hidden !important; }
+        .invoice-modal, .invoice-modal * { visibility: visible !important; }
+        .invoice-modal { position: absolute; inset: 0; display: block; padding: 0; background: #fff; }
+        .invoice-document { width: 100%; max-height: none; overflow: visible; padding: 0; border-radius: 0; box-shadow: none; }
+        .invoice-actions { display: none !important; }
+    }
     @media (max-width: 640px) { .profit-page { padding: 16px; } }
 </style>
 
@@ -146,6 +171,7 @@
                     <th>Nómina estimada</th>
                     <th>Ganancia estimada</th>
                     <th>Margen</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -165,14 +191,131 @@
                             <td>{% if fila.margen != None %}{{ fila.margen|floatformat:2 }}%{% else %}—{% endif %}</td>
                         {% else %}
                             <td class="profit-pending">Pendiente</td>
-                            <td class="profit-pending" colspan="3">{{ fila.motivo_sin_calculo }}</td>
+                            <td class="profit-pending" colspan="2">{{ fila.motivo_sin_calculo }}</td>
                         {% endif %}
+                        <td><button type="button" class="profit-action btn-ver-factura" data-factura-url="{% url 'detalle_factura_ot' fila.ot.pk %}">Ver Factura</button></td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="11" class="profit-muted" style="text-align:center;">No hay OTs cerradas en este período.</td></tr>
+                    <tr><td colspan="12" class="profit-muted" style="text-align:center;">No hay OTs cerradas en este período.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </main>
+
+<div id="modal-factura" class="invoice-modal" role="dialog" aria-modal="true" aria-labelledby="factura-titulo" hidden>
+    <section class="invoice-document">
+        <header class="invoice-header">
+            <h2 id="factura-titulo">Factura de Venta</h2>
+            <p><strong>OT:</strong> <span id="factura-ot"></span></p>
+            <p><strong>Cliente:</strong> <span id="factura-cliente"></span></p>
+            <p><strong>Equipo:</strong> <span id="factura-equipo"></span></p>
+            <p><strong>Técnico:</strong> <span id="factura-tecnico"></span></p>
+            <p><strong>Fecha:</strong> <span id="factura-fecha"></span></p>
+        </header>
+        <section class="invoice-description">
+            <strong>Descripción del servicio</strong>
+            <p id="factura-descripcion"></p>
+        </section>
+        <div id="factura-mensaje" class="invoice-message" role="status" aria-live="polite" hidden></div>
+        <div class="invoice-table-wrap">
+            <table class="invoice-table">
+                <thead><tr><th>Código</th><th>Descripción</th><th>Cant.</th><th>Precio unit.</th><th>Total</th></tr></thead>
+                <tbody id="factura-lineas"></tbody>
+            </table>
+        </div>
+        <section class="invoice-totals">
+            <p><strong>Total materiales</strong><span id="factura-total-materiales"></span></p>
+            <p><strong>Mano de obra / servicios</strong><span id="factura-mano-obra"></span></p>
+            <p><strong>Impuestos (no aplicados)</strong><span id="factura-impuestos"></span></p>
+            <p class="invoice-grand-total"><strong>Total a pagar</strong><strong id="factura-total"></strong></p>
+        </section>
+        <footer class="invoice-actions">
+            <button type="button" class="profit-action" id="factura-imprimir">Imprimir</button>
+            <button type="button" class="profit-action" id="factura-cerrar">Cerrar</button>
+        </footer>
+    </section>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('modal-factura');
+    const lines = document.getElementById('factura-lineas');
+    const message = document.getElementById('factura-mensaje');
+    const money = value => '$ ' + Number(value || 0).toLocaleString('es-CO', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+
+    function setText(id, value) {
+        document.getElementById(id).textContent = value || '—';
+    }
+
+    function addLine(item) {
+        const row = document.createElement('tr');
+        [item.codigo, item.descripcion, item.cantidad, money(item.precio_unitario), money(item.total)]
+            .forEach(function (value) {
+                const cell = document.createElement('td');
+                cell.textContent = value || '—';
+                row.appendChild(cell);
+            });
+        lines.appendChild(row);
+    }
+
+    document.querySelectorAll('.btn-ver-factura').forEach(function (button) {
+        button.addEventListener('click', async function () {
+            modal.hidden = false;
+            message.hidden = false;
+            message.textContent = 'Cargando detalle de factura…';
+            lines.replaceChildren();
+            try {
+                const response = await fetch(button.dataset.facturaUrl, {
+                    credentials: 'same-origin',
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload.ok) {
+                    throw new Error(payload.error || 'No se pudo cargar el detalle de la factura.');
+                }
+                const factura = payload.factura;
+                setText('factura-ot', factura.ot);
+                setText('factura-cliente', factura.cliente);
+                setText('factura-equipo', factura.equipo);
+                setText('factura-tecnico', factura.tecnico);
+                setText('factura-fecha', factura.fecha);
+                setText('factura-descripcion', factura.descripcion);
+                factura.materiales.forEach(addLine);
+                factura.servicios.forEach(addLine);
+                if (!factura.materiales.length && !factura.servicios.length) {
+                    const row = document.createElement('tr');
+                    const cell = document.createElement('td');
+                    cell.colSpan = 5;
+                    cell.textContent = 'No hay materiales ni servicios detallados en esta OT.';
+                    row.appendChild(cell);
+                    lines.appendChild(row);
+                }
+                setText('factura-total-materiales', money(factura.total_materiales));
+                setText('factura-mano-obra', money(factura.mano_obra));
+                setText('factura-impuestos', money(factura.impuestos));
+                setText('factura-total', money(factura.total));
+                message.hidden = true;
+            } catch (error) {
+                message.textContent = error.message;
+            }
+        });
+    });
+
+    document.getElementById('factura-imprimir').addEventListener('click', function () {
+        window.print();
+    });
+    document.getElementById('factura-cerrar').addEventListener('click', function () {
+        modal.hidden = true;
+    });
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal) modal.hidden = true;
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && !modal.hidden) modal.hidden = true;
+    });
+});
+</script>
 {% endblock %}

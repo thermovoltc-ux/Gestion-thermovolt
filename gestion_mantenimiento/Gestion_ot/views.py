@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, FileResponse, Http404, StreamingHttpResponse, HttpResponseBadRequest
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 import json
 import mimetypes
 from decimal import Decimal, ROUND_HALF_UP
@@ -1690,6 +1690,113 @@ def rentabilidad_admin(request):
             'cantidad_pendiente': len(filas) - len(filas_calculables),
         },
     )
+
+
+@login_required
+@require_GET
+def detalle_factura_ot(request, ot_id):
+    if not _es_admin_rentabilidad(request.user):
+        return JsonResponse(
+            {'ok': False, 'error': 'No tenés permiso para consultar esta factura.'},
+            status=403,
+        )
+
+    ot = get_object_or_404(
+        OrdenTrabajo.objects.select_related(
+            'solicitud__equipo',
+            'solicitud__ubicacion',
+            'cierreot',
+        ).prefetch_related(
+            'materiales__material',
+            'servicios_facturados',
+        ),
+        pk=ot_id,
+    )
+    cierre = ot.cierreot
+    materiales = []
+    for material_ot in ot.materiales.all():
+        total = (material_ot.cantidad * material_ot.precio_venta_aplicado).quantize(
+            Decimal('0.01'),
+            rounding=ROUND_HALF_UP,
+        )
+        materiales.append({
+            'codigo': material_ot.material.codigo,
+            'descripcion': material_ot.material.nombre,
+            'cantidad': str(material_ot.cantidad),
+            'precio_unitario': str(material_ot.precio_venta_aplicado),
+            'total': str(total),
+        })
+
+    servicios = list(ot.servicios_facturados.all())
+    catalogo_servicios = {
+        (material.categoria, material.nombre.casefold()): material.codigo
+        for material in Material.objects.filter(
+            nombre__in=[servicio.nombre for servicio in servicios],
+            categoria__in=['servicios', 'maquinaria', 'frio', 'locativos'],
+        ).order_by('pk')
+    }
+    lineas_servicio = []
+    total_lineas_servicio = Decimal('0.00')
+    for servicio in servicios:
+        total = servicio.total
+        total_lineas_servicio += total
+        codigo = next(
+            (
+                catalogo_servicios[(categoria, servicio.nombre.casefold())]
+                for categoria in ('servicios', 'maquinaria', 'frio', 'locativos')
+                if (categoria, servicio.nombre.casefold()) in catalogo_servicios
+            ),
+            '',
+        )
+        lineas_servicio.append({
+            'codigo': codigo,
+            'descripcion': servicio.nombre,
+            'cantidad': str(servicio.cantidad),
+            'precio_unitario': str(servicio.precio_unitario),
+            'total': str(total),
+        })
+
+    valor_mano_obra = cierre.valor_mano_obra or Decimal('0.00')
+    ajuste_mano_obra = valor_mano_obra - total_lineas_servicio
+    if ajuste_mano_obra:
+        lineas_servicio.append({
+            'codigo': '',
+            'descripcion': 'Mano de obra / ajuste registrado',
+            'cantidad': '1.00',
+            'precio_unitario': str(ajuste_mano_obra),
+            'total': str(ajuste_mano_obra),
+        })
+
+    ingreso_materiales = sum(
+        (Decimal(linea['total']) for linea in materiales),
+        Decimal('0.00'),
+    )
+    subtotal = ingreso_materiales + valor_mano_obra
+    return JsonResponse({
+        'ok': True,
+        'factura': {
+            'ot': f"OT-{ot.solicitud.consecutivo}",
+            'cliente': ot.solicitud.ubicacion_nombre or '—',
+            'equipo': ot.solicitud.equipo.nombre if ot.solicitud.equipo else '—',
+            'tecnico': ot.tecnico_display or ot.tecnico_asignado or '—',
+            'fecha': (
+                timezone.localtime(cierre.fecha_inicio_actividad).strftime('%d/%m/%Y')
+                if cierre.fecha_inicio_actividad else '—'
+            ),
+            'descripcion': (
+                cierre.descripcion_falla
+                or ot.solicitud.descripcion_problema
+                or '—'
+            ),
+            'materiales': materiales,
+            'servicios': lineas_servicio,
+            'total_materiales': str(ingreso_materiales),
+            'mano_obra': str(valor_mano_obra),
+            'subtotal': str(subtotal),
+            'impuestos': '0.00',
+            'total': str(subtotal),
+        },
+    })
 
 
 # Vista para cerrar una OT
