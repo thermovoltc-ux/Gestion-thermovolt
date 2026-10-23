@@ -1315,11 +1315,23 @@ def agregar_material_ot_admin(request, ot_id):
     ot = get_object_or_404(OrdenTrabajo, pk=ot_id)
     post_data = request.POST.copy()
     material_name = post_data.get('material_name', '').strip()
+    category_by_prefix = {
+        prefix: category
+        for category, prefix in Material.CATEGORIA_PREFIJOS.items()
+        if category != 'servicios'
+    }
+    category_prefix = post_data.get('categoria', 'R')
+    category = category_by_prefix.get(category_prefix)
+    if category is None:
+        messages.error(request, 'La categoría seleccionada para el material no es válida.')
+        return redirect('gestionar_ot_admin', ot_id=ot.pk)
+
     form = MaterialOTForm(post_data, request.FILES)
     if not form.is_valid() and not post_data.get('material') and material_name:
         validation_errors = set(form.errors) - {'material'}
         if not validation_errors and len(material_name) <= 150:
             existing_material = Material.objects.filter(
+                categoria=category,
                 nombre__iexact=material_name,
             ).order_by('pk').first()
             if existing_material:
@@ -1328,12 +1340,12 @@ def agregar_material_ot_admin(request, ot_id):
                 costo_real = form.cleaned_data.get('costo_real')
                 if costo_real is not None:
                     material = Material(
-                        categoria='repuestos',
+                        categoria=category,
                         nombre=material_name,
                         costo_base=costo_real,
                         precio_venta_sugerido=_precio_venta_desde_costo(
                             costo_real,
-                            'repuestos',
+                            category,
                         ),
                     )
                     material.save()

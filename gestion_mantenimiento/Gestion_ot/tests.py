@@ -1088,9 +1088,10 @@ class RentabilidadAdminTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="filtro-categoria-servicio" name="categoria"')
-        for category in ('repuestos', 'maquinaria', 'frio', 'locativos', 'servicios'):
-            self.assertContains(response, f'<option value="{category}">')
+        self.assertContains(response, 'id="filtro-categoria-material" name="categoria"')
+        for prefix in ('R', 'M', 'F', 'L'):
+            self.assertContains(response, f'<option value="{prefix}">')
+        self.assertNotContains(response, 'filtro-categoria-servicio')
         services = response.context['servicios_catalogo']
         self.assertSetEqual(
             set(services.values_list('categoria', flat=True)),
@@ -1150,6 +1151,27 @@ class RentabilidadAdminTests(TestCase):
             material=maquinaria,
         )
         self.assertEqual(material_ot.precio_venta_aplicado, Decimal('70.00'))
+
+    def test_admin_can_create_material_using_selected_category_and_code_prefix(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('agregar_material_ot_admin', args=[self.ot.pk]),
+            {
+                'categoria': 'M',
+                'material_name': 'Motor de reemplazo nuevo',
+                'cantidad': '1.00',
+                'costo_real': '70000.00',
+            },
+        )
+
+        self.assertRedirects(response, reverse('gestionar_ot_admin', args=[self.ot.pk]))
+        material = Material.objects.get(nombre='Motor de reemplazo nuevo')
+        self.assertEqual(material.categoria, 'maquinaria')
+        self.assertTrue(material.codigo.startswith('M'))
+        self.assertEqual(material.precio_venta_sugerido, Decimal('70000.00'))
+        material_ot = MaterialOT.objects.get(orden_trabajo=self.ot, material=material)
+        self.assertEqual(material_ot.precio_venta_aplicado, Decimal('70000.00'))
 
     def test_admin_billing_post_without_manual_labor_preserves_existing_total(self):
         self.client.force_login(self.admin)
