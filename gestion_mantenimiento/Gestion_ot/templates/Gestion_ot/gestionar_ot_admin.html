@@ -171,11 +171,20 @@
         <form method="post" action="{% url 'agregar_servicio_ot_admin' ot.pk %}" class="admin-service-form">
             {% csrf_token %}
             <div>
+                <label for="filtro-categoria-servicio">Categoría</label>
+                <select id="filtro-categoria-servicio" name="categoria">
+                    <option value="todos">Todos</option>
+                    {% for value, label in categorias_material %}
+                        <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
                 <label for="admin-service-name">Servicio</label>
                 <input type="search" id="admin-service-name" name="nombre" list="servicios-datalist" autocomplete="off" required maxlength="150">
                 <datalist id="servicios-datalist">
                     {% for servicio in servicios_catalogo %}
-                        <option value="{{ servicio.nombre }}" data-precio="{{ servicio.precio_venta_sugerido|unlocalize }}"></option>
+                        <option value="{{ servicio.nombre }}" data-categoria="{{ servicio.categoria }}" data-precio="{{ servicio.precio_venta_sugerido|unlocalize }}"></option>
                     {% endfor %}
                 </datalist>
             </div>
@@ -249,6 +258,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const servicePrice = document.getElementById('admin-service-price');
     const serviceOptions = Array.from(document.querySelectorAll('#servicios-datalist option'));
     const serviceDatalist = document.getElementById('servicios-datalist');
+    const serviceCategory = document.getElementById('filtro-categoria-servicio');
 
     function normalizeSearchText(text) {
         return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
@@ -318,17 +328,39 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     serviceName.addEventListener('input', function () {
-        updateDatalist(serviceDatalist, serviceOptions, serviceName.value);
-        const match = serviceOptions.find(option =>
+        const categoryOptions = serviceOptions.filter(option =>
+            serviceCategory.value === 'todos'
+            || option.dataset.categoria === serviceCategory.value
+        );
+        updateDatalist(serviceDatalist, categoryOptions, serviceName.value);
+        const match = categoryOptions.find(option =>
             normalizeSearchText(option.value.trim()) === normalizeSearchText(serviceName.value.trim())
         );
         if (match) {
             serviceName.value = match.value;
             servicePrice.value = formatLocalizedNumber(match.dataset.precio, true);
-            updateDatalist(serviceDatalist, serviceOptions, serviceName.value);
+            updateDatalist(serviceDatalist, categoryOptions, serviceName.value);
         } else {
             servicePrice.value = '';
         }
+    });
+
+    serviceCategory.addEventListener('change', function () {
+        const categoryOptions = serviceOptions.filter(option =>
+            serviceCategory.value === 'todos'
+            || option.dataset.categoria === serviceCategory.value
+        );
+        const match = categoryOptions.find(option =>
+            normalizeSearchText(option.value.trim()) === normalizeSearchText(serviceName.value.trim())
+        );
+        if (serviceName.value.trim() && !match) {
+            serviceName.value = '';
+            servicePrice.value = '';
+        } else if (match) {
+            serviceName.value = match.value;
+            servicePrice.value = formatLocalizedNumber(match.dataset.precio, true);
+        }
+        updateDatalist(serviceDatalist, categoryOptions, serviceName.value);
     });
 
     function materialTotal() {

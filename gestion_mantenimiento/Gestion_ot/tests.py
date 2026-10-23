@@ -501,7 +501,7 @@ class MaterialOTAjaxTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(Material.objects.filter(codigo='MAT-READONLY').exists())
 
-    def test_creates_catalog_material_with_suggested_markup(self):
+    def test_catalog_material_suggested_price_applies_markup_only_to_spare_parts(self):
         response = self.client.post(
             reverse('crear_material_ajax', args=[self.ot.pk]),
             data='{"categoria":"servicios","nombre":"Correa","costo_base":"7.00"}',
@@ -510,7 +510,7 @@ class MaterialOTAjaxTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         material = Material.objects.get(codigo='SCOR01')
-        self.assertEqual(material.precio_venta_sugerido, Decimal('10.00'))
+        self.assertEqual(material.precio_venta_sugerido, Decimal('7.00'))
         self.assertEqual(material.categoria, 'servicios')
 
     def test_catalog_price_field_fits_the_full_supported_base_cost(self):
@@ -576,6 +576,13 @@ class MaterialOTAjaxTests(TestCase):
 
                 self.assertEqual(response.status_code, 201)
                 self.assertEqual(response.json()['codigo'], codigo_esperado)
+                material = Material.objects.get(codigo=codigo_esperado)
+                expected_price = (
+                    Decimal('10.00')
+                    if categoria == 'repuestos'
+                    else Decimal('7.00')
+                )
+                self.assertEqual(material.precio_venta_sugerido, expected_price)
 
     def test_closure_page_renders_material_catalog_and_table(self):
         Material.objects.create(
@@ -1033,14 +1040,68 @@ class RentabilidadAdminTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="filtro-categoria-servicio" name="categoria"')
+        for category in ('repuestos', 'maquinaria', 'frio', 'locativos', 'servicios'):
+            self.assertContains(response, f'<option value="{category}">')
         services = response.context['servicios_catalogo']
         self.assertSetEqual(
             set(services.values_list('categoria', flat=True)),
-            {'maquinaria', 'frio', 'locativos', 'servicios'},
+            {'repuestos', 'maquinaria', 'frio', 'locativos', 'servicios'},
         )
         for _, _, name in catalog_materials:
             self.assertContains(response, name)
         self.assertContains(response, 'data-precio="150.00"')
+        for category in ('repuestos', 'maquinaria', 'frio', 'locativos', 'servicios'):
+            self.assertContains(response, f'data-categoria="{category}"')
+
+    def test_admin_can_create_service_catalog_item_with_selected_category_and_code(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('agregar_servicio_ot_admin', args=[self.ot.pk]),
+            {
+                'categoria': 'maquinaria',
+                'nombre': 'Motor de reemplazo',
+                'cantidad': '1',
+                'precio_unitario': '75000.00',
+            },
+        )
+
+        self.assertRedirects(response, reverse('gestionar_ot_admin', args=[self.ot.pk]))
+        material = Material.objects.get(nombre='Motor de reemplazo')
+        self.assertEqual(material.categoria, 'maquinaria')
+        self.assertTrue(material.codigo.startswith('M'))
+        self.assertEqual(material.precio_venta_sugerido, Decimal('75000.00'))
+        service_line = ServicioOT.objects.get(orden_trabajo=self.ot)
+        self.assertEqual(service_line.total, Decimal('75000.00'))
+        self.ot.cierreot.refresh_from_db()
+        self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('75060.00'))
+
+    def test_non_spare_part_material_uses_its_cost_without_markup(self):
+        maquinaria = Material.objects.create(
+            codigo='MAQ-NOMARGEN-01',
+            categoria='maquinaria',
+            nombre='Maquinaria sin margen',
+            costo_base=Decimal('50.00'),
+            precio_venta_sugerido=Decimal('50.00'),
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('agregar_material_ot_admin', args=[self.ot.pk]),
+            {
+                'material': maquinaria.pk,
+                'cantidad': '1.00',
+                'costo_real': '70.00',
+            },
+        )
+
+        self.assertRedirects(response, reverse('gestionar_ot_admin', args=[self.ot.pk]))
+        material_ot = MaterialOT.objects.get(
+            orden_trabajo=self.ot,
+            material=maquinaria,
+        )
+        self.assertEqual(material_ot.precio_venta_aplicado, Decimal('70.00'))
 
     def test_admin_billing_post_without_manual_labor_preserves_existing_total(self):
         self.client.force_login(self.admin)

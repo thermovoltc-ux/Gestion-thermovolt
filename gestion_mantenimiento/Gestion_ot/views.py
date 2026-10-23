@@ -1228,6 +1228,15 @@ def facturacion_admin(request):
     )
 
 
+def _precio_venta_desde_costo(costo, categoria):
+    if categoria != 'repuestos':
+        return costo
+    return (costo / Decimal('0.7')).quantize(
+        Decimal('0.01'),
+        rounding=ROUND_HALF_UP,
+    )
+
+
 @login_required
 def gestionar_ot_admin(request, ot_id):
     if not _es_admin_rentabilidad(request.user):
@@ -1272,10 +1281,15 @@ def gestionar_ot_admin(request, ot_id):
             'form': form,
             'material_admin_form': MaterialOTForm(),
             'material_catalogo_form': MaterialForm(),
+            'categorias_material': [
+                ('repuestos', 'Repuestos'),
+                ('maquinaria', 'Maquinaria'),
+                ('frio', 'Frío / Refrigeración'),
+                ('locativos', 'Locativos'),
+                ('servicios', 'Servicios'),
+            ],
             'materiales_catalogo': Material.objects.order_by('nombre'),
-            'servicios_catalogo': Material.objects.filter(
-                categoria__in=['maquinaria', 'frio', 'locativos', 'servicios'],
-            ).order_by('nombre'),
+            'servicios_catalogo': Material.objects.order_by('nombre'),
             'servicios_ot': ot.servicios_facturados.all(),
             'filas_materiales': filas_materiales,
             'resumen': resumen,
@@ -1317,9 +1331,10 @@ def agregar_material_ot_admin(request, ot_id):
                         categoria='repuestos',
                         nombre=material_name,
                         costo_base=costo_real,
-                        precio_venta_sugerido=(
-                            costo_real / Decimal('0.7')
-                        ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
+                        precio_venta_sugerido=_precio_venta_desde_costo(
+                            costo_real,
+                            'repuestos',
+                        ),
                     )
                     material.save()
                     post_data['material'] = str(material.pk)
@@ -1334,9 +1349,10 @@ def agregar_material_ot_admin(request, ot_id):
 
     material_ot = form.save(commit=False)
     material_ot.orden_trabajo = ot
-    material_ot.precio_venta_aplicado = (
-        material_ot.costo_real / Decimal('0.7')
-    ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    material_ot.precio_venta_aplicado = _precio_venta_desde_costo(
+        material_ot.costo_real,
+        material_ot.material.categoria,
+    )
     material_ot.save()
     messages.success(
         request,
@@ -1362,17 +1378,24 @@ def agregar_servicio_ot_admin(request, ot_id):
         return redirect('gestionar_ot_admin', ot_id=ot.pk)
 
     nombre = form.cleaned_data['nombre'].strip()
+    categoria = form.cleaned_data['categoria'] or 'todos'
     cantidad = form.cleaned_data['cantidad']
     precio_unitario = form.cleaned_data['precio_unitario']
     total_servicio = (cantidad * precio_unitario).quantize(Decimal('0.01'))
     with transaction.atomic():
+        categorias_busqueda = (
+            [categoria] if categoria != 'todos' else [
+                value for value, _ in Material.CATEGORIA_CHOICES
+            ]
+        )
         servicio_catalogo = Material.objects.filter(
-            categoria__in=['maquinaria', 'frio', 'locativos', 'servicios'],
+            categoria__in=categorias_busqueda,
             nombre__iexact=nombre,
         ).order_by('pk').first()
         if servicio_catalogo is None:
+            categoria_nueva = 'servicios' if categoria == 'todos' else categoria
             servicio_catalogo = Material(
-                categoria='servicios',
+                categoria=categoria_nueva,
                 nombre=nombre,
                 costo_base=Decimal('0.00'),
                 precio_venta_sugerido=precio_unitario,
@@ -1766,9 +1789,10 @@ def _crear_material_catalogo(request):
         )
 
     material = form.save(commit=False)
-    material.precio_venta_sugerido = (
-        material.costo_base / Decimal('0.7')
-    ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    material.precio_venta_sugerido = _precio_venta_desde_costo(
+        material.costo_base,
+        material.categoria,
+    )
     try:
         with transaction.atomic():
             material.save()
@@ -1830,9 +1854,10 @@ def agregar_material_ot(request, ot_id):
 
     material_ot = form.save(commit=False)
     material_ot.orden_trabajo = ot
-    material_ot.precio_venta_aplicado = (
-        material_ot.costo_real / Decimal('0.7')
-    ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    material_ot.precio_venta_aplicado = _precio_venta_desde_costo(
+        material_ot.costo_real,
+        material_ot.material.categoria,
+    )
     material_ot.save()
 
     return JsonResponse({
@@ -1860,9 +1885,10 @@ def agregar_material_rapido_ot(request, ot_id):
 
     material_ot = form.save(commit=False)
     material_ot.orden_trabajo = ot
-    material_ot.precio_venta_aplicado = (
-        material_ot.costo_real / Decimal('0.7')
-    ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    material_ot.precio_venta_aplicado = _precio_venta_desde_costo(
+        material_ot.costo_real,
+        material_ot.material.categoria,
+    )
     material_ot.save()
 
     return JsonResponse({

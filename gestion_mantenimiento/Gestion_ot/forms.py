@@ -311,6 +311,11 @@ class MaterialOTForm(forms.ModelForm):
 
 class ServicioOTForm(forms.Form):
     nombre = forms.CharField(max_length=150)
+    categoria = forms.ChoiceField(
+        choices=[('todos', 'Todos'), *Material.CATEGORIA_CHOICES],
+        required=False,
+        initial='todos',
+    )
     cantidad = forms.DecimalField(
         min_value=Decimal('0.01'),
         max_digits=10,

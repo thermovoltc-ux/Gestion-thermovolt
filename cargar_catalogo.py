@@ -91,10 +91,12 @@ def import_catalog(csv_path, dry_run=False):
                     categoria=category,
                     nombre__iexact=name,
                 ).order_by('pk').first()
-            suggested_sale_price = (cost / SALE_MARGIN_FACTOR).quantize(
-                Decimal('0.01'),
-                rounding=ROUND_HALF_UP,
-            )
+            suggested_sale_price = cost
+            if category == 'repuestos':
+                suggested_sale_price = (cost / SALE_MARGIN_FACTOR).quantize(
+                    Decimal('0.01'),
+                    rounding=ROUND_HALF_UP,
+                )
 
             if material is None:
                 material = Material(
