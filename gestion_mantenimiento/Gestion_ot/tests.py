@@ -584,25 +584,16 @@ class MaterialOTAjaxTests(TestCase):
         self.assertContains(response, 'Agregar Material / Repuesto')
         self.assertContains(response, 'Rodamiento')
         self.assertContains(response, 'materiales_ot.js')
-        self.assertContains(response, 'nuevo-categoria')
-        self.assertContains(response, 'id="select-material" class="form-control">')
+        self.assertContains(response, 'id="buscar-material-unificado" class="form-control" list="materiales-catalogo"')
+        self.assertContains(response, 'data-id="')
+        self.assertContains(response, 'data-costo="')
+        self.assertNotContains(response, 'id="buscar-material"')
+        self.assertNotContains(response, 'id="select-material"')
+        self.assertNotContains(response, 'btn-abrir-modal-nuevo-material')
+        self.assertNotContains(response, 'modal-nuevo-material')
+        self.assertNotContains(response, 'Crear nuevo repuesto')
         self.assertContains(response, 'id="input-cantidad" class="form-control" value="1" min="0.01" step="0.01">')
         self.assertContains(response, 'id="input-costo-real" class="form-control" min="0" step="0.01">')
-        self.assertContains(response, 'id="nuevo-categoria" class="form-control">')
-        self.assertContains(response, 'id="nuevo-nombre" class="form-control" maxlength="150">')
-        self.assertContains(response, 'id="nuevo-costo" class="form-control" min="0" step="0.01">')
-        for value, label in (
-            ('repuestos', 'Repuestos'),
-            ('servicios', 'Servicios'),
-            ('maquinaria', 'Maquinaria'),
-            ('frio', 'Frío / Refrigeración'),
-            ('locativos', 'Locativos'),
-        ):
-            self.assertContains(
-                response,
-                f'<option value="{value}">{label}</option>',
-                html=True,
-            )
         self.assertNotContains(response, 'nuevo-codigo')
 
     def test_ot_list_shows_quick_material_button_only_for_assigned_in_process_orders(self):
@@ -971,15 +962,51 @@ class RentabilidadAdminTests(TestCase):
         self.assertContains(response, 'Ver factura')
         self.assertContains(response, 'Total facturado')
         self.assertContains(response, 'Guardar facturación')
-        self.assertContains(response, 'Estado operativo (solo lectura)')
-        self.assertContains(response, 'OT Finalizada')
+        self.assertNotContains(response, 'Estado operativo (solo lectura)')
+        self.assertNotContains(response, 'OT Finalizada')
+        self.assertContains(response, 'Estado de facturación')
         self.assertNotContains(response, 'Estado de la OT</strong>')
         self.assertContains(response, 'Agregar material (Admin)')
         self.assertContains(response, 'id="admin-material-search" list="admin-materials-datalist"')
         self.assertNotContains(response, 'admin-open-create-material')
+        self.assertNotContains(response, 'Servicios y mano de obra')
+        self.assertEqual(response.content.count(b'Facturaci\xc3\xb3n del servicio'), 1)
+        self.assertContains(response, 'Valor manual de mano de obra / servicio')
+        self.assertContains(response, 'name="valor_mano_obra"')
         self.assertContains(response, 'id="admin-service-name" name="nombre"')
         self.assertContains(response, 'id="admin-service-quantity" name="cantidad"')
         self.assertContains(response, 'id="admin-service-price" name="precio_unitario"')
+
+    def test_service_catalog_includes_machinery_cold_and_locative_categories(self):
+        catalog_materials = [
+            ('MAQ-OT-001', 'maquinaria', 'Maquinaria para tercerizar'),
+            ('FRI-OT-001', 'frio', 'Equipo frío para tercerizar'),
+            ('LOC-OT-001', 'locativos', 'Trabajo locativo para tercerizar'),
+            ('SER-OT-001', 'servicios', 'Servicio catalogado'),
+        ]
+        for code, category, name in catalog_materials:
+            Material.objects.create(
+                codigo=code,
+                categoria=category,
+                nombre=name,
+                costo_base=Decimal('100.00'),
+                precio_venta_sugerido=Decimal('150.00'),
+            )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('gestionar_ot_admin', args=[self.ot.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        services = response.context['servicios_catalogo']
+        self.assertSetEqual(
+            set(services.values_list('categoria', flat=True)),
+            {'maquinaria', 'frio', 'locativos', 'servicios'},
+        )
+        for _, _, name in catalog_materials:
+            self.assertContains(response, name)
+        self.assertContains(response, 'data-precio="150.00"')
 
     def test_technician_cannot_access_admin_management_or_update_materials(self):
         material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
@@ -1150,6 +1177,35 @@ class RentabilidadAdminTests(TestCase):
         response = self.client.get(reverse('gestionar_ot_admin', args=[self.ot.pk]))
         self.assertContains(response, '$ 300.000,00')
         self.assertContains(response, '$ 300.060,00')
+
+    def test_adding_catalog_machinery_as_service_does_not_create_duplicate_catalog_entry(self):
+        machinery = Material.objects.create(
+            codigo='MAQ-OT-002',
+            categoria='maquinaria',
+            nombre='Equipo tercerizado',
+            costo_base=Decimal('80000.00'),
+            precio_venta_sugerido=Decimal('120000.00'),
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('agregar_servicio_ot_admin', args=[self.ot.pk]),
+            {
+                'nombre': machinery.nombre,
+                'cantidad': '2.00',
+                'precio_unitario': '120000.00',
+            },
+        )
+
+        self.assertRedirects(response, reverse('gestionar_ot_admin', args=[self.ot.pk]))
+        self.assertEqual(
+            Material.objects.filter(nombre=machinery.nombre).count(),
+            1,
+        )
+        service_line = ServicioOT.objects.get(orden_trabajo=self.ot)
+        self.assertEqual(service_line.total, Decimal('240000.00'))
+        self.ot.cierreot.refresh_from_db()
+        self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('240060.00'))
 
     def test_admin_can_add_free_text_material_with_real_cost_as_catalog_base_cost(self):
         self.client.force_login(self.admin)

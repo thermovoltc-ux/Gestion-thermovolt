@@ -1,25 +1,21 @@
 document.addEventListener('DOMContentLoaded', function () {
     const addModal = document.getElementById('modal-agregar-material');
-    const createModal = document.getElementById('modal-nuevo-material');
-    const select = document.getElementById('select-material');
-    if (!addModal || !createModal || !select) {
+    const searchInput = document.getElementById('buscar-material-unificado');
+    const materialsList = document.getElementById('materiales-catalogo');
+    if (!addModal || !searchInput || !materialsList) {
         return;
     }
 
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
     const pageContainer = document.querySelector('.cierre-ot-form-container[data-material-add-url]');
     const tableBody = document.getElementById('lista-materiales');
-    const searchInput = document.getElementById('buscar-material');
     const costInput = document.getElementById('input-costo-real');
     const quantityInput = document.getElementById('input-cantidad');
     const photoInput = document.getElementById('input-foto-factura');
     const observationInput = document.getElementById('input-observaciones-material');
     const addError = document.getElementById('error-material');
-    const createError = document.getElementById('error-nuevo-material');
     const addButton = document.getElementById('btn-guardar-material');
-    const createButton = document.getElementById('btn-crear-nuevo');
     let activeTrigger = null;
-    let returnToAddModal = false;
     const numberFormat = new Intl.NumberFormat('es-CO', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
@@ -37,7 +33,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (payload && payload.errors) {
             target.textContent = Object.values(payload.errors).flat().join(' ');
         } else {
-            target.textContent = (payload && payload.error) || 'No se pudo completar la operación.';
+            target.textContent = (payload && (payload.error || payload.message))
+                || 'No se pudo completar la operación.';
         }
     }
 
@@ -103,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function () {
         addModal.dataset.materialCreateUrl = createEndpoint || '';
         addError.textContent = '';
         showModal(addModal);
-        select.focus();
+        searchInput.focus();
     }
 
     document.querySelectorAll('.btn-abrir-modal-material, #btn-abrir-modal-material')
@@ -117,44 +114,29 @@ document.addEventListener('DOMContentLoaded', function () {
         hideModal(addModal);
     });
 
-    document.getElementById('btn-abrir-modal-nuevo-material').addEventListener('click', function () {
-        createError.textContent = '';
-        returnToAddModal = !addModal.hidden;
-        hideModal(addModal);
-        showModal(createModal);
-        document.getElementById('nuevo-categoria').focus();
-    });
-
-    document.getElementById('btn-cancelar-nuevo').addEventListener('click', function () {
-        hideModal(createModal);
-        if (returnToAddModal) {
-            showModal(addModal);
-            select.focus();
-        }
-    });
-
-    select.addEventListener('change', function () {
-        const option = select.options[select.selectedIndex];
-        if (option && option.dataset.costo) {
-            costInput.value = option.dataset.costo;
-        }
-    });
+    function findMaterialOption(name) {
+        const normalizedName = name.trim().toLocaleLowerCase();
+        return Array.from(materialsList.options).find(function (option) {
+            return option.value.trim().toLocaleLowerCase() === normalizedName;
+        });
+    }
 
     searchInput.addEventListener('input', function () {
-        const query = searchInput.value.trim().toLocaleLowerCase();
-        Array.from(select.options).forEach(function (option, index) {
-            option.hidden = index !== 0 && !option.textContent.toLocaleLowerCase().includes(query);
-        });
-        if (select.options[select.selectedIndex]?.hidden) {
-            select.value = '';
-        }
+        const option = findMaterialOption(searchInput.value);
+        costInput.value = option ? option.dataset.costo : '';
     });
 
     addButton.addEventListener('click', async function () {
         addError.textContent = '';
-        if (!select.value) {
-            addError.textContent = 'Selecciona un material del catálogo.';
-            select.focus();
+        const materialName = searchInput.value.trim();
+        if (!materialName) {
+            addError.textContent = 'Escribe o selecciona un material.';
+            searchInput.focus();
+            return;
+        }
+        if (materialName.length > 150) {
+            addError.textContent = 'El nombre del material no puede superar 150 caracteres.';
+            searchInput.focus();
             return;
         }
         if (!validateNumber(quantityInput, 0.01)) {
@@ -168,17 +150,48 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        const formData = new FormData();
-        formData.append('material', select.value);
-        formData.append('cantidad', quantityInput.value);
-        formData.append('costo_real', costInput.value);
-        formData.append('observaciones', observationInput.value);
-        if (photoInput.files[0]) {
-            formData.append('foto_factura', photoInput.files[0]);
-        }
-
         addButton.disabled = true;
         try {
+            let materialId;
+            const option = findMaterialOption(materialName);
+            if (option) {
+                materialId = option.dataset.id;
+            } else {
+                if (!addModal.dataset.materialCreateUrl) {
+                    throw new Error('No está disponible la creación automática de materiales.');
+                }
+                const createResponse = await fetch(addModal.dataset.materialCreateUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        categoria: 'repuestos',
+                        nombre: materialName,
+                        costo_base: costInput.value,
+                    }),
+                });
+                const createdMaterial = await readResponse(createResponse);
+                materialId = String(createdMaterial.id);
+                const createdOption = document.createElement('option');
+                createdOption.value = createdMaterial.nombre;
+                createdOption.dataset.id = materialId;
+                createdOption.dataset.costo = createdMaterial.costo_base;
+                createdOption.label = `${createdMaterial.codigo} — ${createdMaterial.nombre}`;
+                materialsList.appendChild(createdOption);
+            }
+
+            const formData = new FormData();
+            formData.append('material', materialId);
+            formData.append('cantidad', quantityInput.value);
+            formData.append('costo_real', costInput.value);
+            formData.append('observaciones', observationInput.value);
+            if (photoInput.files[0]) {
+                formData.append('foto_factura', photoInput.files[0]);
+            }
+
             const response = await fetch(addModal.dataset.materialAddUrl, {
                 method: 'POST',
                 headers: { 'X-CSRFToken': csrfToken },
@@ -196,7 +209,6 @@ document.addEventListener('DOMContentLoaded', function () {
             costInput.value = '';
             photoInput.value = '';
             observationInput.value = '';
-            select.value = '';
             searchInput.value = '';
             hideModal(addModal);
         } catch (error) {
@@ -206,83 +218,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    createButton.addEventListener('click', async function () {
-        createError.textContent = '';
-        const categoryInput = document.getElementById('nuevo-categoria');
-        const nameInput = document.getElementById('nuevo-nombre');
-        const baseCostInput = document.getElementById('nuevo-costo');
-        if (!categoryInput.value) {
-            createError.textContent = 'Selecciona una categoría.';
-            categoryInput.focus();
-            return;
-        }
-        if (!nameInput.value.trim()) {
-            createError.textContent = 'Ingresa el nombre del material.';
-            nameInput.focus();
-            return;
-        }
-        if (!validateNumber(baseCostInput, 0)) {
-            createError.textContent = 'Ingresa un costo base válido (cero o mayor).';
-            baseCostInput.focus();
-            return;
-        }
-
-        createButton.disabled = true;
-        try {
-            const response = await fetch(addModal.dataset.materialCreateUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken,
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify({
-                    categoria: categoryInput.value,
-                    nombre: nameInput.value.trim(),
-                    costo_base: baseCostInput.value,
-                }),
-            });
-            const material = await readResponse(response);
-            const option = document.createElement('option');
-            option.value = material.id;
-            option.dataset.costo = material.costo_base;
-            option.textContent = `${material.codigo} — ${material.nombre}`;
-            select.appendChild(option);
-            select.value = String(material.id);
-            costInput.value = material.costo_base;
-            searchInput.value = '';
-            categoryInput.selectedIndex = 0;
-            nameInput.value = '';
-            baseCostInput.value = '';
-            hideModal(createModal);
-            if (returnToAddModal) {
-                showModal(addModal);
-            }
-            returnToAddModal = false;
-            select.focus();
-        } catch (error) {
-            displayErrors(createError, error);
-        } finally {
-            createButton.disabled = false;
-        }
-    });
-
     addModal.addEventListener('click', function (event) {
         if (event.target === addModal) hideModal(addModal);
     });
-    createModal.addEventListener('click', function (event) {
-        if (event.target === createModal) {
-            hideModal(createModal);
-            if (returnToAddModal) showModal(addModal);
-        }
-    });
 
     document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && !createModal.hidden) {
-            hideModal(createModal);
-            if (returnToAddModal) showModal(addModal);
-            returnToAddModal = false;
-        } else if (event.key === 'Escape' && !addModal.hidden) {
+        if (event.key === 'Escape' && !addModal.hidden) {
             hideModal(addModal);
         }
     });

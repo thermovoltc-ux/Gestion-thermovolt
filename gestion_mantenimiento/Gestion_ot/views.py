@@ -1269,7 +1269,7 @@ def gestionar_ot_admin(request, ot_id):
             'material_catalogo_form': MaterialForm(),
             'materiales_catalogo': Material.objects.order_by('nombre'),
             'servicios_catalogo': Material.objects.filter(
-                categoria='servicios',
+                categoria__in=['maquinaria', 'frio', 'locativos', 'servicios'],
             ).order_by('nombre'),
             'servicios_ot': ot.servicios_facturados.all(),
             'filas_materiales': filas_materiales,
@@ -1362,7 +1362,7 @@ def agregar_servicio_ot_admin(request, ot_id):
     total_servicio = (cantidad * precio_unitario).quantize(Decimal('0.01'))
     with transaction.atomic():
         servicio_catalogo = Material.objects.filter(
-            categoria='servicios',
+            categoria__in=['maquinaria', 'frio', 'locativos', 'servicios'],
             nombre__iexact=nombre,
         ).order_by('pk').first()
         if servicio_catalogo is None:
