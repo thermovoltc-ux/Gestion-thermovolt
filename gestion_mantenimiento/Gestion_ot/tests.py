@@ -1415,6 +1415,55 @@ class RentabilidadAdminTests(TestCase):
         self.assertContains(response, '$ 300.000,00')
         self.assertContains(response, '$ 300.060,00')
 
+    def test_admin_can_delete_service_and_recalculate_labor_and_invoice(self):
+        servicio = ServicioOT.objects.create(
+            orden_trabajo=self.ot,
+            nombre='Servicio para eliminar',
+            cantidad=Decimal('2.00'),
+            precio_unitario=Decimal('50.00'),
+        )
+        cierre = self.ot.cierreot
+        cierre.valor_mano_obra = Decimal('160.00')
+        cierre.save(update_fields=['valor_mano_obra'])
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('gestionar_ot_admin', args=[self.ot.pk]),
+        )
+        self.assertContains(response, 'btn-eliminar-servicio')
+        self.assertContains(response, reverse(
+            'eliminar_servicio_ot_admin',
+            args=[self.ot.pk, servicio.pk],
+        ))
+
+        response = self.client.post(
+            reverse('eliminar_servicio_ot_admin', args=[self.ot.pk, servicio.pk]),
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['mano_obra'], '60.00')
+        self.assertEqual(response.json()['total_facturado'], '260.00')
+        self.assertFalse(ServicioOT.objects.filter(pk=servicio.pk).exists())
+        cierre.refresh_from_db()
+        self.assertEqual(cierre.valor_mano_obra, Decimal('60.00'))
+
+    def test_technician_cannot_delete_admin_service_line(self):
+        servicio = ServicioOT.objects.create(
+            orden_trabajo=self.ot,
+            nombre='Servicio protegido',
+            cantidad=Decimal('1.00'),
+            precio_unitario=Decimal('50.00'),
+        )
+        self.client.force_login(self.tecnico)
+
+        response = self.client.post(
+            reverse('eliminar_servicio_ot_admin', args=[self.ot.pk, servicio.pk]),
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(ServicioOT.objects.filter(pk=servicio.pk).exists())
+
     def test_adding_catalog_machinery_as_service_does_not_create_duplicate_catalog_entry(self):
         machinery = Material.objects.create(
             codigo='MAQ-OT-002',

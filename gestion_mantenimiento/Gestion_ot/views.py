@@ -1433,6 +1433,60 @@ def agregar_servicio_ot_admin(request, ot_id):
 
 @login_required
 @require_POST
+def eliminar_servicio_ot_admin(request, ot_id, servicio_id):
+    if not _es_admin_rentabilidad(request.user):
+        return JsonResponse(
+            {'ok': False, 'error': 'No tenés permiso para eliminar servicios de esta OT.'},
+            status=403,
+        )
+
+    with transaction.atomic():
+        ot = get_object_or_404(
+            OrdenTrabajo.objects.select_for_update(),
+            pk=ot_id,
+        )
+        servicio = get_object_or_404(
+            ServicioOT.objects.select_for_update(),
+            pk=servicio_id,
+            orden_trabajo=ot,
+        )
+        cierre = CierreOt.objects.select_for_update().filter(
+            orden_trabajo=ot,
+        ).first()
+        if cierre is None:
+            return JsonResponse(
+                {'ok': False, 'error': 'No se encontró el cierre asociado a la OT.'},
+                status=409,
+            )
+
+        valor_mano_obra = cierre.valor_mano_obra or Decimal('0.00')
+        if servicio.total > valor_mano_obra:
+            return JsonResponse(
+                {
+                    'ok': False,
+                    'error': 'El total de mano de obra no coincide con el servicio; no se eliminó.',
+                },
+                status=409,
+            )
+
+        servicio.delete()
+        cierre.valor_mano_obra = (valor_mano_obra - servicio.total).quantize(
+            Decimal('0.01'),
+            rounding=ROUND_HALF_UP,
+        )
+        cierre.save(update_fields=['valor_mano_obra'])
+        resumen = _calcular_costos_ot(ot, cierre)
+
+    return JsonResponse({
+        'ok': True,
+        'servicio_id': servicio_id,
+        'mano_obra': str(resumen['valor_mano_obra']),
+        'total_facturado': str(resumen['ingreso_total']),
+    })
+
+
+@login_required
+@require_POST
 def actualizar_mano_obra(request, ot_id):
     if not _es_admin_rentabilidad(request.user):
         return JsonResponse({'ok': False, 'error': 'No tenés permiso para modificar la facturación.'}, status=403)

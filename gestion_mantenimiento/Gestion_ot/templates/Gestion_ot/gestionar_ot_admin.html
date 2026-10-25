@@ -10,9 +10,12 @@
     .admin-ot-muted { color: #64748b; }
     .admin-ot-card { background: #fff; border-radius: 12px; padding: 20px; margin: 18px 0; box-shadow: 0 2px 8px rgba(15,23,42,.08); }
     .admin-ot-header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; }
-    .admin-ot-meta { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 12px; margin-top: 16px; }
+    .admin-ot-meta { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 10px; margin-top: 16px; }
     .admin-ot-meta div { padding: 12px; background: #f8fafc; border-radius: 8px; }
     .admin-ot-meta strong { display: block; font-size: 12px; color: #64748b; margin-bottom: 5px; }
+    .admin-ot-meta-detail { margin-top: 12px; padding: 14px 16px; border-radius: 8px; background: #f8fafc; line-height: 1.55; overflow-wrap: anywhere; }
+    .admin-ot-meta-detail strong { display: block; margin-bottom: 5px; color: #64748b; font-size: 12px; }
+    .admin-ot-meta-detail p { margin: 0; white-space: pre-line; }
     .admin-ot-table-wrap { overflow-x: auto; }
     .admin-ot-table { width: 100%; min-width: 1000px; border-collapse: collapse; }
     .admin-ot-table th, .admin-ot-table td { border-bottom: 1px solid #e2e8f0; padding: 10px; text-align: left; vertical-align: middle; }
@@ -29,6 +32,7 @@
     .admin-ot-actions { display: flex; gap: 8px; }
     .admin-ot-btn { display: inline-block; border: 0; border-radius: 6px; padding: 9px 13px; background: #2563eb; color: #fff; text-decoration: none; font-weight: 600; cursor: pointer; }
     .admin-ot-btn-danger { background: #dc2626; }
+    .admin-ot-btn-danger:disabled { opacity: .6; cursor: wait; }
     .admin-ot-btn-secondary { background: #475569; }
     .admin-ot-financials { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 12px; }
     .admin-ot-kpi { padding: 16px; border-radius: 9px; background: #f8fafc; }
@@ -38,7 +42,9 @@
     .admin-ot-message:empty { display: none; }
     .admin-ot-message.error { background: #fef2f2; color: #b91c1c; }
     .admin-ot-live { color: #047857; font-weight: 700; }
-    @media (max-width: 640px) { .admin-ot-page { padding: 14px; } }
+    @media (max-width: 900px) { .admin-ot-meta { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+    @media (max-width: 640px) { .admin-ot-page { padding: 14px; } .admin-ot-meta { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+    @media (max-width: 380px) { .admin-ot-meta { grid-template-columns: 1fr; } }
 </style>
 
 <main class="admin-ot-page" data-ot-admin data-update-url="{{ actualizar_mano_obra_url }}">
@@ -64,9 +70,17 @@
             <div><strong>Técnico asignado</strong>{{ ot.tecnico_display|default:ot.tecnico_asignado }}</div>
             <div><strong>Fecha del cierre</strong>{{ cierre.fecha_inicio_actividad|date:"d/m/Y"|default:"—" }}</div>
             <div><strong>Horario reportado</strong>{% if cierre.hora_inicio and cierre.hora_fin %}{{ cierre.hora_inicio|time:"H:i" }} – {{ cierre.hora_fin|time:"H:i" }}{% else %}No registrado{% endif %}</div>
-            <div><strong>Descripción reportada</strong>{{ cierre.descripcion_falla|default:ot.solicitud.descripcion_problema|default:"—" }}</div>
         </div>
-        {% if cierre.observaciones %}<p><strong>Observaciones:</strong> {{ cierre.observaciones }}</p>{% endif %}
+        <div class="admin-ot-meta-detail">
+            <strong>Descripción reportada</strong>
+            <p>{{ cierre.descripcion_falla|default:ot.solicitud.descripcion_problema|default:"—" }}</p>
+        </div>
+        {% if cierre.observaciones %}
+            <div class="admin-ot-meta-detail">
+                <strong>Observaciones</strong>
+                <p>{{ cierre.observaciones }}</p>
+            </div>
+        {% endif %}
     </section>
 
     <section class="admin-ot-card">
@@ -161,14 +175,21 @@
         {% if servicios_ot %}
             <div class="admin-ot-table-wrap">
                 <table class="admin-ot-table" style="min-width:600px;">
-                    <thead><tr><th>Servicio</th><th>Cantidad</th><th>Precio unitario</th><th>Total</th></tr></thead>
+                    <thead><tr><th>Servicio</th><th>Cantidad</th><th>Precio unitario</th><th>Total</th><th>Acciones</th></tr></thead>
                     <tbody>
                         {% for servicio in servicios_ot %}
-                            <tr>
+                            <tr data-servicio-row="{{ servicio.pk }}">
                                 <td>{{ servicio.nombre }}</td>
                                 <td>{{ servicio.cantidad|intcomma }}</td>
                                 <td>$ {{ servicio.precio_unitario|intcomma }}</td>
                                 <td>$ {{ servicio.total|intcomma }}</td>
+                                <td>
+                                    <button type="button"
+                                            class="admin-ot-btn admin-ot-btn-danger btn-eliminar-servicio"
+                                            data-delete-url="{% url 'eliminar_servicio_ot_admin' ot.pk servicio.pk %}"
+                                            aria-label="Eliminar servicio {{ servicio.nombre }}"
+                                            title="Eliminar servicio">Eliminar</button>
+                                </td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -401,6 +422,49 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.querySelectorAll('.admin-ot-material-form input').forEach(input => input.addEventListener('input', updatePreview));
     updatePreview();
+
+    document.querySelectorAll('.btn-eliminar-servicio').forEach(function (button) {
+        button.addEventListener('click', async function () {
+            if (!window.confirm('¿Eliminar este servicio de la OT?')) return;
+            button.disabled = true;
+            messageEl.classList.remove('error');
+            messageEl.textContent = 'Eliminando servicio…';
+            try {
+                const response = await fetch(button.dataset.deleteUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrf,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                });
+                const data = await response.json();
+                if (!response.ok || !data.ok) {
+                    throw new Error(data.error || 'No se pudo eliminar el servicio.');
+                }
+                const row = button.closest('tr');
+                const tbody = row.parentElement;
+                row.remove();
+                if (!tbody.querySelector('[data-servicio-row]')) {
+                    const emptyRow = document.createElement('tr');
+                    const emptyCell = document.createElement('td');
+                    emptyCell.colSpan = 5;
+                    emptyCell.className = 'admin-ot-muted';
+                    emptyCell.textContent = 'No hay servicios facturados en esta OT.';
+                    emptyRow.appendChild(emptyCell);
+                    tbody.appendChild(emptyRow);
+                }
+                finance.dataset.manoObra = data.mano_obra;
+                finance.dataset.ingresoTotal = data.total_facturado;
+                updatePreview();
+                messageEl.textContent = 'Se eliminó el servicio y se actualizó la facturación.';
+            } catch (error) {
+                messageEl.classList.add('error');
+                messageEl.textContent = error.message;
+                button.disabled = false;
+            }
+        });
+    });
 
     form.addEventListener('submit', async function (event) {
         event.preventDefault();
