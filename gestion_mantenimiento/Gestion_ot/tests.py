@@ -546,6 +546,42 @@ class MaterialOTAjaxTests(TestCase):
         self.assertEqual(segunda_respuesta.json()['codigo'], 'RPV02')
         self.assertFalse(MaterialForm().fields.get('codigo'))
 
+    def test_catalog_code_sequence_increments_globally_across_category_initials(self):
+        Material.objects.create(
+            codigo='RR01',
+            categoria='repuestos',
+            nombre='Rodamiento inicial',
+            costo_base=Decimal('7.00'),
+            precio_venta_sugerido=Decimal('10.00'),
+        )
+        material_iniciales_distintas = Material(
+            categoria='repuestos',
+            nombre='Kit Empaques',
+            costo_base=Decimal('7.00'),
+            precio_venta_sugerido=Decimal('10.00'),
+        )
+        material_iniciales_distintas.save()
+
+        material_mismas_iniciales = Material(
+            categoria='repuestos',
+            nombre='Rodamiento Repuesto',
+            costo_base=Decimal('7.00'),
+            precio_venta_sugerido=Decimal('10.00'),
+        )
+        material_mismas_iniciales.save()
+
+        material_mismas_iniciales_siguiente = Material(
+            categoria='repuestos',
+            nombre='Rodamiento Refrigerado',
+            costo_base=Decimal('7.00'),
+            precio_venta_sugerido=Decimal('10.00'),
+        )
+        material_mismas_iniciales_siguiente.save()
+
+        self.assertEqual(material_iniciales_distintas.codigo, 'RKE02')
+        self.assertEqual(material_mismas_iniciales.codigo, 'RRR03')
+        self.assertEqual(material_mismas_iniciales_siguiente.codigo, 'RRR04')
+
     def test_catalog_codes_and_suggested_prices_follow_each_category(self):
         Material.objects.create(
             codigo='RPV01',

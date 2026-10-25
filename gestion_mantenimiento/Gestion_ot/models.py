@@ -396,13 +396,17 @@ class Material(models.Model):
 
         base = f'{prefijo}{iniciales}'
         codigos_existentes = type(self).objects.filter(
-            codigo__startswith=base,
+            categoria=self.categoria,
+            codigo__startswith=prefijo,
         ).values_list('codigo', flat=True)
         consecutivo_maximo = 0
         for codigo_existente in codigos_existentes:
-            sufijo = codigo_existente[len(base):]
-            if sufijo.isdigit():
-                consecutivo_maximo = max(consecutivo_maximo, int(sufijo))
+            coincidencia = re.search(r'(\d+)$', codigo_existente)
+            if coincidencia:
+                consecutivo_maximo = max(
+                    consecutivo_maximo,
+                    int(coincidencia.group(1)),
+                )
 
         consecutivo = consecutivo_maximo + 1
         while True:
