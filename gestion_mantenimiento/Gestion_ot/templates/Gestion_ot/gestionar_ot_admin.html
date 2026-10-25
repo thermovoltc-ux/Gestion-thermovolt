@@ -24,6 +24,9 @@
     .admin-ot-add-material { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 12px; align-items: end; margin-top: 18px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; }
     .admin-ot-add-material label { display: block; font-weight: 600; }
     .admin-ot-add-material input, .admin-ot-add-material select, .admin-ot-add-material textarea { box-sizing: border-box; width: 100%; margin-top: 5px; padding: 9px; border: 1px solid #cbd5e1; border-radius: 6px; }
+    .admin-ot-add-material .admin-ot-margin-option { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .admin-ot-add-material .admin-ot-margin-option input[type="checkbox"] { width: auto; margin: 0; }
+    .admin-ot-add-material .admin-ot-margin-option label { margin: 0; }
     .admin-ot-add-material .field-errors { color: #b91c1c; }
     .admin-service-form { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 12px; align-items: end; padding: 16px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; }
     .admin-service-form label { display: block; font-weight: 600; }
@@ -154,6 +157,11 @@
                 <label for="{{ material_admin_form.costo_real.id_for_label }}">Costo unitario real</label>
                 {{ material_admin_form.costo_real }}
                 {% if material_admin_form.costo_real.errors %}<div class="field-errors">{{ material_admin_form.costo_real.errors }}</div>{% endif %}
+                <div class="admin-ot-margin-option">
+                    <input type="hidden" name="aplicar_margen" value="0">
+                    <input type="checkbox" class="form-check-input" id="aplicar-margen" name="aplicar_margen" value="1" checked>
+                    <label for="aplicar-margen">Aplicar margen (0.7)</label>
+                </div>
             </div>
             <div>
                 <label for="{{ material_admin_form.foto_factura.id_for_label }}">Foto de factura (opcional)</label>

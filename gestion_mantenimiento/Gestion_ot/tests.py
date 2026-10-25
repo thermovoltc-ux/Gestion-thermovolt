@@ -1105,6 +1105,11 @@ class RentabilidadAdminTests(TestCase):
         self.assertNotContains(response, 'Estado de la OT</strong>')
         self.assertContains(response, 'Agregar material (Admin)')
         self.assertContains(response, 'id="admin-material-search" list="admin-materials-datalist"')
+        self.assertContains(
+            response,
+            'id="aplicar-margen" name="aplicar_margen" value="1" checked',
+        )
+        self.assertContains(response, 'Aplicar margen (0.7)')
         self.assertNotContains(response, 'admin-open-create-material')
         self.assertNotContains(response, 'Servicios y mano de obra')
         self.assertEqual(response.content.count(b'Facturaci\xc3\xb3n del servicio'), 1)
@@ -1242,6 +1247,7 @@ class RentabilidadAdminTests(TestCase):
                 'material_name': 'Motor de reemplazo nuevo',
                 'cantidad': '1.00',
                 'costo_real': '70000.00',
+                'aplicar_margen': '1',
             },
         )
 
@@ -1252,6 +1258,28 @@ class RentabilidadAdminTests(TestCase):
         self.assertEqual(material.precio_venta_sugerido, Decimal('100000.00'))
         material_ot = MaterialOT.objects.get(orden_trabajo=self.ot, material=material)
         self.assertEqual(material_ot.precio_venta_aplicado, Decimal('100000.00'))
+
+    def test_admin_can_add_new_material_without_applying_margin(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('agregar_material_ot_admin', args=[self.ot.pk]),
+            {
+                'categoria': 'R',
+                'material_name': 'Material especial sin margen',
+                'cantidad': '2.00',
+                'costo_real': '70000.00',
+                'aplicar_margen': '0',
+            },
+        )
+
+        self.assertRedirects(response, reverse('gestionar_ot_admin', args=[self.ot.pk]))
+        material = Material.objects.get(nombre='Material especial sin margen')
+        self.assertEqual(material.costo_base, Decimal('70000.00'))
+        self.assertEqual(material.precio_venta_sugerido, Decimal('100000.00'))
+        material_ot = MaterialOT.objects.get(orden_trabajo=self.ot, material=material)
+        self.assertEqual(material_ot.costo_real, Decimal('70000.00'))
+        self.assertEqual(material_ot.precio_venta_aplicado, Decimal('70000.00'))
 
     def test_admin_billing_post_without_manual_labor_preserves_existing_total(self):
         self.client.force_login(self.admin)

@@ -1314,6 +1314,11 @@ def agregar_material_ot_admin(request, ot_id):
 
     ot = get_object_or_404(OrdenTrabajo, pk=ot_id)
     post_data = request.POST.copy()
+    aplicar_margen = post_data.get('aplicar_margen', '1')
+    if aplicar_margen not in {'0', '1'}:
+        messages.error(request, 'La opción de margen seleccionada no es válida.')
+        return redirect('gestionar_ot_admin', ot_id=ot.pk)
+
     material_name = post_data.get('material_name', '').strip()
     category_by_prefix = {
         prefix: category
@@ -1361,9 +1366,13 @@ def agregar_material_ot_admin(request, ot_id):
 
     material_ot = form.save(commit=False)
     material_ot.orden_trabajo = ot
-    material_ot.precio_venta_aplicado = _precio_venta_desde_costo(
-        material_ot.costo_real,
-        material_ot.material.categoria,
+    material_ot.precio_venta_aplicado = (
+        _precio_venta_desde_costo(
+            material_ot.costo_real,
+            material_ot.material.categoria,
+        )
+        if aplicar_margen == '1'
+        else material_ot.costo_real
     )
     material_ot.save()
     messages.success(
