@@ -259,6 +259,23 @@
             $panel.empty();
             var $content = jQuery('<div></div>');
 
+            if (fotoUrl) {
+                jQuery('<img>')
+                    .attr({ src: fotoUrl, alt: nombre || '' })
+                    .css({
+                        maxWidth: '100%',
+                        maxHeight: '200px',
+                        borderRadius: '8px',
+                        border: '1px solid #e5e7eb',
+                        margin: '0 auto 12px',
+                        display: 'block'
+                    })
+                    .on('error', function() {
+                        jQuery(this).hide();
+                    })
+                    .appendTo($content);
+            }
+
             var icono = tipo === 'ubicacion' ? '🏢' : '⚙️';
             jQuery('<h3></h3>')
                 .css({marginTop: 0, marginBottom: '12px', color: '#0d6efd'})
@@ -289,23 +306,6 @@
             }
 
             addField('Descripción', descripcion);
-
-            if (fotoUrl) {
-                jQuery('<img>')
-                    .attr({ src: fotoUrl, alt: nombre || '' })
-                    .css({
-                        maxWidth: '100%',
-                        maxHeight: '200px',
-                        borderRadius: '8px',
-                        border: '1px solid #e5e7eb',
-                        margin: '12px 0',
-                        display: 'block'
-                    })
-                    .on('error', function() {
-                        jQuery(this).hide();
-                    })
-                    .appendTo($content);
-            }
 
             jQuery('<hr>').css({
                 margin: '16px 0',
