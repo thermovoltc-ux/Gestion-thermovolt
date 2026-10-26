@@ -1948,6 +1948,8 @@ def _ot_tecnico_en_proceso(request, ot_id):
 
 @login_required
 def drive_media(request, file_id):
+    from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
+
     stored_prefix = f'drive/{file_id}/'
     visible_ots = _ordenes_visibles_para_usuario(request)
     material_name = MaterialOT.objects.filter(
@@ -1959,6 +1961,47 @@ def drive_media(request, file_id):
         cierre_ot__orden_trabajo__in=visible_ots,
     ).values_list('imagen', flat=True).first()
     stored_name = material_name or image_name
+
+    if not stored_name:
+        tipo_cuenta = request.session.get('tipo_cuenta')
+        scope_ids = (
+            obtener_scope_ubicacion_ids(request)
+            if tipo_cuenta == 'administrador'
+            else None
+        )
+        if tipo_cuenta == 'administrador' and not scope_ids:
+            raise Http404('Imagen no encontrada.')
+
+        location_images = Ubicacion.objects.filter(imagen__startswith=stored_prefix)
+        if scope_ids is not None:
+            location_images = location_images.filter(pk__in=scope_ids)
+        stored_name = location_images.values_list('imagen', flat=True).first()
+
+        if not stored_name:
+            equipment_images = Equipo.objects.filter(
+                imagen__startswith=stored_prefix,
+            ).select_related('parent')
+            for equipo in equipment_images:
+                if scope_ids is None:
+                    stored_name = equipo.imagen.name
+                    break
+
+                if equipo.ubicacion_id:
+                    if equipo.ubicacion_id in scope_ids:
+                        stored_name = equipo.imagen.name
+                        break
+                    continue
+
+                parent = equipo.parent
+                while parent:
+                    if parent.ubicacion_id:
+                        if parent.ubicacion_id in scope_ids:
+                            stored_name = equipo.imagen.name
+                        break
+                    parent = parent.parent
+                if stored_name:
+                    break
+
     if not stored_name:
         raise Http404('Imagen no encontrada.')
 

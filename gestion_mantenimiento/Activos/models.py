@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from mptt.models import MPTTModel, TreeForeignKey
 
 from django.db import models
+from gestion_mantenimiento.Gestion_ot.storage import GoogleDriveMediaStorage
 
 
 # Modelo Regional
@@ -48,7 +49,12 @@ class Ubicacion(models.Model):
     direccion = models.CharField(max_length=255, null=True, blank=True)
     pais = models.CharField(max_length=100, null=True, blank=True)
     ciudad = models.CharField(max_length=100, null=True, blank=True)
-    imagen = models.ImageField(upload_to='ubicaciones/', null=True, blank=True)
+    imagen = models.ImageField(
+        upload_to='ubicaciones/',
+        storage=GoogleDriveMediaStorage(),
+        null=True,
+        blank=True,
+    )
     centro_operaciones = models.ForeignKey(
         CentroOperaciones,
         on_delete=models.SET_NULL,
@@ -121,7 +127,12 @@ class Equipo(models.Model):
     horas_uso = models.IntegerField(null=True, blank=True)
     valor_compra = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     valor_actual = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    imagen = models.ImageField(upload_to='equipos/', null=True, blank=True)
+    imagen = models.ImageField(
+        upload_to='equipos/',
+        storage=GoogleDriveMediaStorage(),
+        null=True,
+        blank=True,
+    )
     ubicacion = models.ForeignKey(Ubicacion, on_delete=models.CASCADE , null=True, blank=True, related_name='equipos')
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
 
