@@ -60,6 +60,13 @@ class CustomLoginCentroOperacionesTests(TestCase):
         self.assertEqual(session['centro_operaciones_id'], self.centro.pk)
         self.assertNotIn('co', session)
 
+    def test_admin_with_registered_center_sees_assets_navigation(self):
+        self._login(self.centro.codigo)
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertContains(response, reverse('lista_activos'))
+
     def test_admin_login_rejects_center_assigned_to_another_client(self):
         otro_cliente = Cliente.objects.create(
             nombre='Otro cliente login',
@@ -79,6 +86,32 @@ class CustomLoginCentroOperacionesTests(TestCase):
             'El Centro de Operaciones no está habilitado para tu cliente.',
             response.context['form'].errors['co'],
         )
+
+    def test_admin_login_uses_legacy_text_for_active_center_without_clients(self):
+        centro_huerfano = CentroOperaciones.objects.create(
+            nombre='Centro sin clientes',
+            codigo='CO-LOGIN-ORPHAN',
+        )
+
+        response = self._login(centro_huerfano.codigo)
+
+        self.assertRedirects(response, reverse('dashboard'))
+        session = self.client.session
+        self.assertNotIn('centro_operaciones_id', session)
+        self.assertEqual(session['co'], centro_huerfano.codigo)
+
+    def test_admin_login_rejects_inactive_center_without_clients(self):
+        centro_inactivo = CentroOperaciones.objects.create(
+            nombre='Centro inactivo sin clientes',
+            codigo='CO-LOGIN-INACTIVE',
+            activo=False,
+        )
+
+        response = self._login(centro_inactivo.codigo)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.wsgi_request.user.is_authenticated)
+        self.assertIn('co', response.context['form'].errors)
 
     def test_admin_login_uses_legacy_text_for_unregistered_center(self):
         response = self._login('LEGACY-CO-77')

@@ -97,7 +97,7 @@
                             </a>
                         </li>
 
-                        {% if request.session.co %}
+                        {% if request.session.co or request.session.centro_operaciones_id %}
                             <li>
                                 <a href="{% url 'lista_activos' %}">
                                     <span class="icon">

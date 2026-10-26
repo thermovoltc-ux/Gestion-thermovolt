@@ -77,15 +77,22 @@ def custom_login(request):
                 ).first()
                 if centro_operaciones:
                     cliente = obtener_cliente_actual(user)
-                    if (
-                        not centro_operaciones.activo
-                        or not cliente
-                        or not centro_operaciones.clientes.filter(pk=cliente.pk).exists()
-                    ):
+                    if not centro_operaciones.activo:
                         form.add_error(
                             'co',
                             'El Centro de Operaciones no está habilitado para tu cliente.',
                         )
+                    elif centro_operaciones.clientes.exists():
+                        if (
+                            not cliente
+                            or not centro_operaciones.clientes.filter(pk=cliente.pk).exists()
+                        ):
+                            form.add_error(
+                                'co',
+                                'El Centro de Operaciones no está habilitado para tu cliente.',
+                            )
+                    else:
+                        co_legacy = co_ingresado
                 else:
                     co_legacy = co_ingresado
 
@@ -104,7 +111,7 @@ def custom_login(request):
                 request.session['tipo_cuenta'] = tipo_cuenta
                 request.session.pop('co', None)
                 request.session.pop('centro_operaciones_id', None)
-                if centro_operaciones:
+                if centro_operaciones and not co_legacy:
                     request.session['centro_operaciones_id'] = centro_operaciones.pk
                 elif co_legacy:
                     request.session['co'] = co_legacy

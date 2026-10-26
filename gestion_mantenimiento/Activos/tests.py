@@ -168,6 +168,22 @@ class ArbolActivosCOFilterTests(TestCase):
         self.assertEqual([node['id'] for node in nodes], [f'ubicacion-{self.child.pk}'])
         self.assertEqual(nodes[0]['parent'], '#')
 
+    def test_non_admin_cannot_read_tree_roots_or_location_children(self):
+        session = self.client.session
+        session['tipo_cuenta'] = 'tecnico'
+        session.save()
+
+        roots_response = self.client.get(reverse('api_arbol_json'))
+        children_response = self.client.get(
+            reverse('api_arbol_json'),
+            {'node': f'ubicacion-{self.root.pk}'},
+        )
+
+        self.assertEqual(roots_response.status_code, 200)
+        self.assertEqual(children_response.status_code, 200)
+        self.assertEqual(roots_response.json(), {'data': []})
+        self.assertEqual(children_response.json(), {'data': []})
+
     def test_invalid_center_session_does_not_fall_back_to_legacy_co(self):
         other_cliente = Cliente.objects.create(
             nombre='Otro cliente',

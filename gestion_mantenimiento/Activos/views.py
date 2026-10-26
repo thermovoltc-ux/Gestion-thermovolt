@@ -383,12 +383,14 @@ def api_arbol_json(request):
     from .models import CentroCostos
 
     tipo_cuenta = request.session.get('tipo_cuenta')
+    if tipo_cuenta != 'administrador':
+        return JsonResponse({'data': []})
+
     scope_ids = set()
 
-    if tipo_cuenta == 'administrador':
-        scope_ids = obtener_scope_ubicacion_ids(request)
+    scope_ids = obtener_scope_ubicacion_ids(request)
 
-    if tipo_cuenta == 'administrador' and not scope_ids:
+    if not scope_ids:
         return JsonResponse({'data': []})
 
     node_id = request.GET.get('node', '')
@@ -535,13 +537,10 @@ def api_arbol_json(request):
 
         return JsonResponse({'data': children})
 
-    if tipo_cuenta == 'administrador':
-        roots = [
-            ubicacion for ubicacion in ubicaciones
-            if ubicacion.id in scope_ids and ubicacion.parent_id not in scope_ids
-        ]
-    else:
-        roots = ubicaciones_por_padre.get(None, [])
+    roots = [
+        ubicacion for ubicacion in ubicaciones
+        if ubicacion.id in scope_ids and ubicacion.parent_id not in scope_ids
+    ]
 
     data = [
         construir_nodo_ubicacion(root, filtrar_scope=bool(scope_ids))
