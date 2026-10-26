@@ -67,6 +67,14 @@ class CustomLoginCentroOperacionesTests(TestCase):
 
         self.assertContains(response, reverse('lista_activos'))
 
+    def test_area_manager_does_not_see_unavailable_assets_navigation(self):
+        self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
+        self._login('', tipo_cuenta='jefe_de_area')
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertNotContains(response, reverse('lista_activos'))
+
     def test_admin_login_rejects_center_assigned_to_another_client(self):
         otro_cliente = Cliente.objects.create(
             nombre='Otro cliente login',
