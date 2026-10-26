@@ -1,1 +1,232 @@
-# Create your tests here.
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.test import TestCase
+from django.urls import reverse
+
+from gestion_mantenimiento.users.models import Cliente, PerfilUsuario
+
+from .models import CentroOperaciones, Equipo, Ubicacion
+
+
+class ArbolActivosCOFilterTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='arbol-co-user',
+            password='test-password',
+        )
+        self.group = Group.objects.get_or_create(name='Cliente')[0]
+        self.user.groups.add(self.group)
+        self.client.force_login(self.user)
+        self.cliente = Cliente.objects.create(
+            nombre='Cliente árbol',
+            codigo='CLIENTE-ARBOL-CO',
+        )
+        PerfilUsuario.objects.create(user=self.user, cliente=self.cliente)
+        self.centers = {
+            codigo: CentroOperaciones.objects.create(
+                nombre=f'Centro {codigo}',
+                codigo=f'CENTRO-{codigo}-ARBOL',
+            )
+            for codigo in ('100', '101', '102', '103', '900')
+        }
+        self.cliente.centros_operaciones.add(*self.centers.values())
+        self.root = Ubicacion.objects.create(
+            nombre='Planta',
+            codigo='PLANTA-CO-TEST',
+            co='100',
+            centro_operaciones=self.centers['100'],
+        )
+        self.child = Ubicacion.objects.create(
+            nombre='Desposte',
+            codigo='DESPOSTE-CO-TEST',
+            co='101',
+            parent=self.root,
+            centro_operaciones=self.centers['101'],
+        )
+        self.sibling = Ubicacion.objects.create(
+            nombre='Empaque',
+            codigo='EMPAQUE-CO-TEST',
+            co='102',
+            parent=self.root,
+            centro_operaciones=self.centers['102'],
+        )
+        self.grandchild = Ubicacion.objects.create(
+            nombre='Línea uno',
+            codigo='LINEA-CO-TEST',
+            co='103',
+            parent=self.child,
+            centro_operaciones=self.centers['103'],
+        )
+        self.root_equipo = Equipo.objects.create(
+            nombre='Equipo de planta',
+            codigo='EQ-PLANTA-CO-TEST',
+            ubicacion=self.root,
+        )
+        self.child_equipo = Equipo.objects.create(
+            nombre='Equipo de desposte',
+            codigo='EQ-DESPOSTE-CO-TEST',
+            ubicacion=self.child,
+        )
+        session = self.client.session
+        session['tipo_cuenta'] = 'administrador'
+        session['centro_operaciones_id'] = self.centers['100'].pk
+        session.save()
+
+    def _get_nodes(self):
+        response = self.client.get(reverse('api_arbol_json'))
+        self.assertEqual(response.status_code, 200)
+        return response.json()['data']
+
+    def test_center_scope_includes_full_descendant_hierarchy(self):
+        nodes = self._get_nodes()
+
+        self.assertEqual([node['id'] for node in nodes], [f'ubicacion-{self.root.pk}'])
+        root_node = nodes[0]
+        child_nodes = [
+            node for node in root_node['children']
+            if node['type'] == 'ubicacion'
+        ]
+        self.assertCountEqual(
+            [node['id'] for node in child_nodes],
+            [f'ubicacion-{self.child.pk}', f'ubicacion-{self.sibling.pk}'],
+        )
+        desposte = next(
+            node for node in child_nodes
+            if node['id'] == f'ubicacion-{self.child.pk}'
+        )
+        self.assertEqual(
+            [node['id'] for node in desposte['children'] if node['type'] == 'ubicacion'],
+            [f'ubicacion-{self.grandchild.pk}'],
+        )
+        self.assertIn(
+            f'equipo-{self.root_equipo.pk}',
+            [node['id'] for node in root_node['children']],
+        )
+
+    def test_child_center_scope_returns_child_and_its_descendants(self):
+        session = self.client.session
+        session['centro_operaciones_id'] = self.centers['101'].pk
+        session.save()
+
+        nodes = self._get_nodes()
+
+        self.assertEqual([node['id'] for node in nodes], [f'ubicacion-{self.child.pk}'])
+        self.assertEqual(nodes[0]['parent'], '#')
+        self.assertEqual(
+            [node['id'] for node in nodes[0]['children'] if node['type'] == 'ubicacion'],
+            [f'ubicacion-{self.grandchild.pk}'],
+        )
+        self.assertIn(
+            f'equipo-{self.child_equipo.pk}',
+            [node['id'] for node in nodes[0]['children']],
+        )
+
+    def test_location_page_has_no_manual_co_filter(self):
+        response = self.client.get(reverse('lista_activos'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'id="filtro-co"')
+
+    def test_admin_center_scope_cannot_be_changed_with_query_parameter(self):
+        outside = Ubicacion.objects.create(
+            nombre='Ubicación externa',
+            codigo='OUTSIDE-CO-TEST',
+            co='900',
+            centro_operaciones=self.centers['900'],
+        )
+
+        outside_response = self.client.get(
+            reverse('api_arbol_json'),
+            {'co': '900'},
+        )
+        self.assertEqual(outside_response.status_code, 200)
+        self.assertEqual(
+            [node['id'] for node in outside_response.json()['data']],
+            [f'ubicacion-{self.root.pk}'],
+        )
+        self.assertNotIn(
+            f'ubicacion-{outside.pk}',
+            [
+                node['id']
+                for node in outside_response.json()['data'][0]['children']
+            ],
+        )
+
+    def test_legacy_co_session_remains_supported(self):
+        session = self.client.session
+        session.pop('centro_operaciones_id', None)
+        session['co'] = '101'
+        session.save()
+
+        nodes = self._get_nodes()
+
+        self.assertEqual([node['id'] for node in nodes], [f'ubicacion-{self.child.pk}'])
+        self.assertEqual(nodes[0]['parent'], '#')
+
+    def test_invalid_center_session_does_not_fall_back_to_legacy_co(self):
+        other_cliente = Cliente.objects.create(
+            nombre='Otro cliente',
+            codigo='OTRO-CLIENTE-ARBOL',
+        )
+        unauthorized_center = CentroOperaciones.objects.create(
+            nombre='No autorizado',
+            codigo='CENTRO-NO-AUTORIZADO',
+        )
+        other_cliente.centros_operaciones.add(unauthorized_center)
+        unauthorized_location = Ubicacion.objects.create(
+            nombre='Ubicación no autorizada',
+            codigo='UBI-NO-AUTORIZADA',
+            co='100',
+            centro_operaciones=unauthorized_center,
+        )
+        session = self.client.session
+        session['centro_operaciones_id'] = unauthorized_center.pk
+        session['co'] = '100'
+        session.save()
+
+        self.assertEqual(self._get_nodes(), [])
+        self.assertNotIn(
+            f'ubicacion-{unauthorized_location.pk}',
+            [node['id'] for node in self._get_nodes()],
+        )
+
+    def test_malformed_center_session_does_not_fall_back_to_legacy_co(self):
+        session = self.client.session
+        session['centro_operaciones_id'] = 'invalid'
+        session['co'] = '100'
+        session.save()
+
+        self.assertEqual(self._get_nodes(), [])
+
+
+class CentroOperacionesModelTests(TestCase):
+    def test_cliente_can_share_and_have_multiple_operation_centers(self):
+        cliente_one = Cliente.objects.create(nombre='Cliente uno', codigo='CLIENTE-CO-001')
+        cliente_two = Cliente.objects.create(nombre='Cliente dos', codigo='CLIENTE-CO-002')
+        centro_uno = CentroOperaciones.objects.create(
+            nombre='Planta',
+            codigo='CO-PLANTA',
+        )
+        centro_dos = CentroOperaciones.objects.create(
+            nombre='Punto de venta',
+            codigo='CO-PDV',
+        )
+
+        cliente_one.centros_operaciones.add(centro_uno, centro_dos)
+        cliente_two.centros_operaciones.add(centro_uno)
+        ubicacion = Ubicacion.objects.create(
+            nombre='Ubicación de planta',
+            codigo='UBI-CO-PLANTA',
+            centro_operaciones=centro_uno,
+        )
+
+        self.assertSetEqual(
+            set(cliente_one.centros_operaciones.all()),
+            {centro_uno, centro_dos},
+        )
+        self.assertSetEqual(
+            set(centro_uno.clientes.all()),
+            {cliente_one, cliente_two},
+        )
+        self.assertEqual(ubicacion.centro_operaciones, centro_uno)
+        self.assertEqual(str(centro_uno), 'CO-PLANTA - Planta')

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.db.models import Q
 
-from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
+from gestion_mantenimiento.Activos.models import CentroOperaciones, Equipo, Ubicacion
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo
 from gestion_mantenimiento.solicitudes.models import Solicitud
 
@@ -31,12 +31,31 @@ def obtener_scope_ubicacion_ids(request):
     if tipo_cuenta != 'administrador':
         return set()
 
-    co = request.session.get('co')
-    co_value = (co or '').strip()
-    if not co_value:
-        return set()
+    if 'centro_operaciones_id' in request.session:
+        centro_operaciones_id = request.session.get('centro_operaciones_id')
+        try:
+            centro_operaciones_id = int(centro_operaciones_id)
+        except (TypeError, ValueError):
+            return set()
 
-    rooted = Ubicacion.objects.filter(co__iexact=co_value)
+        centro = CentroOperaciones.objects.filter(
+            pk=centro_operaciones_id,
+            activo=True,
+        ).first()
+        if not centro:
+            return set()
+
+        cliente = obtener_cliente_actual(user)
+        if not cliente or not centro.clientes.filter(pk=cliente.pk).exists():
+            return set()
+
+        rooted = Ubicacion.objects.filter(centro_operaciones=centro)
+    else:
+        co_value = (request.session.get('co') or '').strip()
+        if not co_value:
+            return set()
+        rooted = Ubicacion.objects.filter(co__iexact=co_value)
+
     ids = set()
     for ubicacion in rooted:
         ids |= _collect_descendants_ids(ubicacion.id)

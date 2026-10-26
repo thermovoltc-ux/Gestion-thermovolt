@@ -10,6 +10,11 @@ class Cliente(models.Model):
     codigo = models.CharField(max_length=50, unique=True)
     activo = models.BooleanField(default=True)
     descripcion = models.TextField(blank=True, null=True)
+    centros_operaciones = models.ManyToManyField(
+        'Activos.CentroOperaciones',
+        related_name='clientes',
+        blank=True,
+    )
 
     class Meta:
         verbose_name = 'Cliente'

@@ -28,7 +28,7 @@ from django.contrib.auth.decorators import user_passes_test
 from allauth.socialaccount.models import SocialApp
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo, TareaMantenimiento
 from gestion_mantenimiento.solicitudes.models import Solicitud
-from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
+from gestion_mantenimiento.Activos.models import CentroOperaciones, Equipo, Ubicacion
 from gestion_mantenimiento.users.access import obtener_cliente_actual, obtener_scope_ubicacion_ids
 from .models import CalendarioTecnico, ConfiguracionPago, Descuento, ReciboPago, RegistroAsistencia
 from .nomina_pdf import generar_nombre_pdf, generar_pdf_recibo
@@ -67,29 +67,48 @@ def custom_login(request):
         if form.is_valid():
             user = form.get_user()
             tipo_cuenta = form.cleaned_data.get('tipo_cuenta')
-            co = form.cleaned_data.get('co')
+            centro_operaciones = None
+            co_legacy = None
 
-            # Permitir a superusuarios / staff iniciar sesión sin validar grupos
-            if user.is_superuser or user.is_staff:
+            if tipo_cuenta == 'administrador':
+                co_ingresado = (form.cleaned_data.get('co') or '').strip()
+                centro_operaciones = CentroOperaciones.objects.filter(
+                    codigo__iexact=co_ingresado,
+                ).first()
+                if centro_operaciones:
+                    cliente = obtener_cliente_actual(user)
+                    if (
+                        not centro_operaciones.activo
+                        or not cliente
+                        or not centro_operaciones.clientes.filter(pk=cliente.pk).exists()
+                    ):
+                        form.add_error(
+                            'co',
+                            'El Centro de Operaciones no está habilitado para tu cliente.',
+                        )
+                else:
+                    co_legacy = co_ingresado
+
+            if not user.is_superuser and not user.is_staff:
+                grupo_esperado = TIPO_CUENTA_A_GRUPO.get(tipo_cuenta)
+                if not grupo_esperado:
+                    form.add_error('tipo_cuenta', 'Tipo de cuenta inválido.')
+                elif not user.groups.filter(name=grupo_esperado).exists():
+                    form.add_error(
+                        'tipo_cuenta',
+                        f'No perteneces al grupo {grupo_esperado}.',
+                    )
+
+            if not form.errors:
                 auth_login(request, user)
                 request.session['tipo_cuenta'] = tipo_cuenta
-                request.session['co'] = co
+                request.session.pop('co', None)
+                request.session.pop('centro_operaciones_id', None)
+                if centro_operaciones:
+                    request.session['centro_operaciones_id'] = centro_operaciones.pk
+                elif co_legacy:
+                    request.session['co'] = co_legacy
                 return redirect('dashboard')
-
-            # Validar que el usuario pertenece al grupo seleccionado
-            grupo_esperado = TIPO_CUENTA_A_GRUPO.get(tipo_cuenta)
-            if not grupo_esperado:
-                form.add_error('tipo_cuenta', 'Tipo de cuenta inválido.')
-            elif not user.groups.filter(name=grupo_esperado).exists():
-                form.add_error(
-                    'tipo_cuenta',
-                    f'No perteneces al grupo {grupo_esperado}.',
-                )
-            else:
-                auth_login(request, user)
-                request.session['tipo_cuenta'] = tipo_cuenta
-                request.session['co'] = co
-                return redirect('dashboard')  # Redirige a la página de inicio después del inicio de sesión
     else:
         form = CustomAuthenticationForm()
     
@@ -1040,4 +1059,3 @@ def nomina_mis_recibos(request):
             'es_admin_view': es_admin_view,
         },
     )
-

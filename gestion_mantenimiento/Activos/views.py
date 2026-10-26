@@ -535,14 +535,20 @@ def api_arbol_json(request):
 
         return JsonResponse({'data': children})
 
-    roots = [
-        ubicacion for ubicacion in ubicaciones_por_padre.get(None, [])
-        if tipo_cuenta != 'administrador' or ubicacion.id in scope_ids
-    ]
+    if tipo_cuenta == 'administrador':
+        roots = [
+            ubicacion for ubicacion in ubicaciones
+            if ubicacion.id in scope_ids and ubicacion.parent_id not in scope_ids
+        ]
+    else:
+        roots = ubicaciones_por_padre.get(None, [])
+
     data = [
         construir_nodo_ubicacion(root, filtrar_scope=bool(scope_ids))
         for root in roots
     ]
+    for node in data:
+        node['parent'] = '#'
     return JsonResponse({'data': data})
 
 

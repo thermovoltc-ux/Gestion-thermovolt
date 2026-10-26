@@ -24,6 +24,20 @@ class UnidadNegocio(models.Model):
         return self.nombre
 
 
+class CentroOperaciones(models.Model):
+    nombre = models.CharField(max_length=200)
+    codigo = models.CharField(max_length=50, unique=True)
+    descripcion = models.TextField(blank=True, null=True)
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Centro de Operaciones'
+        verbose_name_plural = 'Centros de Operaciones'
+
+    def __str__(self):
+        return f'{self.codigo} - {self.nombre}'
+
+
 # Modelo Ubicacion
 class Ubicacion(models.Model):
     id = models.AutoField(primary_key=True)
@@ -35,6 +49,13 @@ class Ubicacion(models.Model):
     pais = models.CharField(max_length=100, null=True, blank=True)
     ciudad = models.CharField(max_length=100, null=True, blank=True)
     imagen = models.ImageField(upload_to='ubicaciones/', null=True, blank=True)
+    centro_operaciones = models.ForeignKey(
+        CentroOperaciones,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ubicaciones',
+    )
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
 
     def __str__(self):

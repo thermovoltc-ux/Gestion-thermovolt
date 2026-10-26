@@ -7,17 +7,96 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
+from gestion_mantenimiento.Activos.models import CentroOperaciones, Equipo, Ubicacion
 from gestion_mantenimiento.Gestion_ot.models import Estado, OrdenTrabajo
 from gestion_mantenimiento.solicitudes.models import Solicitud
 
 from .models import (
     CalendarioTecnico,
+    Cliente,
     ConfiguracionPago,
     Descuento,
+    PerfilUsuario,
     ReciboPago,
     RegistroAsistencia,
 )
+
+
+class CustomLoginCentroOperacionesTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='admin-centro-login',
+            password='test-password',
+        )
+        self.user.groups.add(Group.objects.get_or_create(name='Cliente')[0])
+        self.cliente = Cliente.objects.create(
+            nombre='Cliente login',
+            codigo='CLIENTE-LOGIN-CO',
+        )
+        PerfilUsuario.objects.create(user=self.user, cliente=self.cliente)
+        self.centro = CentroOperaciones.objects.create(
+            nombre='Centro permitido',
+            codigo='CO-LOGIN-100',
+        )
+        self.cliente.centros_operaciones.add(self.centro)
+        self.url = reverse('custom_login')
+
+    def _login(self, co, tipo_cuenta='administrador'):
+        return self.client.post(
+            self.url,
+            {
+                'username': self.user.username,
+                'password': 'test-password',
+                'tipo_cuenta': tipo_cuenta,
+                'co': co,
+            },
+        )
+
+    def test_admin_login_stores_assigned_center_id(self):
+        response = self._login(self.centro.codigo)
+
+        self.assertRedirects(response, reverse('dashboard'))
+        session = self.client.session
+        self.assertEqual(session['centro_operaciones_id'], self.centro.pk)
+        self.assertNotIn('co', session)
+
+    def test_admin_login_rejects_center_assigned_to_another_client(self):
+        otro_cliente = Cliente.objects.create(
+            nombre='Otro cliente login',
+            codigo='OTRO-CLIENTE-LOGIN-CO',
+        )
+        centro_ajeno = CentroOperaciones.objects.create(
+            nombre='Centro ajeno',
+            codigo='CO-LOGIN-900',
+        )
+        otro_cliente.centros_operaciones.add(centro_ajeno)
+
+        response = self._login(centro_ajeno.codigo)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.wsgi_request.user.is_authenticated)
+        self.assertIn(
+            'El Centro de Operaciones no está habilitado para tu cliente.',
+            response.context['form'].errors['co'],
+        )
+
+    def test_admin_login_uses_legacy_text_for_unregistered_center(self):
+        response = self._login('LEGACY-CO-77')
+
+        self.assertRedirects(response, reverse('dashboard'))
+        session = self.client.session
+        self.assertNotIn('centro_operaciones_id', session)
+        self.assertEqual(session['co'], 'LEGACY-CO-77')
+
+    def test_technician_login_does_not_set_center_scope(self):
+        self.user.groups.add(Group.objects.get_or_create(name='Tecnico')[0])
+
+        response = self._login('', tipo_cuenta='tecnico')
+
+        self.assertRedirects(response, reverse('dashboard'))
+        session = self.client.session
+        self.assertNotIn('centro_operaciones_id', session)
+        self.assertNotIn('co', session)
 
 
 class RegistroAsistenciaTests(TestCase):
