@@ -1,4 +1,4 @@
-from datetime import datetime, timezone as datetime_timezone
+from datetime import datetime, timedelta, timezone as datetime_timezone
 from decimal import Decimal
 from io import BytesIO
 from io import StringIO
@@ -26,8 +26,10 @@ from gestion_mantenimiento.Gestion_ot.models import (
     Material,
     MaterialOT,
     OrdenTrabajo,
+    PlanMantenimiento,
     ProcesoInforme,
     ServicioOT,
+    TareaMantenimiento,
 )
 from gestion_mantenimiento.Gestion_ot import views
 from gestion_mantenimiento.Gestion_ot.plantilla_utils import _obtener_imagen_temporal
@@ -185,6 +187,53 @@ class GestionOtFilterRegressionTests(TestCase):
         )
         self.assertNotIn(self.ot_otra_ubicacion.solicitud.consecutivo, [ot.solicitud.consecutivo for ot in ordenes])
         self.assertNotIn(self.ot_finalizada.solicitud.consecutivo, [ot.solicitud.consecutivo for ot in ordenes])
+
+    def test_dashboard_late_filter_combines_with_pending_state(self):
+        plan = PlanMantenimiento.objects.create(
+            equipo=self.equipo_a,
+            nombre='Plan preventivo filtros',
+            fecha_inicio=timezone.localdate() - timedelta(days=30),
+        )
+        tarea_atrasada = TareaMantenimiento.objects.create(
+            plan=plan,
+            fecha_programada=timezone.localdate() - timedelta(days=1),
+            estado='pendiente',
+        )
+        tarea_hoy = TareaMantenimiento.objects.create(
+            plan=plan,
+            fecha_programada=timezone.localdate(),
+            estado='pendiente',
+        )
+        tarea_en_progreso = TareaMantenimiento.objects.create(
+            plan=plan,
+            fecha_programada=timezone.localdate() - timedelta(days=2),
+            estado='en_progreso',
+        )
+
+        response = self.client.get(
+            reverse('gestion_ot'),
+            {'estado': 'pendiente', 'atrasadas': '1'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        tareas = list(
+            response.context['tareas_mantenimiento'].filter(plan=plan)
+        )
+        self.assertIn(tarea_atrasada, tareas)
+        self.assertTrue(all(
+            tarea.estado == 'pendiente'
+            and tarea.fecha_programada < timezone.localdate()
+            for tarea in tareas
+        ))
+        self.assertNotIn(tarea_hoy.pk, [tarea.pk for tarea in tareas])
+        self.assertNotIn(tarea_en_progreso.pk, [tarea.pk for tarea in tareas])
+        self.assertCountEqual(
+            [ot.pk for ot in response.context['ordenes_trabajo']],
+            [self.ot_actual.pk, self.ot_pasada.pk, self.ot_otra_ubicacion.pk],
+        )
+        self.assertEqual(response.context['filter_label'], 'Estado: pendiente | Tareas con atraso')
+        self.assertContains(response, 'Estado: pendiente | Tareas con atraso')
+        self.assertContains(response, reverse('gestion_ot'))
 
 
 class ProcesoInformeRetryTests(TestCase):

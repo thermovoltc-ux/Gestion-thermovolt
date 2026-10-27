@@ -716,16 +716,22 @@ def gestion_ot(request):
         )
 
     filter_label = None
+    labels = []
+
     if filtro_estado:
         solicitudes_pendientes = solicitudes_pendientes.filter(estado__nombre=filtro_estado)
         tarea_estado = filtro_estado
         if filtro_estado == 'en proceso':
             tarea_estado = 'en_progreso'
         tareas_mantenimiento = tareas_mantenimiento.filter(estado=tarea_estado)
-        filter_label = f'Filtrado por estado: {filtro_estado}'
-    elif filtro_atrasadas:
-        tareas_mantenimiento = tareas_mantenimiento.filter(fecha_programada__lt=timezone.now().date())
-        filter_label = 'Tareas con atraso'
+        labels.append(f'Estado: {filtro_estado}')
+
+    if filtro_atrasadas:
+        tareas_mantenimiento = tareas_mantenimiento.filter(fecha_programada__lt=timezone.localdate())
+        labels.append('Tareas con atraso')
+
+    if labels:
+        filter_label = ' | '.join(labels)
 
     form = OrdenTrabajoForm()
     return render(request, 'Gestion_ot/gestion_ot.html', {

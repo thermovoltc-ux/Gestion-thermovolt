@@ -11,6 +11,13 @@
 {% block content %}
 <h1 class="ot-title">Gestión de OT's</h1>
 
+{% if filter_label %}
+    <div style="margin: 10px 0; padding: 8px 12px; background: #e3f2fd; border-left: 4px solid #1976d2; border-radius: 4px;">
+        <strong>Filtro activo:</strong> {{ filter_label }}
+        <a href="{% url 'gestion_ot' %}" style="margin-left: 12px; font-size: 12px;">Limpiar</a>
+    </div>
+{% endif %}
+
 <div class="view-buttons-container">
     <div class="view-buttons">
         <button id="kanbanButton" class="view-button" title="Tablero">
