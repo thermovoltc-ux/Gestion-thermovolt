@@ -383,14 +383,16 @@ def api_arbol_json(request):
     from .models import CentroCostos
 
     tipo_cuenta = request.session.get('tipo_cuenta')
-    if tipo_cuenta != 'administrador':
+    if tipo_cuenta not in ('administrador', 'jefe_de_area'):
         return JsonResponse({'data': []})
 
-    scope_ids = set()
+    scope_ids = (
+        obtener_scope_ubicacion_ids(request)
+        if tipo_cuenta == 'administrador'
+        else set()
+    )
 
-    scope_ids = obtener_scope_ubicacion_ids(request)
-
-    if not scope_ids:
+    if tipo_cuenta == 'administrador' and not scope_ids:
         return JsonResponse({'data': []})
 
     node_id = request.GET.get('node', '')
@@ -401,6 +403,8 @@ def api_arbol_json(request):
         try:
             ubicacion_id = int(node_id.replace('ubicacion-', '', 1))
         except ValueError:
+            return JsonResponse({'data': []})
+        if tipo_cuenta == 'administrador' and ubicacion_id not in scope_ids:
             return JsonResponse({'data': []})
 
     centro_costo_nombre = CentroCostos.objects.filter(
@@ -528,7 +532,7 @@ def api_arbol_json(request):
 
         children = []
         for child in ubicaciones_por_padre.get(ubicacion.id, []):
-            if scope_ids and child.id not in scope_ids:
+            if tipo_cuenta == 'administrador' and child.id not in scope_ids:
                 continue
             children.append(construir_nodo_ubicacion(child, filtrar_scope=True))
 
@@ -537,10 +541,13 @@ def api_arbol_json(request):
 
         return JsonResponse({'data': children})
 
-    roots = [
-        ubicacion for ubicacion in ubicaciones
-        if ubicacion.id in scope_ids and ubicacion.parent_id not in scope_ids
-    ]
+    if tipo_cuenta == 'administrador':
+        roots = [
+            ubicacion for ubicacion in ubicaciones
+            if ubicacion.id in scope_ids and ubicacion.parent_id not in scope_ids
+        ]
+    else:
+        roots = ubicaciones_por_padre.get(None, [])
 
     data = [
         construir_nodo_ubicacion(root, filtrar_scope=bool(scope_ids))

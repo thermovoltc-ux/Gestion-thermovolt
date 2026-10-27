@@ -184,6 +184,51 @@ class ArbolActivosCOFilterTests(TestCase):
         self.assertEqual(roots_response.json(), {'data': []})
         self.assertEqual(children_response.json(), {'data': []})
 
+    def test_area_manager_can_read_all_locations_without_co(self):
+        outside = Ubicacion.objects.create(
+            nombre='Ubicación global',
+            codigo='GLOBAL-AREA-MANAGER',
+            co='900',
+            centro_operaciones=self.centers['900'],
+        )
+        session = self.client.session
+        session['tipo_cuenta'] = 'jefe_de_area'
+        session.pop('centro_operaciones_id', None)
+        session.pop('co', None)
+        session.save()
+
+        roots_response = self.client.get(reverse('api_arbol_json'))
+        children_response = self.client.get(
+            reverse('api_arbol_json'),
+            {'node': f'ubicacion-{self.root.pk}'},
+        )
+
+        self.assertEqual(roots_response.status_code, 200)
+        self.assertCountEqual(
+            [node['id'] for node in roots_response.json()['data']],
+            [f'ubicacion-{self.root.pk}', f'ubicacion-{outside.pk}'],
+        )
+        self.assertIn(
+            f'ubicacion-{self.child.pk}',
+            [node['id'] for node in children_response.json()['data']],
+        )
+
+    def test_client_cannot_request_children_outside_its_center_scope(self):
+        outside = Ubicacion.objects.create(
+            nombre='Ubicación fuera del CO',
+            codigo='OUTSIDE-CO-CHILDREN',
+            co='900',
+            centro_operaciones=self.centers['900'],
+        )
+
+        response = self.client.get(
+            reverse('api_arbol_json'),
+            {'node': f'ubicacion-{outside.pk}'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'data': []})
+
     def test_invalid_center_session_does_not_fall_back_to_legacy_co(self):
         other_cliente = Cliente.objects.create(
             nombre='Otro cliente',

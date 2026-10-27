@@ -67,13 +67,24 @@ class CustomLoginCentroOperacionesTests(TestCase):
 
         self.assertContains(response, reverse('lista_activos'))
 
-    def test_area_manager_does_not_see_unavailable_assets_navigation(self):
+    def test_area_manager_without_co_sees_assets_navigation(self):
         self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
-        self._login('', tipo_cuenta='jefe_de_area')
+        response = self._login('', tipo_cuenta='jefe_de_area')
+
+        self.assertRedirects(response, reverse('dashboard'))
+        session = self.client.session
+        self.assertNotIn('co', session)
+        self.assertNotIn('centro_operaciones_id', session)
 
         response = self.client.get(reverse('dashboard'))
+        self.assertContains(response, reverse('lista_activos'))
 
-        self.assertNotContains(response, reverse('lista_activos'))
+    def test_client_account_cannot_login_without_co(self):
+        response = self._login('')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.wsgi_request.user.is_authenticated)
+        self.assertIn('co', response.context['form'].errors)
 
     def test_admin_login_rejects_center_assigned_to_another_client(self):
         otro_cliente = Cliente.objects.create(
