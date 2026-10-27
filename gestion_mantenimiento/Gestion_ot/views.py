@@ -724,11 +724,16 @@ def gestion_ot(request):
         if filtro_estado == 'en proceso':
             tarea_estado = 'en_progreso'
         tareas_mantenimiento = tareas_mantenimiento.filter(estado=tarea_estado)
+        if filtro_estado in dict(Estado.ESTADO_CHOICES):
+            ordenes_trabajo = ordenes_trabajo.filter(estado__nombre=filtro_estado)
         labels.append(f'Estado: {filtro_estado}')
 
     if filtro_atrasadas:
         tareas_mantenimiento = tareas_mantenimiento.filter(fecha_programada__lt=timezone.localdate())
-        labels.append('Tareas con atraso')
+        ordenes_trabajo = ordenes_trabajo.filter(
+            fecha_actividad__date__lt=timezone.localdate()
+        ).exclude(estado__nombre='finalizada')
+        labels.append('Tareas y OTs con atraso')
 
     if labels:
         filter_label = ' | '.join(labels)

@@ -229,11 +229,29 @@ class GestionOtFilterRegressionTests(TestCase):
         self.assertNotIn(tarea_en_progreso.pk, [tarea.pk for tarea in tareas])
         self.assertCountEqual(
             [ot.pk for ot in response.context['ordenes_trabajo']],
-            [self.ot_actual.pk, self.ot_pasada.pk, self.ot_otra_ubicacion.pk],
+            [self.ot_pasada.pk],
         )
-        self.assertEqual(response.context['filter_label'], 'Estado: pendiente | Tareas con atraso')
-        self.assertContains(response, 'Estado: pendiente | Tareas con atraso')
+        self.assertEqual(response.context['filter_label'], 'Estado: pendiente | Tareas y OTs con atraso')
+        self.assertContains(response, 'Estado: pendiente | Tareas y OTs con atraso')
         self.assertContains(response, reverse('gestion_ot'))
+
+    def test_kanban_state_filter_only_applies_valid_ot_states(self):
+        estado_en_proceso, _ = Estado.objects.get_or_create(nombre='en proceso')
+        ot_en_proceso = self._crear_ot(
+            'En proceso',
+            self.ubicacion_a,
+            self.equipo_a,
+            estado_en_proceso,
+            timezone.now(),
+        )
+
+        response = self.client.get(reverse('gestion_ot'), {'estado': 'en proceso'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            list(response.context['ordenes_trabajo']),
+            [ot_en_proceso],
+        )
 
 
 class ProcesoInformeRetryTests(TestCase):
