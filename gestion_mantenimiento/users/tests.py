@@ -505,6 +505,61 @@ class MotorNominaTests(TestCase):
         self.assertEqual(resultado['neto'], Decimal('72000.00'))
 
 
+class DashboardSolicitudesSinTecnicoTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='jefe-dashboard-solicitudes',
+            password='test-password',
+        )
+        self.client.force_login(self.user)
+        self.client.session['tipo_cuenta'] = 'jefe_de_area'
+        self.client.session.save()
+        self.ubicacion = Ubicacion.objects.create(
+            nombre='Ubicación dashboard solicitudes',
+            codigo='UBI-DASH-SOL',
+        )
+        self.equipo = Equipo.objects.create(
+            nombre='Equipo dashboard solicitudes',
+            codigo='EQ-DASH-SOL',
+            ubicacion=self.ubicacion,
+        )
+        self.estado_solicitado = Estado.objects.get_or_create(nombre='solicitado')[0]
+
+    def crear_solicitud(self, descripcion, estado=None):
+        return Solicitud.objects.create(
+            creado_por=self.user.username,
+            descripcion_problema=descripcion,
+            equipo=self.equipo,
+            ubicacion=self.ubicacion,
+            estado=estado or self.estado_solicitado,
+        )
+
+    def test_dashboard_counts_only_solicitudes_without_assigned_technician(self):
+        self.crear_solicitud('Sin OT')
+
+        ot_sin_tecnico = self.crear_solicitud('OT sin técnico')
+        OrdenTrabajo.objects.create(
+            solicitud=ot_sin_tecnico,
+            tecnico_asignado='',
+            estado=self.estado_solicitado,
+        )
+
+        ot_con_tecnico = self.crear_solicitud('OT con técnico')
+        OrdenTrabajo.objects.create(
+            solicitud=ot_con_tecnico,
+            tecnico_asignado='tecnico-asignado',
+            estado=self.estado_solicitado,
+        )
+
+        estado_en_proceso = Estado.objects.get_or_create(nombre='en proceso')[0]
+        self.crear_solicitud('No solicitada', estado=estado_en_proceso)
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['solicitudes_solicitadas'], 2)
+
+
 class DashboardTecnicoTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(
