@@ -41,14 +41,14 @@ def calcular_horas_efectivas(fecha, hora_entrada, hora_salida):
 
 def horas_trabajadas_en_registro(registro):
     """Devuelve las horas trabajadas de un RegistroAsistencia."""
-    if registro.horas_trabajadas is not None:
-        return _redondear(registro.horas_trabajadas)
     if registro.hora_entrada and registro.hora_salida:
         return calcular_horas_efectivas(
             registro.fecha,
             registro.hora_entrada,
             registro.hora_salida,
         )
+    if registro.horas_trabajadas is not None:
+        return _redondear(registro.horas_trabajadas)
     return CERO
 
 

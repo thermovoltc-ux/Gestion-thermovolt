@@ -566,6 +566,33 @@ class MotorNominaTests(TestCase):
         )
 
     @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
+    def test_nomina_recalcula_almuerzo_desde_marcajes_si_horas_guardadas_estan_obsoletas(self):
+        from gestion_mantenimiento.users.nomina import calcular_periodo
+
+        fecha = date(2026, 10, 29)
+        entrada = timezone.make_aware(
+            datetime.combine(fecha, datetime.min.time().replace(hour=9, minute=10))
+        )
+        salida = timezone.make_aware(
+            datetime.combine(fecha, datetime.min.time().replace(hour=16, minute=40))
+        )
+        registro = RegistroAsistencia.objects.create(
+            usuario=self.user,
+            fecha=fecha,
+            hora_entrada=entrada,
+            hora_salida=salida,
+        )
+        RegistroAsistencia.objects.filter(pk=registro.pk).update(
+            horas_trabajadas=Decimal('7.58')
+        )
+
+        resultado = calcular_periodo(self.user, fecha, fecha)
+
+        self.assertEqual(resultado['horas_efectivas'], Decimal('7.00'))
+        self.assertEqual(resultado['horas_normales'], Decimal('7.00'))
+        self.assertEqual(resultado['horas_extras'], Decimal('0.00'))
+
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
     def test_calculo_diario_respeta_almuerzo_y_solo_toma_fechas_del_periodo(self):
         from gestion_mantenimiento.users.nomina import calcular_periodo
 
