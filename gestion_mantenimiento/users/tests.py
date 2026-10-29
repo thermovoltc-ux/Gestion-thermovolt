@@ -537,7 +537,7 @@ class MotorNominaTests(TestCase):
         )
 
     @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
-    def test_horas_extras_se_calculan_por_semana_con_almuerzo_deducido(self):
+    def test_horas_extras_se_calculan_por_dia_con_almuerzo_deducido(self):
         from gestion_mantenimiento.users.nomina import calcular_periodo
 
         inicio = date(2026, 11, 2)
@@ -556,7 +556,102 @@ class MotorNominaTests(TestCase):
         self.assertEqual(resultado['horas_efectivas'], Decimal('45.00'))
         self.assertEqual(resultado['horas_normales'], Decimal('42.00'))
         self.assertEqual(resultado['horas_extras'], Decimal('3.00'))
-        self.assertTrue(resultado['detalles']['dias'][-1]['semana_provisional'])
+        self.assertEqual(
+            resultado['detalles']['dias'][0]['horas_normales'],
+            7.0,
+        )
+        self.assertEqual(
+            resultado['detalles']['dias'][0]['horas_extras'],
+            0.5,
+        )
+
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
+    def test_calculo_diario_respeta_almuerzo_y_solo_toma_fechas_del_periodo(self):
+        from gestion_mantenimiento.users.nomina import calcular_periodo
+
+        self.config.valor_dia = Decimal('150000.00')
+        self.config.valor_hora_extra = Decimal('18570.00')
+        self.config.save()
+
+        horas_por_fecha = {
+            15: '7.30',
+            16: '10.53',
+            17: '8.93',
+            19: '8.48',
+            20: '8.11',
+            21: '8.17',
+            22: '6.55',
+            23: '10.00',
+            24: '7.12',
+            26: '8.59',
+            27: '7.50',
+            28: '7.50',
+        }
+        for day, hours_value in horas_por_fecha.items():
+            fecha = date(2026, 10, day)
+            entrada = timezone.make_aware(
+                datetime.combine(fecha, datetime.min.time().replace(hour=8))
+            )
+            seconds = int(Decimal(hours_value) * Decimal('3600'))
+            RegistroAsistencia.objects.create(
+                usuario=self.user,
+                fecha=fecha,
+                hora_entrada=entrada,
+                hora_salida=entrada + timedelta(seconds=seconds),
+            )
+
+        for day in (12, 13, 14):
+            fecha = date(2026, 10, day)
+            entrada = timezone.make_aware(
+                datetime.combine(fecha, datetime.min.time().replace(hour=8))
+            )
+            RegistroAsistencia.objects.create(
+                usuario=self.user,
+                fecha=fecha,
+                hora_entrada=entrada,
+                hora_salida=entrada + timedelta(hours=12),
+            )
+
+        fecha_sin_salida = date(2026, 10, 30)
+        RegistroAsistencia.objects.create(
+            usuario=self.user,
+            fecha=fecha_sin_salida,
+            hora_entrada=timezone.make_aware(
+                datetime.combine(
+                    fecha_sin_salida,
+                    datetime.min.time().replace(hour=8),
+                )
+            ),
+        )
+        fecha_corta = date(2026, 10, 29)
+        entrada_corta = timezone.make_aware(
+            datetime.combine(fecha_corta, datetime.min.time().replace(hour=8))
+        )
+        RegistroAsistencia.objects.create(
+            usuario=self.user,
+            fecha=fecha_corta,
+            hora_entrada=entrada_corta,
+            hora_salida=entrada_corta + timedelta(minutes=30),
+        )
+
+        resultado = calcular_periodo(
+            self.user,
+            date(2026, 10, 15),
+            date(2026, 10, 30),
+        )
+
+        self.assertEqual(resultado['dias_trabajados'], 13)
+        self.assertEqual(resultado['horas_efectivas'], Decimal('98.78'))
+        self.assertEqual(resultado['horas_normales'], Decimal('83.55'))
+        self.assertEqual(resultado['horas_extras'], Decimal('15.23'))
+        self.assertEqual(resultado['bruto'], Decimal('2232821.10'))
+        self.assertEqual(
+            sum(
+                (Decimal(str(dia['horas_extras'])) for dia in resultado['detalles']['dias']),
+                Decimal('0.00'),
+            ),
+            Decimal('15.23'),
+        )
 
     def test_calculo_con_registros(self):
         from gestion_mantenimiento.users.nomina import calcular_periodo
@@ -582,7 +677,9 @@ class MotorNominaTests(TestCase):
         )
 
         self.assertEqual(resultado['dias_trabajados'], 5)
-        self.assertEqual(resultado['bruto'], Decimal('610000.00'))
+        self.assertEqual(resultado['horas_normales'], Decimal('35.00'))
+        self.assertEqual(resultado['horas_extras'], Decimal('5.00'))
+        self.assertEqual(resultado['bruto'], Decimal('703750.00'))
 
     def test_calculo_con_descuento(self):
         from gestion_mantenimiento.users.nomina import calcular_periodo
@@ -612,7 +709,7 @@ class MotorNominaTests(TestCase):
         )
 
         self.assertEqual(resultado['total_descuentos'], Decimal('50000.00'))
-        self.assertEqual(resultado['neto'], Decimal('72000.00'))
+        self.assertEqual(resultado['neto'], Decimal('90750.00'))
 
 
 class DashboardSolicitudesSinTecnicoTests(TestCase):
@@ -832,9 +929,9 @@ class ReportesNominaTests(TestCase):
         workbook = load_workbook(BytesIO(response.content), data_only=True)
         self.assertEqual(workbook.sheetnames, ['Nómina', 'Novedades diarias'])
         self.assertEqual(workbook['Nómina']['C4'].value, 7.5)
-        self.assertEqual(workbook['Nómina']['E4'].value, 0)
+        self.assertEqual(workbook['Nómina']['E4'].value, 0.5)
         self.assertEqual(workbook['Novedades diarias']['C2'].value, 7.5)
-        self.assertEqual(workbook['Novedades diarias']['F2'].value, 'Sí')
+        self.assertEqual(workbook['Novedades diarias']['E2'].value, 0.5)
 
 
 class RegenerarRecibosTests(TestCase):

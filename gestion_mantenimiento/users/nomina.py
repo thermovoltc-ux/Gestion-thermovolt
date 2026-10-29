@@ -113,17 +113,11 @@ def calcular_periodo(usuario, fecha_inicio, fecha_fin):
     except ConfiguracionPago.DoesNotExist:
         config = None
 
-    inicio_semana = fecha_inicio - timedelta(days=fecha_inicio.weekday())
-    registros_semana = RegistroAsistencia.objects.filter(
+    registros = RegistroAsistencia.objects.filter(
         usuario=usuario,
-        fecha__gte=inicio_semana,
+        fecha__gte=fecha_inicio,
         fecha__lte=fecha_fin,
     ).order_by('fecha')
-    registros = [
-        registro
-        for registro in registros_semana
-        if fecha_inicio <= registro.fecha <= fecha_fin
-    ]
     dias_especiales = CalendarioTecnico.objects.filter(
         usuario=usuario,
         fecha__gte=fecha_inicio,
@@ -131,32 +125,7 @@ def calcular_periodo(usuario, fecha_inicio, fecha_fin):
     )
     dias_especiales_map = {dia.fecha: dia for dia in dias_especiales}
 
-    horas_semana_estandar = (
-        Decimal(config.horas_semana_estandar)
-        if config
-        else Decimal('42')
-    )
-    acumulado_por_semana = {}
-    clasificacion_por_fecha = {}
-    for registro in registros_semana:
-        semana_inicio = registro.fecha - timedelta(days=registro.fecha.weekday())
-        acumulado_previo = acumulado_por_semana.get(semana_inicio, CERO)
-        horas = horas_trabajadas_en_registro(registro)
-        acumulado_actual = acumulado_previo + horas
-        extras = max(acumulado_actual - horas_semana_estandar, CERO) - max(
-            acumulado_previo - horas_semana_estandar,
-            CERO,
-        )
-        clasificacion_por_fecha[registro.fecha] = {
-            'horas': horas,
-            'normales': horas - extras,
-            'extras': extras,
-            'semana_provisional': (
-                semana_inicio + timedelta(days=6) > fecha_fin
-            ),
-        }
-        acumulado_por_semana[semana_inicio] = acumulado_actual
-
+    limite_horas_normales_diarias = Decimal('7.00')
     horas_totales = CERO
     horas_normales = CERO
     horas_extras = CERO
@@ -167,10 +136,12 @@ def calcular_periodo(usuario, fecha_inicio, fecha_fin):
     detalle_dias = []
 
     for registro in registros:
-        clasificacion = clasificacion_por_fecha[registro.fecha]
-        horas = clasificacion['horas']
-        normales = clasificacion['normales']
-        extras = clasificacion['extras']
+        if not registro.hora_entrada or not registro.hora_salida:
+            continue
+
+        horas = horas_trabajadas_en_registro(registro)
+        normales = min(horas, limite_horas_normales_diarias)
+        extras = max(horas - limite_horas_normales_diarias, CERO)
         nocturnas = horas_nocturnas_en_registro(registro)
         festivo = es_dia_festivo(registro.fecha)
 
@@ -188,7 +159,6 @@ def calcular_periodo(usuario, fecha_inicio, fecha_fin):
             'horas_extras': float(extras),
             'nocturnas': float(nocturnas),
             'festivo': festivo,
-            'semana_provisional': clasificacion['semana_provisional'],
         })
 
     for dia in dias_especiales_map.values():

@@ -638,10 +638,6 @@ def _calcular_filas_reportes(fecha_inicio, fecha_fin, tecnico_id=''):
                 'horas_efectivas': calculo['horas_efectivas'],
                 'extras': calculo['horas_extras'],
                 'detalles_dias': calculo['detalles']['dias'],
-                'semana_provisional': any(
-                    dia['semana_provisional']
-                    for dia in calculo['detalles']['dias']
-                ),
                 'bruto': calculo['bruto'],
                 'descuentos': calculo['total_descuentos'],
                 'neto': calculo['neto'],
@@ -739,7 +735,7 @@ def nomina_reporte_export_excel(request):
         bottom=Side(style='thin'),
     )
 
-    ws.merge_cells('A1:I1')
+    ws.merge_cells('A1:H1')
     ws['A1'] = f"Reporte de Nómina - {fecha_inicio.strftime('%d/%m/%Y')} al {fecha_fin.strftime('%d/%m/%Y')}"
     ws['A1'].font = Font(bold=True, size=14, color='1E293B')
     ws['A1'].alignment = Alignment(horizontal='center')
@@ -750,7 +746,6 @@ def nomina_reporte_export_excel(request):
         'Horas Efectivas',
         'Horas Normales',
         'Horas Extras',
-        'Semana Provisional',
         'Bruto',
         'Descuentos',
         'Neto',
@@ -783,15 +778,10 @@ def nomina_reporte_export_excel(request):
             cell = ws.cell(row=row, column=column, value=float(value))
             cell.number_format = '0.00'
             cell.border = border
-        ws.cell(
-            row=row,
-            column=6,
-            value='Sí' if fila['semana_provisional'] else 'No',
-        ).border = border
         for column, value in (
-            (7, float(fila['bruto'])),
-            (8, float(fila['descuentos'])),
-            (9, float(fila['neto'])),
+            (6, float(fila['bruto'])),
+            (7, float(fila['descuentos'])),
+            (8, float(fila['neto'])),
         ):
             cell = ws.cell(row=row, column=column, value=value)
             cell.number_format = '$#,##0.00'
@@ -813,7 +803,7 @@ def nomina_reporte_export_excel(request):
         cell = ws.cell(row=row, column=column, value=float(value))
         cell.number_format = '0.00'
         cell.font = Font(bold=True, color='065F46')
-    for column, value in ((7, total_bruto), (8, total_descuentos), (9, total_neto)):
+    for column, value in ((6, total_bruto), (7, total_descuentos), (8, total_neto)):
         cell = ws.cell(row=row, column=column, value=float(value))
         cell.number_format = '$#,##0.00'
         cell.font = Font(bold=True, color='065F46')
@@ -825,7 +815,6 @@ def nomina_reporte_export_excel(request):
         'Horas Efectivas',
         'Horas Normales',
         'Horas Extras',
-        'Semana Provisional',
     ]
     for column, header in enumerate(novedades_headers, 1):
         cell = ws_novedades.cell(row=1, column=column, value=header)
@@ -845,7 +834,6 @@ def nomina_reporte_export_excel(request):
                 dia['horas'],
                 dia['horas_normales'],
                 dia['horas_extras'],
-                'Sí' if dia['semana_provisional'] else 'No',
             )
             for column, value in enumerate(values, 1):
                 cell = ws_novedades.cell(row=daily_row, column=column, value=value)
