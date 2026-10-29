@@ -83,22 +83,20 @@ def es_dia_festivo(fecha):
 
 
 def rango_quincena(fecha, corte):
-    """Devuelve el rango calendario de una de las dos quincenas del mes."""
+    """Devuelve el corte y asigna el último día del mes al corte siguiente."""
     ultimo_dia = monthrange(fecha.year, fecha.month)[1]
     if corte == 'q1':
-        return fecha.replace(day=1), fecha.replace(day=14)
+        ultimo_dia_mes_anterior = fecha.replace(day=1) - timedelta(days=1)
+        return ultimo_dia_mes_anterior, fecha.replace(day=14)
     if corte == 'q2':
-        return fecha.replace(day=15), fecha.replace(day=ultimo_dia)
+        return fecha.replace(day=15), fecha.replace(day=ultimo_dia - 1)
     raise ValueError(f'Corte quincenal inválido: {corte}')
 
 
-def ultimo_corte_cerrado(fecha_referencia):
-    """Devuelve el último corte cerrado para la fecha indicada."""
-    if fecha_referencia.day >= 15:
-        return rango_quincena(fecha_referencia, 'q1')
-
-    mes_anterior = fecha_referencia.replace(day=1) - timedelta(days=1)
-    return rango_quincena(mes_anterior, 'q2')
+def rango_quincena_actual(fecha):
+    """Devuelve el rango predeterminado según la quincena actual."""
+    corte = 'q1' if fecha.day <= 15 else 'q2'
+    return rango_quincena(fecha, corte)
 
 
 def calcular_periodo(usuario, fecha_inicio, fecha_fin):

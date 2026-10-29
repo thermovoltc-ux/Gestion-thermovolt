@@ -500,13 +500,13 @@ def nomina_calendario_form(request, dia_id=None):
 @_requiere_admin
 def nomina_supervisor(request):
     """Calcula la nómina del período para todos los técnicos."""
-    from .nomina import calcular_periodo, ultimo_corte_cerrado
+    from .nomina import calcular_periodo, rango_quincena_actual
 
     tipo_periodo = request.GET.get('periodo', 'quincenal')
-    hoy = date.today()
+    hoy = timezone.localdate()
 
     if tipo_periodo == 'quincenal':
-        fecha_inicio, fecha_fin = ultimo_corte_cerrado(hoy)
+        fecha_inicio, fecha_fin = rango_quincena_actual(hoy)
     elif tipo_periodo == 'mensual':
         fecha_inicio = hoy.replace(day=1)
         fecha_fin = hoy.replace(day=monthrange(hoy.year, hoy.month)[1])
@@ -655,9 +655,9 @@ def _calcular_filas_reportes(fecha_inicio, fecha_fin, tecnico_id=''):
 @_requiere_admin
 def nomina_reportes(request):
     """Muestra un reporte consolidado de nómina con filtros de período y técnico."""
-    from .nomina import rango_quincena, ultimo_corte_cerrado
+    from .nomina import rango_quincena, rango_quincena_actual
 
-    hoy = date.today()
+    hoy = timezone.localdate()
     tipo_periodo = request.GET.get('periodo', 'quincenal')
 
     if tipo_periodo == 'q1':
@@ -668,7 +668,7 @@ def nomina_reportes(request):
         fecha_inicio = hoy.replace(day=1)
         fecha_fin = hoy.replace(day=monthrange(hoy.year, hoy.month)[1])
     else:
-        fecha_inicio, fecha_fin = ultimo_corte_cerrado(hoy)
+        fecha_inicio, fecha_fin = rango_quincena_actual(hoy)
 
     if request.GET.get('desde'):
         fecha_inicio = date.fromisoformat(request.GET['desde'])

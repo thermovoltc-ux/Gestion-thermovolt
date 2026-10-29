@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -520,19 +521,19 @@ class MotorNominaTests(TestCase):
         self.assertEqual(resultado['bruto'], Decimal('0.00'))
 
     def test_rangos_quincenales_cubren_febrero_y_fin_de_ano(self):
-        from gestion_mantenimiento.users.nomina import rango_quincena, ultimo_corte_cerrado
+        from gestion_mantenimiento.users.nomina import rango_quincena
 
         self.assertEqual(
             rango_quincena(date(2024, 2, 1), 'q1'),
-            (date(2024, 2, 1), date(2024, 2, 14)),
+            (date(2024, 1, 31), date(2024, 2, 14)),
         )
         self.assertEqual(
             rango_quincena(date(2024, 2, 1), 'q2'),
-            (date(2024, 2, 15), date(2024, 2, 29)),
+            (date(2024, 2, 15), date(2024, 2, 28)),
         )
         self.assertEqual(
-            ultimo_corte_cerrado(date(2027, 1, 1)),
-            (date(2026, 12, 15), date(2026, 12, 31)),
+            rango_quincena(date(2026, 10, 1), 'q2'),
+            (date(2026, 10, 15), date(2026, 10, 30)),
         )
 
     @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
@@ -764,6 +765,37 @@ class ReportesNominaTests(TestCase):
         self.assertContains(response, 'Novedades diarias')
         self.assertEqual(response.context['fecha_inicio'], date(2026, 10, 1))
         self.assertEqual(response.context['fecha_fin'], date(2026, 10, 31))
+
+    def test_vistas_nomina_usan_quincena_actual_por_defecto(self):
+        casos = (
+            (date(2026, 10, 15), date(2026, 9, 30), date(2026, 10, 14)),
+            (date(2026, 10, 29), date(2026, 10, 15), date(2026, 10, 30)),
+        )
+        for hoy, inicio_esperado, fin_esperado in casos:
+            with self.subTest(hoy=hoy), patch(
+                'gestion_mantenimiento.users.views.timezone.localdate',
+                return_value=hoy,
+            ):
+                for url_name in ('nomina_supervisor', 'nomina_reportes'):
+                    response = self.client.get(reverse(url_name))
+
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.context['fecha_inicio'], inicio_esperado)
+                    self.assertEqual(response.context['fecha_fin'], fin_esperado)
+
+    def test_vista_supervisor_respeta_fechas_manuales(self):
+        with patch(
+            'gestion_mantenimiento.users.views.timezone.localdate',
+            return_value=date(2026, 10, 29),
+        ):
+            response = self.client.get(
+                reverse('nomina_supervisor'),
+                {'desde': '2026-09-10', 'hasta': '2026-09-20'},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['fecha_inicio'], date(2026, 9, 10))
+        self.assertEqual(response.context['fecha_fin'], date(2026, 9, 20))
 
     @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
     def test_export_excel_devuelve_workbook_valido(self):
