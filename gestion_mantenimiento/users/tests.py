@@ -867,6 +867,10 @@ class RegenerarRecibosTests(TestCase):
         response = self._post_generar()
 
         self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response['Location'],
+            f"{reverse('nomina_supervisor')}?desde=2026-10-01&hasta=2026-10-15&periodo=quincenal",
+        )
         recibos = ReciboPago.objects.filter(
             usuario=self.user,
             tipo_periodo='quincenal',

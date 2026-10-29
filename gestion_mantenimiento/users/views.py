@@ -1,6 +1,7 @@
 from calendar import monthrange
 from datetime import date, timedelta
 from decimal import Decimal
+from urllib.parse import urlencode
 
 from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib import messages
@@ -952,7 +953,13 @@ def nomina_generar_recibos(request):
         messages.success(request, f"Recibos: {', '.join(resumen)}.")
     else:
         messages.info(request, 'No se generaron recibos para este período.')
-    return redirect('nomina_supervisor')
+    url = reverse('nomina_supervisor')
+    params = urlencode({
+        'desde': fecha_inicio.isoformat(),
+        'hasta': fecha_fin.isoformat(),
+        'periodo': tipo_periodo,
+    })
+    return redirect(f'{url}?{params}')
 
 
 @login_required
