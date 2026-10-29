@@ -1332,7 +1332,22 @@ class RentabilidadAdminTests(TestCase):
 
         self.assertFalse(form.fields['valor_mano_obra'].required)
         self.assertEqual(form.cleaned_data['valor_mano_obra'], Decimal('0.00'))
-        self.assertNotIn('estado', form.fields)
+        self.assertEqual(set(form.fields), {'valor_mano_obra'})
+
+    def test_model_rejects_facturada_without_dian_pdf(self):
+        from django.core.exceptions import ValidationError
+
+        cierre = self.ot.cierreot
+        cierre.estado_facturacion = 'facturada'
+        cierre.factura_dian_drive_id = ''
+
+        with self.assertRaises(ValidationError) as error:
+            cierre.clean()
+
+        self.assertIn(
+            'No se puede marcar como Facturada sin adjuntar el PDF de la DIAN.',
+            error.exception.message_dict['estado_facturacion'],
+        )
 
     def test_invalid_date_range_is_rejected(self):
         self.client.force_login(self.admin)
@@ -1359,10 +1374,11 @@ class RentabilidadAdminTests(TestCase):
         self.assertContains(response, self.material.nombre)
         self.assertContains(response, 'Ver factura')
         self.assertContains(response, 'Total facturado')
-        self.assertContains(response, 'Guardar facturación')
+        self.assertContains(response, 'Generar Prefactura')
+        self.assertNotContains(response, 'Estado de facturación')
+        self.assertNotContains(response, 'name="estado_facturacion"')
         self.assertNotContains(response, 'Estado operativo (solo lectura)')
         self.assertNotContains(response, 'OT Finalizada')
-        self.assertContains(response, 'Estado de facturación')
         self.assertNotContains(response, 'Estado de la OT</strong>')
         self.assertContains(response, 'Agregar material (Admin)')
         self.assertContains(response, 'id="admin-material-search" list="admin-materials-datalist"')
@@ -1542,7 +1558,7 @@ class RentabilidadAdminTests(TestCase):
         self.assertEqual(material_ot.costo_real, Decimal('70000.00'))
         self.assertEqual(material_ot.precio_venta_aplicado, Decimal('70000.00'))
 
-    def test_admin_cannot_mark_invoice_without_dian_pdf(self):
+    def test_admin_management_post_ignores_tampered_billed_state_without_pdf(self):
         self.client.force_login(self.admin)
 
         response = self.client.post(
@@ -1550,19 +1566,18 @@ class RentabilidadAdminTests(TestCase):
             {'estado_facturacion': 'facturada'},
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertFormError(
-            response.context['form'],
-            'estado_facturacion',
-            'No se puede marcar como Facturada sin adjuntar el PDF de la DIAN.',
-        )
+        self.assertRedirects(response, reverse('facturacion_admin'))
         self.ot.cierreot.refresh_from_db()
         self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('60.00'))
         self.assertEqual(self.ot.cierreot.estado_facturacion, 'pendiente')
 
-    def test_admin_can_mark_invoice_when_dian_pdf_is_already_attached(self):
+    def test_admin_management_post_preserves_existing_dian_invoice(self):
         self.ot.cierreot.factura_dian_drive_id = 'private-drive-file-id'
-        self.ot.cierreot.save(update_fields=['factura_dian_drive_id'])
+        self.ot.cierreot.estado_facturacion = 'facturada'
+        self.ot.cierreot.save(update_fields=[
+            'factura_dian_drive_id',
+            'estado_facturacion',
+        ])
         self.client.force_login(self.admin)
 
         response = self.client.post(
@@ -1570,11 +1585,11 @@ class RentabilidadAdminTests(TestCase):
             {'estado_facturacion': 'facturada'},
         )
 
-        self.assertRedirects(response, reverse('gestionar_ot_admin', args=[self.ot.pk]))
+        self.assertRedirects(response, reverse('facturacion_admin'))
         self.ot.cierreot.refresh_from_db()
         self.assertEqual(self.ot.cierreot.estado_facturacion, 'facturada')
 
-    def test_billing_ajax_without_manual_labor_preserves_existing_total(self):
+    def test_billing_ajax_ignores_tampered_invoice_status_and_returns_redirect(self):
         self.client.force_login(self.admin)
 
         response = self.client.post(
@@ -1583,11 +1598,8 @@ class RentabilidadAdminTests(TestCase):
             HTTP_X_REQUESTED_WITH='XMLHttpRequest',
         )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertIn(
-            'No se puede marcar como Facturada sin adjuntar el PDF de la DIAN.',
-            str(response.json()['errors']['estado_facturacion'][0]['message']),
-        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['redirect_url'], reverse('facturacion_admin'))
         self.ot.cierreot.refresh_from_db()
         self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('60.00'))
         self.assertEqual(self.ot.cierreot.estado_facturacion, 'pendiente')
@@ -1643,7 +1655,7 @@ class RentabilidadAdminTests(TestCase):
                 'valor_mano_obra': '500000.00',
                 # Legacy/tampered submissions must not mutate the operational state.
                 'estado': self.estado_revision.pk,
-                'estado_facturacion': 'pendiente',
+                'estado_facturacion': 'facturada',
             },
             HTTP_X_REQUESTED_WITH='XMLHttpRequest',
         )

@@ -89,7 +89,7 @@ class CierreOtFacturacionForm(forms.ModelForm):
     )
     class Meta:
         model = CierreOt
-        fields = ['valor_mano_obra', 'estado_facturacion']
+        fields = ['valor_mano_obra']
 
     def clean_valor_mano_obra(self):
         return self.cleaned_data.get('valor_mano_obra') or Decimal('0.00')

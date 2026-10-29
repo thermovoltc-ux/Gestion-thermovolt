@@ -1270,9 +1270,12 @@ def gestionar_ot_admin(request, ot_id):
         post_data.setdefault('valor_mano_obra', str(cierre.valor_mano_obra or Decimal('0.00')))
         form = CierreOtFacturacionForm(post_data, instance=cierre)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Se guardaron los datos de facturación de la OT.')
-            return redirect('gestionar_ot_admin', ot_id=ot.pk)
+            cierre = form.save(commit=False)
+            if not cierre.factura_dian_drive_id:
+                cierre.estado_facturacion = 'pendiente'
+            cierre.save()
+            messages.success(request, 'Se generó la prefactura de la OT.')
+            return redirect('facturacion_admin')
     else:
         form = CierreOtFacturacionForm(instance=cierre)
 
@@ -1528,7 +1531,10 @@ def actualizar_mano_obra(request, ot_id):
             status=400,
         )
 
-    cierre = form.save()
+    cierre = form.save(commit=False)
+    if not cierre.factura_dian_drive_id:
+        cierre.estado_facturacion = 'pendiente'
+    cierre.save()
     resumen = _calcular_costos_ot(ot, cierre)
     return JsonResponse({
         'ok': True,
@@ -1539,6 +1545,7 @@ def actualizar_mano_obra(request, ot_id):
         'ganancia': resumen['ganancia'],
         'margen': resumen['margen'],
         'estado_facturacion': cierre.estado_facturacion,
+        'redirect_url': reverse('facturacion_admin'),
     })
 
 

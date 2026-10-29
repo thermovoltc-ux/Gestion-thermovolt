@@ -179,7 +179,6 @@
 
     <section class="admin-ot-card admin-ot-billing">
         <h2>Facturación del servicio</h2>
-        {% if form.errors %}<div class="admin-ot-message error">{{ form.errors }}</div>{% endif %}
         {% if servicios_ot %}
             <div class="admin-ot-table-wrap">
                 <table class="admin-ot-table" style="min-width:600px;">
@@ -228,14 +227,8 @@
 
         <form method="post" id="admin-ot-billing-form">
             {% csrf_token %}
-            <div class="admin-ot-meta">
-                <div>
-                    <label for="{{ form.estado_facturacion.id_for_label }}"><strong>Estado de facturación</strong></label>
-                    {{ form.estado_facturacion }}
-                    <small>Este estado es independiente del flujo del técnico.</small>
-                </div>
-            </div>
-            <button type="submit" class="admin-ot-btn" style="margin-top:14px;">Guardar facturación</button>
+            {% if form.errors %}<div class="admin-ot-message error">{{ form.errors }}</div>{% endif %}
+            <button type="submit" class="admin-ot-btn" style="margin-top:14px;">Generar Prefactura</button>
             <span id="admin-ot-save-message" class="admin-ot-live" role="status" aria-live="polite"></span>
         </form>
     </section>
@@ -493,14 +486,9 @@ document.addEventListener('DOMContentLoaded', function () {
             finance.dataset.totalMateriales = data.total_materiales;
             finance.dataset.manoObra = data.mano_obra;
             if (data.costo_nomina !== null) finance.dataset.costoNomina = data.costo_nomina;
-            if (data.estado_facturacion === 'facturada') {
-                messageEl.textContent = 'Facturación guardada y OT marcada como facturada. Ya no aparecerá en pendientes.';
-            }
             messageEl.classList.remove('error');
-            if (data.estado_facturacion !== 'facturada') {
-                messageEl.textContent = 'Facturación y estado guardados.';
-            }
-            updatePreview();
+            messageEl.textContent = 'Prefactura generada. Redirigiendo a Facturación…';
+            window.location.href = data.redirect_url;
         } catch (error) {
             messageEl.classList.add('error');
             messageEl.textContent = 'No se pudo guardar. Comprueba tu conexión e inténtalo de nuevo.';
