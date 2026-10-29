@@ -10,6 +10,7 @@ from unittest.mock import patch
 from gestion_mantenimiento.Gestion_ot.storage import GoogleDriveMediaStorage
 from gestion_mantenimiento.users.models import Cliente, PerfilUsuario
 
+from . import views
 from .models import CentroOperaciones, Equipo, Ubicacion
 
 
@@ -328,6 +329,40 @@ class AssetDriveMediaTests(TestCase):
             Equipo._meta.get_field('imagen').storage,
             GoogleDriveMediaStorage,
         )
+
+    def test_hoja_vida_image_resolver_reads_from_equipment_field_storage(self):
+        self._set_drive_image(self.equipment, 'imagen', 'equipment-pdf-image')
+        image_name = self.equipment.imagen.name
+
+        with patch(
+            'gestion_mantenimiento.Gestion_ot.storage.GoogleDriveMediaStorage.open',
+            side_effect=lambda *args: File(
+                BytesIO(b'pdf-equipment-image'),
+                name='file.png',
+            ),
+        ) as open_image:
+            image_bytes = views._resolve_equipo_image_bytes(self.equipment)
+
+        self.assertEqual(image_bytes, b'pdf-equipment-image')
+        open_image.assert_called_once_with(image_name, 'rb')
+
+    def test_hoja_vida_image_resolver_logs_if_configured_image_is_unreadable(self):
+        self._set_drive_image(self.equipment, 'imagen', 'unreadable-equipment-image')
+
+        with patch(
+            'gestion_mantenimiento.Gestion_ot.storage.GoogleDriveMediaStorage.open',
+            side_effect=OSError('Drive unavailable'),
+        ):
+            with patch.object(
+                views.default_storage,
+                'open',
+                side_effect=OSError('No local image'),
+            ):
+                with patch.object(views.logger, 'warning') as log_warning:
+                    image_bytes = views._resolve_equipo_image_bytes(self.equipment)
+
+        self.assertIsNone(image_bytes)
+        log_warning.assert_called_once()
 
     def test_drive_media_serves_location_and_equipment_images_to_tree_users(self):
         self._set_drive_image(self.location, 'imagen', 'location-image-id')

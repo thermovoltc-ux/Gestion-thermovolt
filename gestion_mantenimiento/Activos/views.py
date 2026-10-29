@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import zipfile
@@ -21,6 +22,8 @@ from reportlab.platypus import Image as RLImage
 from PIL import Image as PILImage
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo
 from gestion_mantenimiento.users.access import obtener_scope_ubicacion_ids
+
+logger = logging.getLogger(__name__)
 
 
 def _normalizar_url_media(url):
@@ -588,20 +591,27 @@ def _resolve_equipo_image_bytes(equipo, request=None):
     if not equipo.imagen:
         return None
 
+    last_error = None
+    try:
+        with equipo.imagen.storage.open(equipo.imagen.name, 'rb') as image_file:
+            return image_file.read()
+    except Exception as exc:
+        last_error = exc
+
     try:
         if hasattr(equipo.imagen, 'path') and equipo.imagen.path and os.path.exists(equipo.imagen.path):
             with open(equipo.imagen.path, 'rb') as image_file:
                 return image_file.read()
-    except Exception:
-        pass
+    except Exception as exc:
+        last_error = exc
 
     try:
         image_name = getattr(equipo.imagen, 'name', None)
         if image_name:
             with default_storage.open(image_name, 'rb') as image_file:
                 return image_file.read()
-    except Exception:
-        pass
+    except Exception as exc:
+        last_error = exc
 
     try:
         image_url = getattr(equipo.imagen, 'url', None)
@@ -616,8 +626,14 @@ def _resolve_equipo_image_bytes(equipo, request=None):
             if remote_url:
                 with urlopen(remote_url) as response:
                     return response.read()
-    except Exception:
-        pass
+    except Exception as exc:
+        last_error = exc
+
+    logger.warning(
+        'No se pudo resolver la imagen del equipo %s para el PDF: %s',
+        equipo.pk,
+        last_error,
+    )
 
     return None
 
