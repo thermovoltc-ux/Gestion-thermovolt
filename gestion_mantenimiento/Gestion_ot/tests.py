@@ -1259,6 +1259,8 @@ class RentabilidadAdminTests(TestCase):
         self.assertContains(response, 'id="factura-tecnico"')
         self.assertContains(response, 'id="factura-equipo"')
         self.assertContains(response, 'invoice-dian-success')
+        self.assertContains(response, '.invoice-dian-success[hidden] { display: none; }')
+        self.assertContains(response, 'const facturaYaSubida = button.dataset.facturaDianSubida === \'true\';')
         self.assertContains(response, '✓ Esta OT ya ha sido facturada')
         self.assertContains(response, 'Descargar PDF DIAN')
         self.assertContains(response, 'Subir PDF y Marcar como Facturada')
