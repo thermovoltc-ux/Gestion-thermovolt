@@ -1271,7 +1271,7 @@ def gestionar_ot_admin(request, ot_id):
         form = CierreOtFacturacionForm(post_data, instance=cierre)
         if form.is_valid():
             cierre = form.save(commit=False)
-            if not cierre.factura_dian_drive_id:
+            if cierre.estado_facturacion == 'sin_prefactura':
                 cierre.estado_facturacion = 'pendiente'
             cierre.save()
             messages.success(request, 'Se generó la prefactura de la OT.')
@@ -1532,7 +1532,7 @@ def actualizar_mano_obra(request, ot_id):
         )
 
     cierre = form.save(commit=False)
-    if not cierre.factura_dian_drive_id:
+    if cierre.estado_facturacion == 'sin_prefactura':
         cierre.estado_facturacion = 'pendiente'
     cierre.save()
     resumen = _calcular_costos_ot(ot, cierre)
@@ -1608,6 +1608,7 @@ def rentabilidad_admin(request):
     tecnico_id = request.GET.get('tecnico', '').strip()
     ots = OrdenTrabajo.objects.filter(
         cierreot__fecha_inicio_actividad__date__range=(fecha_inicio, fecha_fin),
+        cierreot__estado_facturacion__in=('pendiente', 'facturada'),
     )
     if tecnico_id:
         try:

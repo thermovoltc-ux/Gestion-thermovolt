@@ -49,6 +49,7 @@ class OrdenTrabajo(models.Model):
 
 class CierreOt(models.Model):
     ESTADO_FACTURACION_CHOICES = [
+        ('sin_prefactura', 'Sin prefactura'),
         ('pendiente', 'Prefactura'),
         ('facturada', 'Facturada'),
     ]
@@ -58,7 +59,7 @@ class CierreOt(models.Model):
     estado_facturacion = models.CharField(
         max_length=20,
         choices=ESTADO_FACTURACION_CHOICES,
-        default='pendiente',
+        default='sin_prefactura',
         db_index=True,
     )
     factura_dian_drive_id = models.CharField(

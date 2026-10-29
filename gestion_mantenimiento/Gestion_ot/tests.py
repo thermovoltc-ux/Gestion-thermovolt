@@ -1009,6 +1009,7 @@ class RentabilidadAdminTests(TestCase):
             hora_inicio=datetime.min.time().replace(hour=9),
             hora_fin=datetime.min.time().replace(hour=11),
             valor_mano_obra=Decimal('60.00'),
+            estado_facturacion='pendiente',
         )
         self.material = Material.objects.create(
             codigo='MAT-RENT-001',
@@ -1085,6 +1086,55 @@ class RentabilidadAdminTests(TestCase):
         self.assertContains(response, 'Ingreso total')
         self.assertContains(response, 'Mano de obra')
 
+    def test_rentabilidad_excludes_orders_until_prefactura_is_generated(self):
+        solicitud = Solicitud.objects.create(
+            creado_por=self.tecnico.username,
+            descripcion_problema='OT aún sin prefactura',
+            equipo=self.equipo,
+            ubicacion=self.ubicacion,
+            estado=self.estado,
+        )
+        ot_sin_prefactura = OrdenTrabajo.objects.create(
+            solicitud=solicitud,
+            tecnico_asignado=self.tecnico.username,
+            estado=self.estado,
+        )
+        CierreOt.objects.create(
+            orden_trabajo=ot_sin_prefactura,
+            fecha_inicio_actividad=self.ot.cierreot.fecha_inicio_actividad,
+            hora_inicio=datetime.min.time().replace(hour=9),
+            hora_fin=datetime.min.time().replace(hour=11),
+        )
+        self.client.force_login(self.admin)
+        url_rentabilidad = reverse('rentabilidad_admin')
+
+        response = self.client.get(url_rentabilidad)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [fila['ot'].pk for fila in response.context['filas']],
+            [self.ot.pk],
+        )
+        self.assertEqual(
+            ot_sin_prefactura.cierreot.estado_facturacion,
+            'sin_prefactura',
+        )
+
+        response = self.client.post(
+            reverse('actualizar_mano_obra', args=[ot_sin_prefactura.pk]),
+            {'valor_mano_obra': '0.00'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['estado_facturacion'], 'pendiente')
+        response = self.client.get(url_rentabilidad)
+        self.assertEqual(response.status_code, 200)
+        self.assertSetEqual(
+            {fila['ot'].pk for fila in response.context['filas']},
+            {self.ot.pk, ot_sin_prefactura.pk},
+        )
+
     def test_rentabilidad_groups_by_root_location_and_orders_newest_first(self):
         raiz_duplicada = Ubicacion.objects.create(
             nombre=self.ubicacion.nombre,
@@ -1128,6 +1178,7 @@ class RentabilidadAdminTests(TestCase):
                 hora_inicio=datetime.min.time().replace(hour=9),
                 hora_fin=datetime.min.time().replace(hour=11),
                 valor_mano_obra=Decimal('60.00'),
+                estado_facturacion='pendiente',
             )
 
         self.client.force_login(self.admin)
@@ -2060,6 +2111,7 @@ class RentabilidadAdminTests(TestCase):
             fecha_inicio_actividad=(
                 self.ot.cierreot.fecha_inicio_actividad + relativedelta(days=1)
             ),
+            estado_facturacion='pendiente',
         )
         self.client.force_login(self.admin)
 
