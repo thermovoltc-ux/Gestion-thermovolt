@@ -1685,7 +1685,9 @@ def rentabilidad_admin(request):
 
         ganancia = None
         margen = None
+        costos_totales = None
         if costo_nomina is not None:
+            costos_totales = costo_materiales + costo_nomina
             ganancia = ingreso_total - costo_materiales - costo_nomina
             if ingreso_total:
                 margen = (ganancia * Decimal('100') / ingreso_total).quantize(
@@ -1702,6 +1704,7 @@ def rentabilidad_admin(request):
             'valor_mano_obra': valor_mano_obra,
             'ingreso_total': ingreso_total,
             'costo_materiales': costo_materiales,
+            'costos_totales': costos_totales,
             'horas': horas,
             'costo_nomina': costo_nomina,
             'ganancia': ganancia,

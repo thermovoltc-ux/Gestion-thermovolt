@@ -1065,6 +1065,7 @@ class RentabilidadAdminTests(TestCase):
         self.assertEqual(response.context['totales']['costo_materiales'], Decimal('100.00'))
         self.assertEqual(response.context['totales']['costo_nomina'], Decimal('200.00'))
         self.assertEqual(response.context['totales']['ganancia'], Decimal('-40.00'))
+        self.assertEqual(response.context['filas'][0]['costos_totales'], Decimal('300.00'))
         self.assertEqual(response.context['por_tecnico'][0]['cantidad_ots'], 1)
         self.assertEqual(response.context['por_cliente'][0]['ganancia'], Decimal('-40.00'))
         self.assertEqual(response.context['costos_totales'], Decimal('300.00'))
@@ -1170,21 +1171,26 @@ class RentabilidadAdminTests(TestCase):
         self.assertEqual(fila['estado_facturacion'], 'facturada')
         self.assertTrue(fila['factura_dian_subida'])
         self.assertContains(response, 'Facturada')
-        self.assertContains(response, 'Ver PDF')
+        self.assertContains(response, 'Facturada - Ver PDF')
+        self.assertContains(response, 'profit-action-done')
         self.assertContains(
             response,
             reverse('descargar_factura_dian', args=[self.ot.pk]),
         )
 
-    def test_rentabilidad_table_shows_invoice_status_and_actions(self):
+    def test_rentabilidad_table_shows_compact_financial_columns_and_pending_action(self):
         self.client.force_login(self.admin)
 
         response = self.client.get(reverse('rentabilidad_admin'))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Estado factura')
+        self.assertNotContains(response, 'Estado factura')
+        self.assertContains(response, 'Costos totales')
+        self.assertContains(response, 'Ingreso total')
+        self.assertContains(response, 'Ganancia estimada')
         self.assertContains(response, 'Prefactura')
-        self.assertContains(response, 'Ver / Subir PDF DIAN')
+        self.assertContains(response, 'Prefactura - Subir PDF')
+        self.assertContains(response, 'profit-action-pending')
         self.assertContains(
             response,
             reverse('subir_factura_dian', args=[self.ot.pk]),

@@ -42,6 +42,21 @@
     .profit-chart-fallback { display: none; padding: 28px 12px; color: #64748b; text-align: center; }
     .profit-table-wrap { overflow: auto; }
     .profit-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1200px; }
+    .profit-table.profit-detail-table { min-width: 0; table-layout: fixed; }
+    .profit-table.profit-detail-table th, .profit-table.profit-detail-table td { padding: 10px 8px; white-space: normal; overflow-wrap: anywhere; }
+    .profit-detail-table th:nth-child(1) { width: 8%; }
+    .profit-detail-table th:nth-child(2) { width: 7%; }
+    .profit-detail-table th:nth-child(3) { width: 13%; }
+    .profit-detail-table th:nth-child(4) { width: 15%; }
+    .profit-detail-table th:nth-child(5) { width: 12%; }
+    .profit-detail-table th:nth-child(6) { width: 12%; }
+    .profit-detail-table th:nth-child(7) { width: 13%; }
+    .profit-detail-table th:nth-child(8) { width: 8%; }
+    .profit-detail-table th:nth-child(9) { width: 12%; }
+    .profit-detail-table td:nth-child(1), .profit-detail-table td:nth-child(2),
+    .profit-detail-table td:nth-child(5), .profit-detail-table td:nth-child(6),
+    .profit-detail-table td:nth-child(7), .profit-detail-table td:nth-child(8) { overflow-wrap: normal; }
+    .profit-detail-table .profit-action { display: block; box-sizing: border-box; width: 100%; padding: 8px 6px; text-align: center; white-space: normal; }
     .profit-table th, .profit-table td { padding: 12px 14px; border-bottom: 1px solid #eef2f7; text-align: right; white-space: nowrap; }
     .profit-table th { position: sticky; top: 0; z-index: 1; background: #f8fafc; color: #475569; font-size: 11px; font-weight: 800; letter-spacing: .055em; text-transform: uppercase; }
     .profit-table tbody tr { transition: background .12s ease; }
@@ -65,6 +80,12 @@
     .profit-margin-mid { background: #fef3c7; color: #92400e; }
     .profit-margin-low { background: #fee2e2; color: #991b1b; }
     .profit-action { display: inline-block; border: 0; border-radius: 7px; padding: 8px 12px; background: #2563eb; color: #fff; font-weight: 700; text-decoration: none; cursor: pointer; transition: background .15s ease, transform .15s ease; }
+    .profit-action-pending { background: #d97706; color: #fff; }
+    .profit-action-pending:hover { background: #b45309; color: #fff; }
+    .profit-action-done { background: #15803d; color: #fff; }
+    .profit-action-done:hover { background: #166534; color: #fff; }
+    .profit-action-warning { background: #b91c1c; color: #fff; }
+    .profit-action-warning:hover { background: #991b1b; color: #fff; }
     .profit-invoice-status { display: inline-block; padding: 5px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; }
     .profit-invoice-status-pending { background: #fef3c7; color: #92400e; }
     .profit-invoice-status-done { background: #dcfce7; color: #166534; }
@@ -174,19 +195,15 @@
             <div><h2>Detalle de órdenes de trabajo</h2><p>{{ filas|length }} OT(s) en el período seleccionado.</p></div>
         </div>
         <div class="profit-table-wrap">
-        <table class="profit-table table-hover">
+        <table class="profit-table profit-detail-table table-hover">
             <thead>
                 <tr>
                     <th>Fecha</th>
                     <th>OT</th>
-                    <th>Estado factura</th>
                     <th>Técnico</th>
                     <th>Cliente</th>
-                    <th>Ingreso materiales</th>
-                    <th>Mano de obra</th>
+                    <th>Costos totales</th>
                     <th>Ingreso total</th>
-                    <th>Costo materiales</th>
-                    <th>Nómina estimada</th>
                     <th>Ganancia estimada</th>
                     <th>Margen</th>
                     <th>Acciones</th>
@@ -197,45 +214,31 @@
                     <tr>
                         <td>{{ fila.fecha|date:"d/m/Y" }}</td>
                         <td><span class="profit-ot-number">OT-{{ fila.ot.solicitud.consecutivo }}</span></td>
-                        <td>
-                            {% if fila.factura_dian_subida %}
-                                <span class="profit-invoice-status profit-invoice-status-done">Facturada</span>
-                            {% elif fila.estado_facturacion == 'facturada' %}
-                                <span class="profit-invoice-status profit-invoice-status-warning">Revisar factura</span>
-                            {% else %}
-                                <span class="profit-invoice-status profit-invoice-status-pending">Prefactura</span>
-                            {% endif %}
-                        </td>
                         <td class="profit-name">{{ fila.ot.tecnico_display|default:fila.ot.tecnico_asignado }}</td>
                         <td>{{ fila.ot.solicitud.ubicacion_nombre|default:"—" }}</td>
-                        <td>$ {{ fila.ingreso_materiales|intcomma }}</td>
-                        <td>$ {{ fila.valor_mano_obra|intcomma }}</td>
-                        <td>$ {{ fila.ingreso_total|intcomma }}</td>
-                        <td>$ {{ fila.costo_materiales|intcomma }}</td>
                         {% if fila.costo_nomina != None %}
-                            <td>$ {{ fila.costo_nomina|intcomma }}<br><small>{{ fila.horas|floatformat:2 }} h</small></td>
+                            <td>$ {{ fila.costos_totales|intcomma }}<br><small>Materiales + nómina</small></td>
+                            <td>$ {{ fila.ingreso_total|intcomma }}</td>
                             <td class="{% if fila.ganancia < 0 %}profit-negative{% else %}profit-positive{% endif %}">$ {{ fila.ganancia|intcomma }}</td>
                             <td>{% if fila.margen != None %}<span class="profit-margin {% if fila.margen < 0 %}profit-margin-low{% elif fila.margen < 20 %}profit-margin-mid{% else %}profit-margin-high{% endif %}">{{ fila.margen|floatformat:2 }}%</span>{% else %}—{% endif %}</td>
                         {% else %}
-                            <td class="profit-pending">Pendiente</td>
+                            <td class="profit-pending" title="{{ fila.motivo_sin_calculo }}">Pendiente</td>
+                            <td>$ {{ fila.ingreso_total|intcomma }}</td>
                             <td class="profit-pending" colspan="2">{{ fila.motivo_sin_calculo }}</td>
                         {% endif %}
                         <td>
                             <button
                                 type="button"
-                                class="profit-action btn-ver-factura"
+                                class="profit-action {% if fila.factura_dian_subida %}profit-action-done{% elif fila.estado_facturacion == 'facturada' %}profit-action-warning{% else %}profit-action-pending{% endif %} btn-ver-factura"
                                 data-factura-url="{% url 'detalle_factura_ot' fila.ot.pk %}"
                                 data-subir-url="{% url 'subir_factura_dian' fila.ot.pk %}"
                                 data-descargar-url="{% url 'descargar_factura_dian' fila.ot.pk %}"
                                 data-factura-dian-subida="{% if fila.factura_dian_subida %}true{% else %}false{% endif %}"
-                            >{% if fila.factura_dian_subida %}Ver detalle{% else %}Ver / Subir PDF DIAN{% endif %}</button>
-                            {% if fila.factura_dian_subida %}
-                                <a class="profit-action" href="{% url 'descargar_factura_dian' fila.ot.pk %}">Ver PDF</a>
-                            {% endif %}
+                            >{% if fila.factura_dian_subida %}Facturada - Ver PDF{% elif fila.estado_facturacion == 'facturada' %}Revisar factura{% else %}Prefactura - Subir PDF{% endif %}</button>
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="13" class="profit-muted" style="text-align:center;">No hay OTs cerradas en este período.</td></tr>
+                    <tr><td colspan="9" class="profit-muted" style="text-align:center;">No hay OTs cerradas en este período.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
