@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -20,6 +20,7 @@ from .models import (
     ReciboPago,
     RegistroAsistencia,
 )
+from .forms import CalendarioTecnicoForm, ConfiguracionPagoForm
 
 
 class CustomLoginCentroOperacionesTests(TestCase):
@@ -152,6 +153,7 @@ class CustomLoginCentroOperacionesTests(TestCase):
 
 
 class RegistroAsistenciaTests(TestCase):
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2000-01-01')
     def test_calcula_horas_trabajadas_automaticamente(self):
         user = get_user_model().objects.create_user(
             username='tecnico-prueba',
@@ -165,7 +167,75 @@ class RegistroAsistenciaTests(TestCase):
             hora_salida=now,
         )
 
-        self.assertEqual(registro.horas_trabajadas, 8.0)
+        self.assertEqual(registro.horas_trabajadas, Decimal('7.50'))
+
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
+    def test_descuenta_almuerzo_solo_desde_fecha_de_vigencia(self):
+        user = get_user_model().objects.create_user(
+            username='tecnico-vigencia-almuerzo',
+            password='test-password',
+        )
+        for fecha, horas_esperadas in (
+            (date(2026, 10, 28), Decimal('8.00')),
+            (date(2026, 10, 29), Decimal('7.50')),
+        ):
+            entrada = timezone.make_aware(datetime.combine(fecha, datetime.min.time().replace(hour=8)))
+            salida = entrada + timedelta(hours=8)
+            registro = RegistroAsistencia.objects.create(
+                usuario=user,
+                fecha=fecha,
+                hora_entrada=entrada,
+                hora_salida=salida,
+            )
+            self.assertEqual(registro.horas_trabajadas, horas_esperadas)
+
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
+    def test_descuenta_30_minutos_y_no_deja_horas_negativas(self):
+        from gestion_mantenimiento.users.nomina import calcular_horas_efectivas
+
+        fecha = date(2026, 10, 29)
+        entrada = timezone.make_aware(datetime.combine(fecha, datetime.min.time()))
+
+        self.assertEqual(
+            calcular_horas_efectivas(fecha, entrada, entrada + timedelta(hours=7, minutes=30)),
+            Decimal('7.00'),
+        )
+        self.assertEqual(
+            calcular_horas_efectivas(fecha, entrada, entrada + timedelta(minutes=30)),
+            Decimal('0.00'),
+        )
+        self.assertEqual(
+            calcular_horas_efectivas(fecha, entrada, entrada + timedelta(minutes=20)),
+            Decimal('0.00'),
+        )
+
+    def test_pico_placa_no_se_ofrece_en_formularios(self):
+        config_form = ConfiguracionPagoForm()
+        calendario_form = CalendarioTecnicoForm()
+
+        self.assertNotIn('dia_pico_placa', config_form.fields)
+        self.assertNotIn(
+            'pico_placa',
+            [value for value, _label in calendario_form.fields['tipo'].choices],
+        )
+
+    def test_pico_placa_historico_se_puede_conservar_al_editar(self):
+        user = get_user_model().objects.create_user(
+            username='tecnico-pico-historico',
+            password='test-password',
+        )
+        dia = CalendarioTecnico.objects.create(
+            usuario=user,
+            fecha=date(2026, 10, 29),
+            tipo='pico_placa',
+        )
+
+        form = CalendarioTecnicoForm(instance=dia)
+
+        self.assertIn(
+            'pico_placa',
+            [value for value, _label in form.fields['tipo'].choices],
+        )
 
     def test_no_calcula_horas_sin_entrada_y_salida(self):
         user = get_user_model().objects.create_user(
@@ -247,6 +317,7 @@ class RegistroAsistenciaTests(TestCase):
             f"{reverse('listar_ot')}?vista=calendario&tecnico={user.username}",
         )
 
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2000-01-01')
     def test_marcar_salida_completa_el_dia(self):
         user = get_user_model().objects.create_user(
             username='tecnico-h2-salida',
@@ -272,7 +343,7 @@ class RegistroAsistenciaTests(TestCase):
             fecha=timezone.localdate(),
         )
         self.assertIsNotNone(registro.hora_salida)
-        self.assertEqual(registro.horas_trabajadas, 8.0)
+        self.assertEqual(registro.horas_trabajadas, Decimal('7.50'))
         self.assertRedirects(
             response,
             f"{reverse('listar_ot')}?vista=calendario&tecnico={user.username}",
@@ -448,6 +519,44 @@ class MotorNominaTests(TestCase):
         self.assertEqual(resultado['horas_normales'], Decimal('0.00'))
         self.assertEqual(resultado['bruto'], Decimal('0.00'))
 
+    def test_rangos_quincenales_cubren_febrero_y_fin_de_ano(self):
+        from gestion_mantenimiento.users.nomina import rango_quincena, ultimo_corte_cerrado
+
+        self.assertEqual(
+            rango_quincena(date(2024, 2, 1), 'q1'),
+            (date(2024, 2, 1), date(2024, 2, 14)),
+        )
+        self.assertEqual(
+            rango_quincena(date(2024, 2, 1), 'q2'),
+            (date(2024, 2, 15), date(2024, 2, 29)),
+        )
+        self.assertEqual(
+            ultimo_corte_cerrado(date(2027, 1, 1)),
+            (date(2026, 12, 15), date(2026, 12, 31)),
+        )
+
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
+    def test_horas_extras_se_calculan_por_semana_con_almuerzo_deducido(self):
+        from gestion_mantenimiento.users.nomina import calcular_periodo
+
+        inicio = date(2026, 11, 2)
+        for dia_numero in range(6):
+            fecha = inicio + timedelta(days=dia_numero)
+            entrada = timezone.make_aware(datetime.combine(fecha, datetime.min.time().replace(hour=8)))
+            RegistroAsistencia.objects.create(
+                usuario=self.user,
+                fecha=fecha,
+                hora_entrada=entrada,
+                hora_salida=entrada + timedelta(hours=8),
+            )
+
+        resultado = calcular_periodo(self.user, inicio, inicio + timedelta(days=5))
+
+        self.assertEqual(resultado['horas_efectivas'], Decimal('45.00'))
+        self.assertEqual(resultado['horas_normales'], Decimal('42.00'))
+        self.assertEqual(resultado['horas_extras'], Decimal('3.00'))
+        self.assertTrue(resultado['detalles']['dias'][-1]['semana_provisional'])
+
     def test_calculo_con_registros(self):
         from gestion_mantenimiento.users.nomina import calcular_periodo
 
@@ -571,6 +680,7 @@ class DashboardTecnicoTests(TestCase):
         self.client.session['tipo_cuenta'] = 'tecnico'
         self.client.session.save()
 
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2000-01-01')
     def test_dashboard_muestra_resumen_semanal(self):
         RegistroAsistencia.objects.create(
             usuario=self.user,
@@ -583,7 +693,7 @@ class DashboardTecnicoTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('horas_semana', response.context)
-        self.assertGreaterEqual(response.context['horas_semana'], 4)
+        self.assertEqual(response.context['horas_semana'], Decimal('3.50'))
         self.assertContains(response, 'Esta semana')
 
     def test_dashboard_muestra_historial_asistencia(self):
@@ -651,13 +761,29 @@ class ReportesNominaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Reportes de Nómina')
         self.assertContains(response, 'Exportar a Excel')
+        self.assertContains(response, 'Novedades diarias')
         self.assertEqual(response.context['fecha_inicio'], date(2026, 10, 1))
         self.assertEqual(response.context['fecha_fin'], date(2026, 10, 31))
 
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
     def test_export_excel_devuelve_workbook_valido(self):
+        tecnico = get_user_model().objects.create_user(
+            username='tecnico-excel-novedades',
+            password='test-password',
+        )
+        tecnico.groups.add(Group.objects.get_or_create(name='Tecnico')[0])
+        fecha = date(2026, 10, 29)
+        entrada = timezone.make_aware(datetime.combine(fecha, datetime.min.time().replace(hour=8)))
+        RegistroAsistencia.objects.create(
+            usuario=tecnico,
+            fecha=fecha,
+            hora_entrada=entrada,
+            hora_salida=entrada + timedelta(hours=8),
+        )
+
         response = self.client.get(
             reverse('nomina_reporte_export_excel'),
-            {'desde': '2026-10-01', 'hasta': '2026-10-31'},
+            {'desde': '2026-10-29', 'hasta': '2026-10-31'},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -667,6 +793,16 @@ class ReportesNominaTests(TestCase):
         )
         self.assertTrue(response.content.startswith(b'PK\x03\x04'))
         self.assertIn('Content-Disposition', response)
+
+        from io import BytesIO
+        from openpyxl import load_workbook
+
+        workbook = load_workbook(BytesIO(response.content), data_only=True)
+        self.assertEqual(workbook.sheetnames, ['Nómina', 'Novedades diarias'])
+        self.assertEqual(workbook['Nómina']['C4'].value, 7.5)
+        self.assertEqual(workbook['Nómina']['E4'].value, 0)
+        self.assertEqual(workbook['Novedades diarias']['C2'].value, 7.5)
+        self.assertEqual(workbook['Novedades diarias']['F2'].value, 'Sí')
 
 
 class RegenerarRecibosTests(TestCase):

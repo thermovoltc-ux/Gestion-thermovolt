@@ -64,7 +64,6 @@ class ConfiguracionPagoForm(forms.ModelForm):
             'recargo_nocturno_porcentaje',
             'recargo_festivo_porcentaje',
             'horas_semana_estandar',
-            'dia_pico_placa',
             'activo',
         ]
         widgets = {
@@ -76,7 +75,6 @@ class ConfiguracionPagoForm(forms.ModelForm):
             'recargo_nocturno_porcentaje': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'recargo_festivo_porcentaje': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'horas_semana_estandar': forms.NumberInput(attrs={'class': 'form-control'}),
-            'dia_pico_placa': forms.Select(attrs={'class': 'form-control'}),
         }
 
 
@@ -96,6 +94,18 @@ class DescuentoForm(forms.ModelForm):
 
 
 class CalendarioTecnicoForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['tipo'].choices = [
+            choice
+            for choice in self.fields['tipo'].choices
+            if choice[0] != 'pico_placa'
+        ]
+        if self.instance.pk and self.instance.tipo == 'pico_placa':
+            self.fields['tipo'].choices.append(
+                ('pico_placa', 'Pico y placa (histórico)')
+            )
+
     class Meta:
         model = CalendarioTecnico
         fields = [

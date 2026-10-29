@@ -96,8 +96,13 @@ class RegistroAsistencia(models.Model):
 
     def calcular_horas(self):
         if self.hora_entrada and self.hora_salida:
-            delta = self.hora_salida - self.hora_entrada
-            return round(Decimal(delta.total_seconds()) / Decimal(3600), 2)
+            from .nomina import calcular_horas_efectivas
+
+            return calcular_horas_efectivas(
+                self.fecha,
+                self.hora_entrada,
+                self.hora_salida,
+            )
         return None
 
     def save(self, *args, **kwargs):

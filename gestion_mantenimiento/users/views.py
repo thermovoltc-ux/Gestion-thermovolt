@@ -499,18 +499,13 @@ def nomina_calendario_form(request, dia_id=None):
 @_requiere_admin
 def nomina_supervisor(request):
     """Calcula la nómina del período para todos los técnicos."""
-    from .nomina import calcular_periodo
+    from .nomina import calcular_periodo, ultimo_corte_cerrado
 
     tipo_periodo = request.GET.get('periodo', 'quincenal')
     hoy = date.today()
 
     if tipo_periodo == 'quincenal':
-        if hoy.day <= 15:
-            fecha_inicio = hoy.replace(day=1)
-            fecha_fin = hoy.replace(day=15)
-        else:
-            fecha_inicio = hoy.replace(day=16)
-            fecha_fin = hoy.replace(day=monthrange(hoy.year, hoy.month)[1])
+        fecha_inicio, fecha_fin = ultimo_corte_cerrado(hoy)
     elif tipo_periodo == 'mensual':
         fecha_inicio = hoy.replace(day=1)
         fecha_fin = hoy.replace(day=monthrange(hoy.year, hoy.month)[1])
@@ -639,7 +634,13 @@ def _calcular_filas_reportes(fecha_inicio, fecha_fin, tecnico_id=''):
                 'usuario': tecnico,
                 'dias': calculo['dias_trabajados'],
                 'horas': calculo['horas_normales'],
+                'horas_efectivas': calculo['horas_efectivas'],
                 'extras': calculo['horas_extras'],
+                'detalles_dias': calculo['detalles']['dias'],
+                'semana_provisional': any(
+                    dia['semana_provisional']
+                    for dia in calculo['detalles']['dias']
+                ),
                 'bruto': calculo['bruto'],
                 'descuentos': calculo['total_descuentos'],
                 'neto': calculo['neto'],
@@ -653,21 +654,20 @@ def _calcular_filas_reportes(fecha_inicio, fecha_fin, tecnico_id=''):
 @_requiere_admin
 def nomina_reportes(request):
     """Muestra un reporte consolidado de nómina con filtros de período y técnico."""
+    from .nomina import rango_quincena, ultimo_corte_cerrado
+
     hoy = date.today()
     tipo_periodo = request.GET.get('periodo', 'quincenal')
 
     if tipo_periodo == 'q1':
-        fecha_inicio = hoy.replace(day=1)
-        fecha_fin = hoy.replace(day=15)
+        fecha_inicio, fecha_fin = rango_quincena(hoy, 'q1')
     elif tipo_periodo == 'q2':
-        fecha_inicio = hoy.replace(day=16)
-        fecha_fin = hoy.replace(day=monthrange(hoy.year, hoy.month)[1])
+        fecha_inicio, fecha_fin = rango_quincena(hoy, 'q2')
     elif tipo_periodo == 'mensual':
         fecha_inicio = hoy.replace(day=1)
         fecha_fin = hoy.replace(day=monthrange(hoy.year, hoy.month)[1])
     else:
-        fecha_inicio = hoy.replace(day=1)
-        fecha_fin = hoy.replace(day=15) if hoy.day <= 15 else hoy
+        fecha_inicio, fecha_fin = ultimo_corte_cerrado(hoy)
 
     if request.GET.get('desde'):
         fecha_inicio = date.fromisoformat(request.GET['desde'])
@@ -738,12 +738,22 @@ def nomina_reporte_export_excel(request):
         bottom=Side(style='thin'),
     )
 
-    ws.merge_cells('A1:G1')
+    ws.merge_cells('A1:I1')
     ws['A1'] = f"Reporte de Nómina - {fecha_inicio.strftime('%d/%m/%Y')} al {fecha_fin.strftime('%d/%m/%Y')}"
     ws['A1'].font = Font(bold=True, size=14, color='1E293B')
     ws['A1'].alignment = Alignment(horizontal='center')
 
-    headers = ['Técnico', 'Días', 'Horas Normales', 'Horas Extras', 'Bruto', 'Descuentos', 'Neto']
+    headers = [
+        'Técnico',
+        'Días',
+        'Horas Efectivas',
+        'Horas Normales',
+        'Horas Extras',
+        'Semana Provisional',
+        'Bruto',
+        'Descuentos',
+        'Neto',
+    ]
     for column, header in enumerate(headers, 1):
         cell = ws.cell(row=3, column=column, value=header)
         cell.font = header_font
@@ -755,18 +765,32 @@ def nomina_reporte_export_excel(request):
     total_bruto = Decimal('0.00')
     total_descuentos = Decimal('0.00')
     total_neto = Decimal('0.00')
+    total_efectivas = Decimal('0.00')
+    total_normales = Decimal('0.00')
+    total_extras = Decimal('0.00')
     for fila in filas:
         if 'error' in fila:
             continue
         tecnico = fila['usuario']
         ws.cell(row=row, column=1, value=tecnico.username).border = border
         ws.cell(row=row, column=2, value=fila['dias']).border = border
-        ws.cell(row=row, column=3, value=float(fila['horas'])).border = border
-        ws.cell(row=row, column=4, value=float(fila['extras'])).border = border
         for column, value in (
-            (5, float(fila['bruto'])),
-            (6, float(fila['descuentos'])),
-            (7, float(fila['neto'])),
+            (3, fila['horas_efectivas']),
+            (4, fila['horas']),
+            (5, fila['extras']),
+        ):
+            cell = ws.cell(row=row, column=column, value=float(value))
+            cell.number_format = '0.00'
+            cell.border = border
+        ws.cell(
+            row=row,
+            column=6,
+            value='Sí' if fila['semana_provisional'] else 'No',
+        ).border = border
+        for column, value in (
+            (7, float(fila['bruto'])),
+            (8, float(fila['descuentos'])),
+            (9, float(fila['neto'])),
         ):
             cell = ws.cell(row=row, column=column, value=value)
             cell.number_format = '$#,##0.00'
@@ -774,13 +798,60 @@ def nomina_reporte_export_excel(request):
         total_bruto += fila['bruto']
         total_descuentos += fila['descuentos']
         total_neto += fila['neto']
+        total_efectivas += fila['horas_efectivas']
+        total_normales += fila['horas']
+        total_extras += fila['extras']
         row += 1
 
     ws.cell(row=row, column=1, value='TOTALES').font = Font(bold=True)
-    for column, value in ((5, total_bruto), (6, total_descuentos), (7, total_neto)):
+    for column, value in (
+        (3, total_efectivas),
+        (4, total_normales),
+        (5, total_extras),
+    ):
+        cell = ws.cell(row=row, column=column, value=float(value))
+        cell.number_format = '0.00'
+        cell.font = Font(bold=True, color='065F46')
+    for column, value in ((7, total_bruto), (8, total_descuentos), (9, total_neto)):
         cell = ws.cell(row=row, column=column, value=float(value))
         cell.number_format = '$#,##0.00'
         cell.font = Font(bold=True, color='065F46')
+
+    ws_novedades = wb.create_sheet('Novedades diarias')
+    novedades_headers = [
+        'Técnico',
+        'Fecha',
+        'Horas Efectivas',
+        'Horas Normales',
+        'Horas Extras',
+        'Semana Provisional',
+    ]
+    for column, header in enumerate(novedades_headers, 1):
+        cell = ws_novedades.cell(row=1, column=column, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = border
+
+    daily_row = 2
+    for fila in filas:
+        if 'error' in fila:
+            continue
+        for dia in fila['detalles_dias']:
+            values = (
+                fila['usuario'].username,
+                dia['fecha'],
+                dia['horas'],
+                dia['horas_normales'],
+                dia['horas_extras'],
+                'Sí' if dia['semana_provisional'] else 'No',
+            )
+            for column, value in enumerate(values, 1):
+                cell = ws_novedades.cell(row=daily_row, column=column, value=value)
+                cell.border = border
+                if column in (3, 4, 5):
+                    cell.number_format = '0.00'
+            daily_row += 1
 
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

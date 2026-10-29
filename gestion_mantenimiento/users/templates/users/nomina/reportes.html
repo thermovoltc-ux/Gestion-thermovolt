@@ -15,7 +15,7 @@
             <div>
                 <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Tipo de período</label>
                 <select name="periodo" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
-                    <option value="quincenal" {% if tipo_periodo == 'quincenal' %}selected{% endif %}>Quincenal actual</option>
+                    <option value="quincenal" {% if tipo_periodo == 'quincenal' %}selected{% endif %}>Último corte cerrado</option>
                     <option value="q1" {% if tipo_periodo == 'q1' %}selected{% endif %}>Primera quincena</option>
                     <option value="q2" {% if tipo_periodo == 'q2' %}selected{% endif %}>Segunda quincena</option>
                     <option value="mensual" {% if tipo_periodo == 'mensual' %}selected{% endif %}>Mensual</option>
@@ -76,8 +76,10 @@
                 <tr style="background: #f1f5f9;">
                     <th style="padding: 12px; text-align: left;">Técnico</th>
                     <th style="padding: 12px; text-align: center;">Días</th>
-                    <th style="padding: 12px; text-align: right;">Horas</th>
+                    <th style="padding: 12px; text-align: right;">Horas efectivas</th>
+                    <th style="padding: 12px; text-align: right;">Normales</th>
                     <th style="padding: 12px; text-align: right;">Extras</th>
+                    <th style="padding: 12px; text-align: center;">Semana provisional</th>
                     <th style="padding: 12px; text-align: right;">Bruto</th>
                     <th style="padding: 12px; text-align: right;">Descuentos</th>
                     <th style="padding: 12px; text-align: right;">Neto</th>
@@ -88,18 +90,54 @@
                     <tr style="border-bottom: 1px solid #e2e8f0;">
                         <td style="padding: 12px; font-weight: 600;">{{ fila.usuario.username }}</td>
                         {% if fila.error %}
-                            <td colspan="6" style="padding: 12px; text-align: center; color: #dc3545;">⚠️ {{ fila.error }}</td>
+                            <td colspan="8" style="padding: 12px; text-align: center; color: #dc3545;">⚠️ {{ fila.error }}</td>
                         {% else %}
                             <td style="padding: 12px; text-align: center;">{{ fila.dias }}</td>
+                            <td style="padding: 12px; text-align: right;">{{ fila.horas_efectivas }}</td>
                             <td style="padding: 12px; text-align: right;">{{ fila.horas }}</td>
                             <td style="padding: 12px; text-align: right;">{{ fila.extras }}</td>
+                            <td style="padding: 12px; text-align: center;">{% if fila.semana_provisional %}Sí{% else %}No{% endif %}</td>
                             <td style="padding: 12px; text-align: right;">${{ fila.bruto }}</td>
                             <td style="padding: 12px; text-align: right; color: #dc3545;">-${{ fila.descuentos }}</td>
                             <td style="padding: 12px; text-align: right; font-weight: 700; color: #059669;">${{ fila.neto }}</td>
                         {% endif %}
                     </tr>
                 {% empty %}
-                    <tr><td colspan="7" style="padding: 24px; text-align: center; color: #94a3b8;">No hay resultados para este período.</td></tr>
+                    <tr><td colspan="9" style="padding: 24px; text-align: center; color: #94a3b8;">No hay resultados para este período.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h2 style="margin: 28px 0 12px;">Novedades diarias</h2>
+    <div style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f1f5f9;">
+                    <th style="padding: 12px; text-align: left;">Técnico</th>
+                    <th style="padding: 12px; text-align: center;">Fecha</th>
+                    <th style="padding: 12px; text-align: right;">Horas efectivas</th>
+                    <th style="padding: 12px; text-align: right;">Normales</th>
+                    <th style="padding: 12px; text-align: right;">Extras</th>
+                    <th style="padding: 12px; text-align: center;">Semana provisional</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in filas %}
+                    {% if not fila.error %}
+                        {% for dia in fila.detalles_dias %}
+                            <tr style="border-bottom: 1px solid #e2e8f0;">
+                                <td style="padding: 12px;">{{ fila.usuario.username }}</td>
+                                <td style="padding: 12px; text-align: center;">{{ dia.fecha }}</td>
+                                <td style="padding: 12px; text-align: right;">{{ dia.horas }}</td>
+                                <td style="padding: 12px; text-align: right;">{{ dia.horas_normales }}</td>
+                                <td style="padding: 12px; text-align: right;">{{ dia.horas_extras }}</td>
+                                <td style="padding: 12px; text-align: center;">{% if dia.semana_provisional %}Sí{% else %}No{% endif %}</td>
+                            </tr>
+                        {% endfor %}
+                    {% endif %}
+                {% empty %}
+                    <tr><td colspan="6" style="padding: 24px; text-align: center; color: #94a3b8;">No hay novedades para este período.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

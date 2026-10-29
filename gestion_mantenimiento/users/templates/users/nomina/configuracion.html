@@ -14,7 +14,6 @@
                 <th style="padding: 12px; text-align: left;">Tipo</th>
                 <th style="padding: 12px; text-align: right;">Valor Día</th>
                 <th style="padding: 12px; text-align: right;">Salario Mes</th>
-                <th style="padding: 12px; text-align: center;">Pico y Placa</th>
                 <th style="padding: 12px; text-align: center;">Acciones</th>
             </tr></thead>
             <tbody>
@@ -24,10 +23,9 @@
                     <td style="padding: 12px;">{% if item.config %}{{ item.config.get_tipo_pago_display }}{% else %}<em style="color: #94a3b8;">Sin configurar</em>{% endif %}</td>
                     <td style="padding: 12px; text-align: right;">{% if item.config and item.config.valor_dia %}${{ item.config.valor_dia }}{% else %}—{% endif %}</td>
                     <td style="padding: 12px; text-align: right;">{% if item.config and item.config.salario_mensual %}${{ item.config.salario_mensual }}{% else %}—{% endif %}</td>
-                    <td style="padding: 12px; text-align: center;">{% if item.config and item.config.dia_pico_placa is not None %}{{ item.config.get_dia_pico_placa_display }}{% else %}—{% endif %}</td>
                     <td style="padding: 12px; text-align: center;"><a href="{% url 'nomina_configurar_tecnico' item.usuario.id %}" style="background: #3b82f6; color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 13px;">⚙️ Configurar</a></td>
                 </tr>
-                {% empty %}<tr><td colspan="6" style="padding: 24px; text-align: center; color: #94a3b8;">No hay técnicos registrados.</td></tr>{% endfor %}
+                {% empty %}<tr><td colspan="5" style="padding: 24px; text-align: center; color: #94a3b8;">No hay técnicos registrados.</td></tr>{% endfor %}
             </tbody>
         </table>
     </div>

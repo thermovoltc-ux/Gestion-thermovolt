@@ -69,6 +69,12 @@ CSRF_TRUSTED_ORIGINS = [
 
 SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
 
+# The effective-hours rule applies only to attendance dated on or after this day.
+NOMINA_FECHA_VIGENCIA_ALMUERZO = os.environ.get(
+    'NOMINA_FECHA_VIGENCIA_ALMUERZO',
+    '2026-10-29',
+)
+
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SAMESITE = 'Lax'
@@ -397,7 +403,6 @@ LOGGING = {
         },
     },
 }
-
 
 
 
