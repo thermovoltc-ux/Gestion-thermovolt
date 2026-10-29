@@ -41,7 +41,7 @@
     .profit-chart-box { position: relative; height: 300px; }
     .profit-chart-fallback { display: none; padding: 28px 12px; color: #64748b; text-align: center; }
     .profit-table-wrap { overflow: auto; }
-    .profit-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1050px; }
+    .profit-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1200px; }
     .profit-table th, .profit-table td { padding: 12px 14px; border-bottom: 1px solid #eef2f7; text-align: right; white-space: nowrap; }
     .profit-table th { position: sticky; top: 0; z-index: 1; background: #f8fafc; color: #475569; font-size: 11px; font-weight: 800; letter-spacing: .055em; text-transform: uppercase; }
     .profit-table tbody tr { transition: background .12s ease; }
@@ -65,6 +65,10 @@
     .profit-margin-mid { background: #fef3c7; color: #92400e; }
     .profit-margin-low { background: #fee2e2; color: #991b1b; }
     .profit-action { display: inline-block; border: 0; border-radius: 7px; padding: 8px 12px; background: #2563eb; color: #fff; font-weight: 700; text-decoration: none; cursor: pointer; transition: background .15s ease, transform .15s ease; }
+    .profit-invoice-status { display: inline-block; padding: 5px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; }
+    .profit-invoice-status-pending { background: #fef3c7; color: #92400e; }
+    .profit-invoice-status-done { background: #dcfce7; color: #166534; }
+    .profit-invoice-status-warning { background: #fee2e2; color: #991b1b; }
     .invoice-modal[hidden] { display: none; }
     .invoice-modal { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 20px; background: rgba(15, 23, 42, .65); }
     .invoice-document { width: min(900px, 100%); max-height: 90vh; overflow: auto; padding: 36px; background: #fff; color: #1e293b; border-radius: 12px; box-shadow: 0 20px 60px rgba(0, 0, 0, .25); }
@@ -223,6 +227,7 @@
                 <tr>
                     <th>Fecha</th>
                     <th>OT</th>
+                    <th>Estado factura</th>
                     <th>Técnico</th>
                     <th>Cliente</th>
                     <th>Ingreso materiales</th>
@@ -240,6 +245,15 @@
                     <tr>
                         <td>{{ fila.fecha|date:"d/m/Y" }}</td>
                         <td><span class="profit-ot-number">OT-{{ fila.ot.solicitud.consecutivo }}</span></td>
+                        <td>
+                            {% if fila.factura_dian_subida %}
+                                <span class="profit-invoice-status profit-invoice-status-done">Facturada</span>
+                            {% elif fila.estado_facturacion == 'facturada' %}
+                                <span class="profit-invoice-status profit-invoice-status-warning">Revisar factura</span>
+                            {% else %}
+                                <span class="profit-invoice-status profit-invoice-status-pending">Prefactura</span>
+                            {% endif %}
+                        </td>
                         <td class="profit-name">{{ fila.ot.tecnico_display|default:fila.ot.tecnico_asignado }}</td>
                         <td>{{ fila.ot.solicitud.ubicacion_nombre|default:"—" }}</td>
                         <td>$ {{ fila.ingreso_materiales|intcomma }}</td>
@@ -254,10 +268,22 @@
                             <td class="profit-pending">Pendiente</td>
                             <td class="profit-pending" colspan="2">{{ fila.motivo_sin_calculo }}</td>
                         {% endif %}
-                        <td><button type="button" class="profit-action btn-ver-factura" data-factura-url="{% url 'detalle_factura_ot' fila.ot.pk %}">Ver Factura</button></td>
+                        <td>
+                            <button
+                                type="button"
+                                class="profit-action btn-ver-factura"
+                                data-factura-url="{% url 'detalle_factura_ot' fila.ot.pk %}"
+                                data-subir-url="{% url 'subir_factura_dian' fila.ot.pk %}"
+                                data-descargar-url="{% url 'descargar_factura_dian' fila.ot.pk %}"
+                                data-factura-dian-subida="{% if fila.factura_dian_subida %}true{% else %}false{% endif %}"
+                            >{% if fila.factura_dian_subida %}Ver detalle{% else %}Ver / Subir PDF DIAN{% endif %}</button>
+                            {% if fila.factura_dian_subida %}
+                                <a class="profit-action" href="{% url 'descargar_factura_dian' fila.ot.pk %}">Ver PDF</a>
+                            {% endif %}
+                        </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="12" class="profit-muted" style="text-align:center;">No hay OTs cerradas en este período.</td></tr>
+                    <tr><td colspan="13" class="profit-muted" style="text-align:center;">No hay OTs cerradas en este período.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -378,6 +404,20 @@ document.addEventListener('DOMContentLoaded', function () {
             <p><strong>Impuestos (no aplicados)</strong><span id="factura-impuestos"></span></p>
             <p class="invoice-grand-total"><strong>Total a pagar</strong><strong id="factura-total"></strong></p>
         </section>
+        <section class="invoice-upload" id="factura-dian-upload-section" hidden>
+            <h3>Factura electrónica DIAN</h3>
+            <p id="factura-dian-already-uploaded" hidden>
+                Esta OT ya ha sido facturada.
+                <a id="factura-dian-download-link" href="#">Descargar PDF DIAN</a>
+            </p>
+            <form id="factura-dian-upload-form" hidden>
+                {% csrf_token %}
+                <label for="factura-dian-file">Adjuntar PDF de la factura DIAN (máximo 20 MB)</label>
+                <input id="factura-dian-file" name="factura_dian" type="file" accept=".pdf,application/pdf" required>
+                <button type="submit" class="profit-action">Guardar Factura DIAN</button>
+            </form>
+            <p id="factura-dian-upload-message" role="status" aria-live="polite" hidden></p>
+        </section>
         <footer class="invoice-actions">
             <button type="button" class="profit-action" id="factura-imprimir">Imprimir</button>
             <button type="button" class="profit-action" id="factura-cerrar">Cerrar</button>
@@ -389,6 +429,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('modal-factura');
     const lines = document.getElementById('factura-lineas');
     const message = document.getElementById('factura-mensaje');
+    const uploadSection = document.getElementById('factura-dian-upload-section');
+    const uploadForm = document.getElementById('factura-dian-upload-form');
+    const uploadInput = document.getElementById('factura-dian-file');
+    const uploadMessage = document.getElementById('factura-dian-upload-message');
+    const alreadyUploaded = document.getElementById('factura-dian-already-uploaded');
+    const downloadLink = document.getElementById('factura-dian-download-link');
     const money = value => '$ ' + Number(value || 0).toLocaleString('es-CO', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
@@ -412,6 +458,14 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.btn-ver-factura').forEach(function (button) {
         button.addEventListener('click', async function () {
             modal.hidden = false;
+            uploadSection.hidden = false;
+            uploadForm.action = button.dataset.subirUrl;
+            uploadForm.hidden = button.dataset.facturaDianSubida === 'true';
+            alreadyUploaded.hidden = !uploadForm.hidden;
+            downloadLink.href = button.dataset.descargarUrl;
+            uploadInput.value = '';
+            uploadMessage.hidden = true;
+            uploadMessage.textContent = '';
             message.hidden = false;
             message.textContent = 'Cargando detalle de factura…';
             lines.replaceChildren();
@@ -450,6 +504,40 @@ document.addEventListener('DOMContentLoaded', function () {
                 message.textContent = error.message;
             }
         });
+    });
+
+    uploadForm.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        if (!uploadInput.files.length) {
+            uploadMessage.hidden = false;
+            uploadMessage.textContent = 'Seleccioná el PDF de la factura DIAN.';
+            return;
+        }
+
+        const submitButton = uploadForm.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        uploadMessage.hidden = false;
+        uploadMessage.textContent = 'Subiendo factura DIAN…';
+        try {
+            const response = await fetch(uploadForm.action, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRFToken': uploadForm.querySelector('[name="csrfmiddlewaretoken"]').value,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: new FormData(uploadForm),
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload.success) {
+                throw new Error(payload.error || 'No se pudo guardar la factura DIAN.');
+            }
+            uploadMessage.textContent = 'Factura DIAN guardada. Actualizando el estado…';
+            window.location.reload();
+        } catch (error) {
+            uploadMessage.textContent = error.message;
+            submitButton.disabled = false;
+        }
     });
 
     document.getElementById('factura-imprimir').addEventListener('click', function () {

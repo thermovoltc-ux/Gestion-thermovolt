@@ -1056,6 +1056,9 @@ class RentabilidadAdminTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['cantidad_calculable'], 1)
+        fila = response.context['filas'][0]
+        self.assertEqual(fila['estado_facturacion'], 'pendiente')
+        self.assertFalse(fila['factura_dian_subida'])
         self.assertEqual(response.context['totales']['ingreso_materiales'], Decimal('200.00'))
         self.assertEqual(response.context['totales']['valor_mano_obra'], Decimal('60.00'))
         self.assertEqual(response.context['totales']['ingresos'], Decimal('260.00'))
@@ -1080,6 +1083,197 @@ class RentabilidadAdminTests(TestCase):
         )
         self.assertContains(response, 'Ingreso total')
         self.assertContains(response, 'Mano de obra')
+
+    def test_rentabilidad_context_reports_uploaded_dian_invoice(self):
+        cierre = self.ot.cierreot
+        cierre.factura_dian_drive_id = 'private-drive-file-id'
+        cierre.estado_facturacion = 'facturada'
+        cierre.save(update_fields=[
+            'factura_dian_drive_id',
+            'estado_facturacion',
+        ])
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('rentabilidad_admin'))
+
+        self.assertEqual(response.status_code, 200)
+        fila = response.context['filas'][0]
+        self.assertEqual(fila['estado_facturacion'], 'facturada')
+        self.assertTrue(fila['factura_dian_subida'])
+        self.assertContains(response, 'Facturada')
+        self.assertContains(response, 'Ver PDF')
+        self.assertContains(
+            response,
+            reverse('descargar_factura_dian', args=[self.ot.pk]),
+        )
+
+    def test_rentabilidad_table_shows_invoice_status_and_actions(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('rentabilidad_admin'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Estado factura')
+        self.assertContains(response, 'Prefactura')
+        self.assertContains(response, 'Ver / Subir PDF DIAN')
+        self.assertContains(
+            response,
+            reverse('subir_factura_dian', args=[self.ot.pk]),
+        )
+
+    def test_upload_dian_invoice_saves_drive_id_and_marks_billed(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from gestion_mantenimiento.Gestion_ot import views
+
+        self.client.force_login(self.admin)
+        pdf = SimpleUploadedFile(
+            'factura.pdf',
+            b'%PDF-1.7\ncontenido de prueba',
+            content_type='application/pdf',
+        )
+
+        with patch.dict('os.environ', {'GOOGLE_DRIVE_FOLDER_ID': 'drive-folder-id'}):
+            with patch.object(
+                views,
+                'subir_pdf_privado_a_drive',
+                return_value={'drive_file_id': 'private-dian-file-id'},
+            ) as upload:
+                response = self.client.post(
+                    reverse('subir_factura_dian', args=[self.ot.pk]),
+                    {'factura_dian': pdf},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'success': True})
+        upload.assert_called_once_with(
+            b'%PDF-1.7\ncontenido de prueba',
+            f'factura-dian-ot-{self.ot.pk}.pdf',
+            folder_id='drive-folder-id',
+        )
+        self.ot.cierreot.refresh_from_db()
+        self.assertEqual(self.ot.cierreot.factura_dian_drive_id, 'private-dian-file-id')
+        self.assertEqual(self.ot.cierreot.estado_facturacion, 'facturada')
+
+    def test_upload_dian_invoice_rejects_non_pdf_content(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from gestion_mantenimiento.Gestion_ot import views
+
+        self.client.force_login(self.admin)
+        file_upload = SimpleUploadedFile(
+            'factura.pdf',
+            b'not a PDF',
+            content_type='application/pdf',
+        )
+
+        with patch.object(views, 'subir_pdf_privado_a_drive') as upload:
+            response = self.client.post(
+                reverse('subir_factura_dian', args=[self.ot.pk]),
+                {'factura_dian': file_upload},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('no parece ser un PDF válido', response.json()['error'])
+        upload.assert_not_called()
+        self.ot.cierreot.refresh_from_db()
+        self.assertEqual(self.ot.cierreot.estado_facturacion, 'pendiente')
+
+    def test_upload_dian_invoice_requires_configured_drive_folder(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from gestion_mantenimiento.Gestion_ot import views
+
+        self.client.force_login(self.admin)
+        file_upload = SimpleUploadedFile(
+            'factura.pdf',
+            b'%PDF-1.7\ncontenido de prueba',
+            content_type='application/pdf',
+        )
+
+        with patch.dict('os.environ', {'GOOGLE_DRIVE_FOLDER_ID': ''}):
+            response = self.client.post(
+                reverse('subir_factura_dian', args=[self.ot.pk]),
+                {'factura_dian': file_upload},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.ot.cierreot.refresh_from_db()
+        self.assertEqual(self.ot.cierreot.estado_facturacion, 'pendiente')
+
+    def test_upload_dian_invoice_rejects_duplicate_upload(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from gestion_mantenimiento.Gestion_ot import views
+
+        cierre = self.ot.cierreot
+        cierre.factura_dian_drive_id = 'existing-private-file-id'
+        cierre.estado_facturacion = 'facturada'
+        cierre.save(update_fields=['factura_dian_drive_id', 'estado_facturacion'])
+        self.client.force_login(self.admin)
+        file_upload = SimpleUploadedFile(
+            'factura.pdf',
+            b'%PDF-1.7\ncontenido de prueba',
+            content_type='application/pdf',
+        )
+
+        with patch.object(views, 'subir_pdf_privado_a_drive') as upload:
+            response = self.client.post(
+                reverse('subir_factura_dian', args=[self.ot.pk]),
+                {'factura_dian': file_upload},
+            )
+
+        self.assertEqual(response.status_code, 409)
+        upload.assert_not_called()
+
+    def test_invoice_dian_download_is_private_and_streamed(self):
+        from gestion_mantenimiento.Gestion_ot import views
+
+        cierre = self.ot.cierreot
+        cierre.factura_dian_drive_id = 'private-dian-file-id'
+        cierre.estado_facturacion = 'facturada'
+        cierre.save(update_fields=['factura_dian_drive_id', 'estado_facturacion'])
+        self.client.force_login(self.admin)
+
+        with patch.object(
+            views,
+            'iterar_archivo_privado_drive',
+            return_value=iter([b'%PDF-1.7\nprivate content']),
+        ) as download:
+            response = self.client.get(
+                reverse('descargar_factura_dian', args=[self.ot.pk])
+            )
+            content = b''.join(response.streaming_content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(content, b'%PDF-1.7\nprivate content')
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertEqual(response['Cache-Control'], 'private, no-store')
+        download.assert_called_once_with('private-dian-file-id')
+
+    def test_technician_cannot_upload_or_download_dian_invoice(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from gestion_mantenimiento.Gestion_ot import views
+
+        cierre = self.ot.cierreot
+        cierre.factura_dian_drive_id = 'private-dian-file-id'
+        cierre.estado_facturacion = 'facturada'
+        cierre.save(update_fields=['factura_dian_drive_id', 'estado_facturacion'])
+        self.client.force_login(self.tecnico)
+        file_upload = SimpleUploadedFile(
+            'factura.pdf',
+            b'%PDF-1.7\ncontenido de prueba',
+            content_type='application/pdf',
+        )
+
+        with patch.object(views, 'subir_pdf_privado_a_drive') as upload:
+            response = self.client.post(
+                reverse('subir_factura_dian', args=[self.ot.pk]),
+                {'factura_dian': file_upload},
+            )
+
+        self.assertEqual(response.status_code, 403)
+        upload.assert_not_called()
+        response = self.client.get(
+            reverse('descargar_factura_dian', args=[self.ot.pk])
+        )
+        self.assertEqual(response.status_code, 404)
 
     def test_invoice_detail_includes_items_and_reconciles_to_rentabilidad_total(self):
         servicio_material = Material.objects.create(
@@ -1348,7 +1542,27 @@ class RentabilidadAdminTests(TestCase):
         self.assertEqual(material_ot.costo_real, Decimal('70000.00'))
         self.assertEqual(material_ot.precio_venta_aplicado, Decimal('70000.00'))
 
-    def test_admin_billing_post_without_manual_labor_preserves_existing_total(self):
+    def test_admin_cannot_mark_invoice_without_dian_pdf(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('gestionar_ot_admin', args=[self.ot.pk]),
+            {'estado_facturacion': 'facturada'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context['form'],
+            'estado_facturacion',
+            'No se puede marcar como Facturada sin adjuntar el PDF de la DIAN.',
+        )
+        self.ot.cierreot.refresh_from_db()
+        self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('60.00'))
+        self.assertEqual(self.ot.cierreot.estado_facturacion, 'pendiente')
+
+    def test_admin_can_mark_invoice_when_dian_pdf_is_already_attached(self):
+        self.ot.cierreot.factura_dian_drive_id = 'private-drive-file-id'
+        self.ot.cierreot.save(update_fields=['factura_dian_drive_id'])
         self.client.force_login(self.admin)
 
         response = self.client.post(
@@ -1358,7 +1572,6 @@ class RentabilidadAdminTests(TestCase):
 
         self.assertRedirects(response, reverse('gestionar_ot_admin', args=[self.ot.pk]))
         self.ot.cierreot.refresh_from_db()
-        self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('60.00'))
         self.assertEqual(self.ot.cierreot.estado_facturacion, 'facturada')
 
     def test_billing_ajax_without_manual_labor_preserves_existing_total(self):
@@ -1370,10 +1583,14 @@ class RentabilidadAdminTests(TestCase):
             HTTP_X_REQUESTED_WITH='XMLHttpRequest',
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['mano_obra'], '60.00')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(
+            'No se puede marcar como Facturada sin adjuntar el PDF de la DIAN.',
+            str(response.json()['errors']['estado_facturacion'][0]['message']),
+        )
         self.ot.cierreot.refresh_from_db()
         self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('60.00'))
+        self.assertEqual(self.ot.cierreot.estado_facturacion, 'pendiente')
 
 
     def test_technician_cannot_access_admin_management_or_update_materials(self):
@@ -1426,7 +1643,7 @@ class RentabilidadAdminTests(TestCase):
                 'valor_mano_obra': '500000.00',
                 # Legacy/tampered submissions must not mutate the operational state.
                 'estado': self.estado_revision.pk,
-                'estado_facturacion': 'facturada',
+                'estado_facturacion': 'pendiente',
             },
             HTTP_X_REQUESTED_WITH='XMLHttpRequest',
         )
@@ -1438,12 +1655,12 @@ class RentabilidadAdminTests(TestCase):
         self.assertEqual(response.json()['costo_nomina'], '200.00')
         self.assertEqual(response.json()['ganancia'], '499900.00')
         self.assertEqual(response.json()['margen'], '99.94')
-        self.assertEqual(response.json()['estado_facturacion'], 'facturada')
+        self.assertEqual(response.json()['estado_facturacion'], 'pendiente')
         self.ot.refresh_from_db()
         self.assertEqual(self.ot.estado, self.estado)
         self.ot.cierreot.refresh_from_db()
         self.assertEqual(self.ot.cierreot.valor_mano_obra, Decimal('500000.00'))
-        self.assertEqual(self.ot.cierreot.estado_facturacion, 'facturada')
+        self.assertEqual(self.ot.cierreot.estado_facturacion, 'pendiente')
 
     def test_admin_can_add_material_to_finalized_order_and_financials_update(self):
         self.assertEqual(self.ot.estado.nombre, 'finalizada')
@@ -1721,10 +1938,14 @@ class RentabilidadAdminTests(TestCase):
             response,
             reverse('gestionar_ot_admin', args=[self.ot.pk]),
         )
-        self.assertContains(response, 'Pendiente de facturar')
+        self.assertContains(response, 'Prefactura')
 
+        self.ot.cierreot.factura_dian_drive_id = 'private-drive-file-id'
         self.ot.cierreot.estado_facturacion = 'facturada'
-        self.ot.cierreot.save(update_fields=['estado_facturacion'])
+        self.ot.cierreot.save(update_fields=[
+            'factura_dian_drive_id',
+            'estado_facturacion',
+        ])
         response = self.client.get(reverse('facturacion_admin'))
         self.assertNotContains(
             response,

@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, FileResponse, Http404, StreamingHttpResponse, HttpResponseBadRequest
 from django.views.decorators.http import require_GET, require_POST
+from django.core.exceptions import ValidationError
 import json
 import mimetypes
 from decimal import Decimal, ROUND_HALF_UP
@@ -1688,6 +1689,8 @@ def rentabilidad_admin(request):
         filas.append({
             'ot': ot,
             'fecha': cierre.fecha_inicio_actividad,
+            'estado_facturacion': cierre.estado_facturacion,
+            'factura_dian_subida': bool(cierre.factura_dian_drive_id),
             'ingreso_materiales': ingreso_materiales,
             'valor_mano_obra': valor_mano_obra,
             'ingreso_total': ingreso_total,
@@ -1910,6 +1913,120 @@ def detalle_factura_ot(request, ot_id):
             'total': str(subtotal),
         },
     })
+
+
+@login_required
+@require_POST
+def subir_factura_dian(request, ot_id):
+    if not _es_admin_rentabilidad(request.user):
+        return JsonResponse(
+            {'success': False, 'error': 'No tenés permiso para cargar facturas DIAN.'},
+            status=403,
+        )
+
+    cierre = get_object_or_404(
+        CierreOt.objects.select_related('orden_trabajo'),
+        orden_trabajo_id=ot_id,
+    )
+    ot = cierre.orden_trabajo
+    if cierre.factura_dian_drive_id:
+        return JsonResponse(
+            {'success': False, 'error': 'Esta OT ya tiene una factura DIAN cargada.'},
+            status=409,
+        )
+
+    uploaded_file = request.FILES.get('factura_dian')
+    if uploaded_file is None:
+        return JsonResponse(
+            {'success': False, 'error': 'Seleccioná el PDF de la factura DIAN.'},
+            status=400,
+        )
+
+    max_size_bytes = 20 * 1024 * 1024
+    if uploaded_file.size > max_size_bytes:
+        return JsonResponse(
+            {'success': False, 'error': 'El PDF no puede superar los 20 MB.'},
+            status=400,
+        )
+
+    pdf_bytes = uploaded_file.read(max_size_bytes + 1)
+    if len(pdf_bytes) > max_size_bytes:
+        return JsonResponse(
+            {'success': False, 'error': 'El PDF no puede superar los 20 MB.'},
+            status=400,
+        )
+    if not pdf_bytes.startswith(b'%PDF-'):
+        return JsonResponse(
+            {'success': False, 'error': 'El archivo seleccionado no parece ser un PDF válido.'},
+            status=400,
+        )
+
+    drive_folder_id = os.environ.get('GOOGLE_DRIVE_FOLDER_ID', '').strip()
+    if not drive_folder_id:
+        return JsonResponse(
+            {'success': False, 'error': 'El almacenamiento de facturas no está configurado.'},
+            status=503,
+        )
+
+    filename = f'factura-dian-ot-{ot.pk}.pdf'
+    try:
+        metadata = subir_pdf_privado_a_drive(
+            pdf_bytes,
+            filename,
+            folder_id=drive_folder_id,
+        )
+    except (HttpError, OSError, RuntimeError) as exc:
+        logger.exception('No se pudo subir la factura DIAN de la OT %s a Drive.', ot.pk)
+        return JsonResponse(
+            {'success': False, 'error': 'No se pudo guardar el PDF en Google Drive. Inténtalo nuevamente.'},
+            status=502,
+        )
+
+    drive_file_id = metadata.get('drive_file_id')
+    if not drive_file_id:
+        logger.error('Google Drive no devolvió un ID para la factura DIAN de la OT %s.', ot.pk)
+        return JsonResponse(
+            {'success': False, 'error': 'Google Drive no confirmó el almacenamiento del PDF.'},
+            status=502,
+        )
+
+    cierre.factura_dian_drive_id = drive_file_id
+    cierre.estado_facturacion = 'facturada'
+    try:
+        cierre.full_clean()
+        cierre.save(update_fields=['factura_dian_drive_id', 'estado_facturacion'])
+    except ValidationError as exc:
+        logger.exception('No se pudo guardar el estado de factura DIAN para la OT %s.', ot.pk)
+        return JsonResponse(
+            {'success': False, 'error': 'El PDF se subió, pero no se pudo actualizar el estado de facturación.'},
+            status=500,
+        )
+
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_GET
+def descargar_factura_dian(request, ot_id):
+    if not _es_admin_rentabilidad(request.user):
+        raise Http404('No tenés permiso para descargar esta factura.')
+
+    cierre = get_object_or_404(
+        CierreOt.objects.select_related('orden_trabajo'),
+        orden_trabajo_id=ot_id,
+    )
+    if not cierre.factura_dian_drive_id:
+        raise Http404('Esta OT no tiene una factura DIAN cargada.')
+
+    response = StreamingHttpResponse(
+        iterar_archivo_privado_drive(cierre.factura_dian_drive_id),
+        content_type='application/pdf',
+    )
+    response['Content-Disposition'] = f'attachment; filename="factura-dian-ot-{ot_id}.pdf"'
+    response['Cache-Control'] = 'private, no-store'
+    response['X-Content-Type-Options'] = 'nosniff'
+    response['X-Accel-Buffering'] = 'no'
+    return response
 
 
 # Vista para cerrar una OT

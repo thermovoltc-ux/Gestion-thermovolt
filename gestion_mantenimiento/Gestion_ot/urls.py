@@ -14,6 +14,16 @@ urlpatterns = [
         views.detalle_factura_ot,
         name='detalle_factura_ot',
     ),
+    path(
+        'rentabilidad/factura/<int:ot_id>/subir-dian/',
+        views.subir_factura_dian,
+        name='subir_factura_dian',
+    ),
+    path(
+        'rentabilidad/factura/<int:ot_id>/descargar-dian/',
+        views.descargar_factura_dian,
+        name='descargar_factura_dian',
+    ),
     path('facturacion/', views.facturacion_admin, name='facturacion_admin'),
     path('gestionar_ot/<int:ot_id>/', views.gestionar_ot_admin, name='gestionar_ot_admin'),
     path('gestionar_ot/<int:ot_id>/mano-obra/', views.actualizar_mano_obra, name='actualizar_mano_obra'),
