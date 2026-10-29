@@ -1247,6 +1247,24 @@ class RentabilidadAdminTests(TestCase):
             reverse('subir_factura_dian', args=[self.ot.pk]),
         )
 
+    def test_invoice_modal_has_conditional_upload_and_compact_metadata(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('rentabilidad_admin'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Factura de Venta')
+        self.assertContains(response, 'invoice-metadata')
+        self.assertContains(response, 'id="factura-cliente"')
+        self.assertContains(response, 'id="factura-tecnico"')
+        self.assertContains(response, 'id="factura-equipo"')
+        self.assertContains(response, 'invoice-dian-success')
+        self.assertContains(response, '✓ Esta OT ya ha sido facturada')
+        self.assertContains(response, 'Descargar PDF DIAN')
+        self.assertContains(response, 'Subir PDF y Marcar como Facturada')
+        self.assertNotContains(response, 'Factura electrónica DIAN')
+        self.assertNotContains(response, 'Guardar Factura DIAN')
+
     def test_upload_dian_invoice_saves_drive_id_and_marks_billed(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
         from gestion_mantenimiento.Gestion_ot import views

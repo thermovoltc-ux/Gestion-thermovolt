@@ -96,6 +96,18 @@
     .invoice-header { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; padding-bottom: 20px; border-bottom: 2px solid #1e293b; }
     .invoice-header h2 { grid-column: 1 / -1; margin: 0 0 8px; }
     .invoice-header p { margin: 0; }
+    .invoice-metadata { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 5px 12px; color: #475569; }
+    .invoice-upload { margin-top: 20px; }
+    .invoice-upload form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 14px; align-items: end; }
+    .invoice-upload form[hidden] { display: none; }
+    .invoice-upload label { grid-column: 1 / -1; font-weight: 700; }
+    .invoice-upload input { min-width: 0; }
+    .invoice-upload button { background: #15803d; }
+    .invoice-upload button:hover { background: #166534; }
+    .invoice-dian-success { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border: 1px solid #86efac; border-radius: 9px; background: #f0fdf4; color: #166534; font-weight: 700; }
+    .invoice-dian-success p { margin: 0; }
+    .invoice-dian-download { background: #2563eb; }
+    .invoice-dian-download:hover { background: #1d4ed8; }
     .invoice-description { padding: 18px 0; border-bottom: 1px solid #cbd5e1; }
     .invoice-table-wrap { overflow-x: auto; margin: 20px 0; }
     .invoice-table { width: 100%; border-collapse: collapse; }
@@ -386,10 +398,14 @@ document.addEventListener('DOMContentLoaded', function () {
         <header class="invoice-header">
             <h2 id="factura-titulo">Factura de Venta</h2>
             <p><strong>OT:</strong> <span id="factura-ot"></span></p>
-            <p><strong>Cliente:</strong> <span id="factura-cliente"></span></p>
-            <p><strong>Equipo:</strong> <span id="factura-equipo"></span></p>
-            <p><strong>Técnico:</strong> <span id="factura-tecnico"></span></p>
             <p><strong>Fecha:</strong> <span id="factura-fecha"></span></p>
+            <p class="invoice-metadata">
+                <span><strong>Cliente:</strong> <span id="factura-cliente"></span></span>
+                <span aria-hidden="true">|</span>
+                <span><strong>Técnico:</strong> <span id="factura-tecnico"></span></span>
+                <span aria-hidden="true">|</span>
+                <span><strong>Equipo:</strong> <span id="factura-equipo"></span></span>
+            </p>
         </header>
         <section class="invoice-description">
             <strong>Descripción del servicio</strong>
@@ -409,16 +425,15 @@ document.addEventListener('DOMContentLoaded', function () {
             <p class="invoice-grand-total"><strong>Total a pagar</strong><strong id="factura-total"></strong></p>
         </section>
         <section class="invoice-upload" id="factura-dian-upload-section" hidden>
-            <h3>Factura electrónica DIAN</h3>
-            <p id="factura-dian-already-uploaded" hidden>
-                Esta OT ya ha sido facturada.
-                <a id="factura-dian-download-link" href="#">Descargar PDF DIAN</a>
-            </p>
+            <div id="factura-dian-already-uploaded" class="invoice-dian-success" role="status" hidden>
+                <p>✓ Esta OT ya ha sido facturada</p>
+                <a id="factura-dian-download-link" class="profit-action invoice-dian-download" href="#">Descargar PDF DIAN</a>
+            </div>
             <form id="factura-dian-upload-form" hidden>
                 {% csrf_token %}
                 <label for="factura-dian-file">Adjuntar PDF de la factura DIAN (máximo 20 MB)</label>
                 <input id="factura-dian-file" name="factura_dian" type="file" accept=".pdf,application/pdf" required>
-                <button type="submit" class="profit-action">Guardar Factura DIAN</button>
+                <button type="submit" class="profit-action">Subir PDF y Marcar como Facturada</button>
             </form>
             <p id="factura-dian-upload-message" role="status" aria-live="polite" hidden></p>
         </section>
