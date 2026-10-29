@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 from django.contrib.auth.models import User
@@ -48,7 +49,7 @@ class OrdenTrabajo(models.Model):
 
 class CierreOt(models.Model):
     ESTADO_FACTURACION_CHOICES = [
-        ('pendiente', 'Pendiente de facturar'),
+        ('pendiente', 'Prefactura'),
         ('facturada', 'Facturada'),
     ]
 
@@ -59,6 +60,11 @@ class CierreOt(models.Model):
         choices=ESTADO_FACTURACION_CHOICES,
         default='pendiente',
         db_index=True,
+    )
+    factura_dian_drive_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
     )
     tipo_mantenimiento = models.CharField(max_length=255, null=True, blank=True)
     materiales_utilizados = models.TextField(null=True, blank=True)
@@ -84,6 +90,15 @@ class CierreOt(models.Model):
     tipo_intervencion = models.CharField(max_length=100, null=True, blank=True)
     firma_digital = models.TextField(null=True, blank=True)  # Firma como data URL (base64)
     se_soluciono = models.BooleanField(default=False)  # Si se solucionó la falla
+
+    def clean(self):
+        super().clean()
+        if self.estado_facturacion == 'facturada' and not self.factura_dian_drive_id:
+            raise ValidationError({
+                'estado_facturacion': (
+                    'No se puede marcar como Facturada sin adjuntar el PDF de la DIAN.'
+                )
+            })
 
     def __str__(self):
         return f"OT-{self.orden_trabajo.solicitud.consecutivo} - {self.nombre_tecnico} "
