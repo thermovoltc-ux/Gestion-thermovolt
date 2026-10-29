@@ -1111,7 +1111,7 @@ def facturacion_admin(request):
 
     ots = OrdenTrabajo.objects.filter(
         estado__nombre__in=['en revision', 'finalizada'],
-        cierreot__estado_facturacion='pendiente',
+        cierreot__estado_facturacion__in=['pendiente', 'sin_prefactura'],
     ).select_related(
         'estado',
         'solicitud__equipo',
