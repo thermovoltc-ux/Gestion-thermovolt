@@ -1084,6 +1084,75 @@ class RentabilidadAdminTests(TestCase):
         self.assertContains(response, 'Ingreso total')
         self.assertContains(response, 'Mano de obra')
 
+    def test_rentabilidad_groups_by_root_location_and_orders_newest_first(self):
+        raiz_duplicada = Ubicacion.objects.create(
+            nombre=self.ubicacion.nombre,
+            codigo='UBI-RENT-DUP',
+        )
+        sububicaciones = [
+            Ubicacion.objects.create(
+                nombre='Sucursal principal',
+                codigo='UBI-RENT-CHILD',
+                parent=self.ubicacion,
+            ),
+            Ubicacion.objects.create(
+                nombre='Sucursal duplicada',
+                codigo='UBI-RENT-DUP-CHILD',
+                parent=raiz_duplicada,
+            ),
+        ]
+        fecha_cierre = self.ot.cierreot.fecha_inicio_actividad
+
+        for indice, ubicacion in enumerate(sububicaciones, start=1):
+            equipo = Equipo.objects.create(
+                nombre=f'Equipo rentabilidad adicional {indice}',
+                codigo=f'EQ-RENT-ADD-{indice}',
+                ubicacion=ubicacion,
+            )
+            solicitud = Solicitud.objects.create(
+                creado_por=self.tecnico.username,
+                descripcion_problema='Prueba de agrupación por raíz',
+                equipo=equipo,
+                ubicacion=ubicacion,
+                estado=self.estado,
+            )
+            ot = OrdenTrabajo.objects.create(
+                solicitud=solicitud,
+                tecnico_asignado=self.tecnico.username,
+                estado=self.estado,
+            )
+            CierreOt.objects.create(
+                orden_trabajo=ot,
+                fecha_inicio_actividad=fecha_cierre,
+                hora_inicio=datetime.min.time().replace(hour=9),
+                hora_fin=datetime.min.time().replace(hour=11),
+                valor_mano_obra=Decimal('60.00'),
+            )
+
+        self.client.force_login(self.admin)
+        hoy = timezone.localdate().isoformat()
+        response = self.client.get(
+            reverse('rentabilidad_admin'),
+            {'desde': hoy, 'hasta': hoy},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        consecutivos = [
+            fila['ot'].solicitud.consecutivo
+            for fila in response.context['filas']
+        ]
+        self.assertEqual(consecutivos, sorted(consecutivos, reverse=True))
+        resumenes_cliente = response.context['por_cliente']
+        self.assertEqual(len(resumenes_cliente), 2)
+        self.assertEqual(
+            [resumen['nombre'] for resumen in resumenes_cliente],
+            [self.ubicacion.nombre, self.ubicacion.nombre],
+        )
+        self.assertEqual(
+            sorted(resumen['cantidad_ots'] for resumen in resumenes_cliente),
+            [1, 2],
+        )
+
     def test_rentabilidad_context_reports_uploaded_dian_invoice(self):
         cierre = self.ot.cierreot
         cierre.factura_dian_drive_id = 'private-drive-file-id'

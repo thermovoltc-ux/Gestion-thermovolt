@@ -1621,8 +1621,8 @@ def rentabilidad_admin(request):
         'solicitud__ubicacion',
         'cierreot',
     ).prefetch_related('materiales').order_by(
-        'cierreot__fecha_inicio_actividad',
-        'solicitud__consecutivo',
+        '-cierreot__fecha_inicio_actividad',
+        '-solicitud__consecutivo',
     )
     usernames = {ot.tecnico_asignado for ot in ots}
     from gestion_mantenimiento.users.models import ConfiguracionPago
@@ -1737,11 +1737,33 @@ def rentabilidad_admin(request):
         ),
     }
 
-    def agrupar_filas(nombre_por_fila):
+    ubicaciones_raiz_cache = {}
+
+    def obtener_ubicacion_raiz(ubicacion):
+        if ubicacion is None:
+            return None
+
+        camino = []
+        actual = ubicacion
+        while actual is not None and actual.pk not in ubicaciones_raiz_cache:
+            camino.append(actual)
+            actual = actual.parent
+
+        raiz = ubicaciones_raiz_cache.get(actual.pk) if actual is not None else None
+        for nodo in reversed(camino):
+            if nodo.parent_id is None:
+                raiz = nodo
+            if raiz is not None:
+                ubicaciones_raiz_cache[nodo.pk] = raiz
+        return raiz
+
+    def agrupar_filas(clave_y_nombre_por_fila):
         grupos = {}
         for fila in filas_calculables:
-            nombre = nombre_por_fila(fila) or 'Sin asignar'
-            grupo = grupos.setdefault(nombre, {
+            clave, nombre = clave_y_nombre_por_fila(fila)
+            if not nombre:
+                clave, nombre = None, 'Sin asignar'
+            grupo = grupos.setdefault(clave, {
                 'nombre': nombre,
                 'cantidad_ots': 0,
                 'ingresos': Decimal('0.00'),
@@ -1765,11 +1787,19 @@ def rentabilidad_admin(request):
         )
 
     por_tecnico = agrupar_filas(
-        lambda fila: fila['ot'].tecnico_display or fila['ot'].tecnico_asignado
+        lambda fila: (
+            fila['ot'].tecnico_display or fila['ot'].tecnico_asignado,
+            fila['ot'].tecnico_display or fila['ot'].tecnico_asignado,
+        )
     )
-    por_cliente = agrupar_filas(
-        lambda fila: fila['ot'].solicitud.ubicacion_nombre
-    )
+
+    def clave_cliente(fila):
+        raiz = obtener_ubicacion_raiz(fila['ot'].solicitud.ubicacion)
+        if raiz is None:
+            return None, 'Sin asignar'
+        return raiz.pk, raiz.nombre
+
+    por_cliente = agrupar_filas(clave_cliente)
     costos_totales = totales['costo_materiales'] + totales['costo_nomina']
     margen_total = None
     if totales['ingresos']:

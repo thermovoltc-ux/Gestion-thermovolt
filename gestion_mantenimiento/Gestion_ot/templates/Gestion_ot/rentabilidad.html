@@ -169,54 +169,6 @@
         </article>
     </section>
 
-    <section class="profit-summary">
-        <h2>Rentabilidad por técnico</h2>
-        <div class="profit-table-wrap">
-            <table class="profit-table table-hover">
-                <thead><tr><th>Técnico</th><th>OTs</th><th>Ingreso total</th><th>Mano de obra</th><th>Costos materiales</th><th>Nómina estimada</th><th>Ganancia estimada</th></tr></thead>
-                <tbody>
-                    {% for resumen in por_tecnico %}
-                        <tr>
-                            <td>{{ resumen.nombre }}</td>
-                            <td>{{ resumen.cantidad_ots }}</td>
-                            <td>$ {{ resumen.ingresos|intcomma }}</td>
-                            <td>$ {{ resumen.valor_mano_obra|intcomma }}</td>
-                            <td>$ {{ resumen.costo_materiales|intcomma }}</td>
-                            <td>$ {{ resumen.costo_nomina|intcomma }}</td>
-                            <td>$ {{ resumen.ganancia|intcomma }}</td>
-                        </tr>
-                    {% empty %}
-                        <tr><td colspan="7" class="profit-muted" style="text-align:center;">No hay OTs calculables para agrupar.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </section>
-
-    <section class="profit-summary">
-        <h2>Rentabilidad por cliente</h2>
-        <div class="profit-table-wrap">
-            <table class="profit-table table-hover">
-                <thead><tr><th>Cliente</th><th>OTs</th><th>Ingreso total</th><th>Mano de obra</th><th>Costos materiales</th><th>Nómina estimada</th><th>Ganancia estimada</th></tr></thead>
-                <tbody>
-                    {% for resumen in por_cliente %}
-                        <tr>
-                            <td>{{ resumen.nombre }}</td>
-                            <td>{{ resumen.cantidad_ots }}</td>
-                            <td>$ {{ resumen.ingresos|intcomma }}</td>
-                            <td>$ {{ resumen.valor_mano_obra|intcomma }}</td>
-                            <td>$ {{ resumen.costo_materiales|intcomma }}</td>
-                            <td>$ {{ resumen.costo_nomina|intcomma }}</td>
-                            <td>$ {{ resumen.ganancia|intcomma }}</td>
-                        </tr>
-                    {% empty %}
-                        <tr><td colspan="7" class="profit-muted" style="text-align:center;">No hay OTs calculables para agrupar.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </section>
-
     <section class="profit-detail">
         <div class="profit-detail-heading">
             <div><h2>Detalle de órdenes de trabajo</h2><p>{{ filas|length }} OT(s) en el período seleccionado.</p></div>
@@ -289,6 +241,55 @@
         </table>
         </div>
     </section>
+
+    <section class="profit-summary">
+        <h2>Rentabilidad por técnico</h2>
+        <div class="profit-table-wrap">
+            <table class="profit-table table-hover">
+                <thead><tr><th>Técnico</th><th>OTs</th><th>Ingreso total</th><th>Mano de obra</th><th>Costos materiales</th><th>Nómina estimada</th><th>Ganancia estimada</th></tr></thead>
+                <tbody>
+                    {% for resumen in por_tecnico %}
+                        <tr>
+                            <td>{{ resumen.nombre }}</td>
+                            <td>{{ resumen.cantidad_ots }}</td>
+                            <td>$ {{ resumen.ingresos|intcomma }}</td>
+                            <td>$ {{ resumen.valor_mano_obra|intcomma }}</td>
+                            <td>$ {{ resumen.costo_materiales|intcomma }}</td>
+                            <td>$ {{ resumen.costo_nomina|intcomma }}</td>
+                            <td>$ {{ resumen.ganancia|intcomma }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="7" class="profit-muted" style="text-align:center;">No hay OTs calculables para agrupar.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="profit-summary">
+        <h2>Rentabilidad por cliente</h2>
+        <div class="profit-table-wrap">
+            <table class="profit-table table-hover">
+                <thead><tr><th>Cliente</th><th>OTs</th><th>Ingreso total</th><th>Mano de obra</th><th>Costos materiales</th><th>Nómina estimada</th><th>Ganancia estimada</th></tr></thead>
+                <tbody>
+                    {% for resumen in por_cliente %}
+                        <tr>
+                            <td>{{ resumen.nombre }}</td>
+                            <td>{{ resumen.cantidad_ots }}</td>
+                            <td>$ {{ resumen.ingresos|intcomma }}</td>
+                            <td>$ {{ resumen.valor_mano_obra|intcomma }}</td>
+                            <td>$ {{ resumen.costo_materiales|intcomma }}</td>
+                            <td>$ {{ resumen.costo_nomina|intcomma }}</td>
+                            <td>$ {{ resumen.ganancia|intcomma }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="7" class="profit-muted" style="text-align:center;">No hay OTs calculables para agrupar.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
 </main>
 
 {{ datos_graficos|json_script:"profit-chart-data" }}
