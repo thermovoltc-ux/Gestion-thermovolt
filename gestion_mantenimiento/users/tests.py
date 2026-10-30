@@ -170,15 +170,15 @@ class RegistroAsistenciaTests(TestCase):
 
         self.assertEqual(registro.horas_trabajadas, Decimal('7.50'))
 
-    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-15')
     def test_descuenta_almuerzo_solo_desde_fecha_de_vigencia(self):
         user = get_user_model().objects.create_user(
             username='tecnico-vigencia-almuerzo',
             password='test-password',
         )
         for fecha, horas_esperadas in (
-            (date(2026, 10, 28), Decimal('8.00')),
-            (date(2026, 10, 29), Decimal('7.50')),
+            (date(2026, 10, 14), Decimal('8.00')),
+            (date(2026, 10, 15), Decimal('7.50')),
         ):
             entrada = timezone.make_aware(datetime.combine(fecha, datetime.min.time().replace(hour=8)))
             salida = entrada + timedelta(hours=8)
@@ -190,11 +190,11 @@ class RegistroAsistenciaTests(TestCase):
             )
             self.assertEqual(registro.horas_trabajadas, horas_esperadas)
 
-    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-15')
     def test_descuenta_30_minutos_y_no_deja_horas_negativas(self):
         from gestion_mantenimiento.users.nomina import calcular_horas_efectivas
 
-        fecha = date(2026, 10, 29)
+        fecha = date(2026, 10, 15)
         entrada = timezone.make_aware(datetime.combine(fecha, datetime.min.time()))
 
         self.assertEqual(
@@ -536,7 +536,7 @@ class MotorNominaTests(TestCase):
             (date(2026, 10, 15), date(2026, 10, 30)),
         )
 
-    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-15')
     def test_horas_extras_se_calculan_por_dia_con_almuerzo_deducido(self):
         from gestion_mantenimiento.users.nomina import calcular_periodo
 
@@ -565,11 +565,11 @@ class MotorNominaTests(TestCase):
             0.5,
         )
 
-    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-15')
     def test_nomina_recalcula_almuerzo_desde_marcajes_si_horas_guardadas_estan_obsoletas(self):
         from gestion_mantenimiento.users.nomina import calcular_periodo
 
-        fecha = date(2026, 10, 29)
+        fecha = date(2026, 10, 15)
         entrada = timezone.make_aware(
             datetime.combine(fecha, datetime.min.time().replace(hour=9, minute=10))
         )
@@ -592,7 +592,7 @@ class MotorNominaTests(TestCase):
         self.assertEqual(resultado['horas_normales'], Decimal('7.00'))
         self.assertEqual(resultado['horas_extras'], Decimal('0.00'))
 
-    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-15')
     def test_calculo_diario_respeta_almuerzo_y_solo_toma_fechas_del_periodo(self):
         from gestion_mantenimiento.users.nomina import calcular_periodo
 
@@ -668,16 +668,16 @@ class MotorNominaTests(TestCase):
         )
 
         self.assertEqual(resultado['dias_trabajados'], 13)
-        self.assertEqual(resultado['horas_efectivas'], Decimal('98.78'))
-        self.assertEqual(resultado['horas_normales'], Decimal('83.55'))
-        self.assertEqual(resultado['horas_extras'], Decimal('15.23'))
-        self.assertEqual(resultado['bruto'], Decimal('2232821.10'))
+        self.assertEqual(resultado['horas_efectivas'], Decimal('92.78'))
+        self.assertEqual(resultado['horas_normales'], Decimal('82.47'))
+        self.assertEqual(resultado['horas_extras'], Decimal('10.31'))
+        self.assertEqual(resultado['bruto'], Decimal('2141456.70'))
         self.assertEqual(
             sum(
                 (Decimal(str(dia['horas_extras'])) for dia in resultado['detalles']['dias']),
                 Decimal('0.00'),
             ),
-            Decimal('15.23'),
+            Decimal('10.31'),
         )
 
     def test_calculo_con_registros(self):
@@ -921,7 +921,7 @@ class ReportesNominaTests(TestCase):
         self.assertEqual(response.context['fecha_inicio'], date(2026, 9, 10))
         self.assertEqual(response.context['fecha_fin'], date(2026, 9, 20))
 
-    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-29')
+    @override_settings(NOMINA_FECHA_VIGENCIA_ALMUERZO='2026-10-15')
     def test_export_excel_devuelve_workbook_valido(self):
         tecnico = get_user_model().objects.create_user(
             username='tecnico-excel-novedades',

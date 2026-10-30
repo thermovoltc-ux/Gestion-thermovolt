@@ -72,7 +72,7 @@ SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 
 # The effective-hours rule applies only to attendance dated on or after this day.
 NOMINA_FECHA_VIGENCIA_ALMUERZO = os.environ.get(
     'NOMINA_FECHA_VIGENCIA_ALMUERZO',
-    '2026-10-29',
+    '2026-10-15',
 )
 
 SESSION_COOKIE_SECURE = not DEBUG
@@ -403,7 +403,6 @@ LOGGING = {
         },
     },
 }
-
 
 
 
