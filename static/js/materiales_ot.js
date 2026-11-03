@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const addError = document.getElementById('error-material');
     const addButton = document.getElementById('btn-guardar-material');
     let activeTrigger = null;
+    let requestInProgress = false;
     const numberFormat = new Intl.NumberFormat('es-CO', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
@@ -69,8 +70,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function appendMaterialRow(material) {
-        if (!tableBody) {
-            return;
+        if (!tableBody || tableBody.querySelector(`[data-material-ot-id="${material.id}"]`)) {
+            return false;
         }
         const emptyRow = document.getElementById('sin-materiales');
         if (emptyRow) {
@@ -78,6 +79,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const row = document.createElement('tr');
+        row.dataset.materialOtId = material.id;
         const nameCell = document.createElement('td');
         const quantityCell = document.createElement('td');
         const costCell = document.createElement('td');
@@ -101,6 +103,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         row.append(nameCell, quantityCell, costCell, invoiceCell, observationCell);
         tableBody.appendChild(row);
+        return true;
     }
 
     function openAddModal(trigger) {
@@ -141,6 +144,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     addButton.addEventListener('click', async function () {
+        if (requestInProgress) {
+            return;
+        }
         addError.textContent = '';
         const materialName = searchInput.value.trim();
         if (!materialName) {
@@ -165,6 +171,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         addButton.disabled = true;
+        requestInProgress = true;
         try {
             let materialId;
             const option = findMaterialOption(materialName);
@@ -215,7 +222,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             const material = await readResponse(response);
             appendMaterialRow(material);
-            if (activeTrigger && activeTrigger.dataset.materialCount !== undefined) {
+            if (!material.duplicate && activeTrigger && activeTrigger.dataset.materialCount !== undefined) {
                 const count = Number(activeTrigger.dataset.materialCount) + 1;
                 activeTrigger.dataset.materialCount = String(count);
                 activeTrigger.textContent = `➕ Materiales (${count})`;
@@ -230,6 +237,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             displayErrors(addError, error);
         } finally {
+            requestInProgress = false;
             addButton.disabled = false;
         }
     });

@@ -1380,7 +1380,6 @@ def agregar_material_ot_admin(request, ot_id):
         return redirect('gestionar_ot_admin', ot_id=ot.pk)
 
     material_ot = form.save(commit=False)
-    material_ot.orden_trabajo = ot
     material_ot.precio_venta_aplicado = (
         _precio_venta_desde_costo(
             material_ot.costo_real,
@@ -1389,11 +1388,14 @@ def agregar_material_ot_admin(request, ot_id):
         if aplicar_margen == '1'
         else material_ot.costo_real
     )
-    material_ot.save()
-    messages.success(
-        request,
-        'Se agregó el material a la OT; el resumen financiero fue actualizado.',
-    )
+    _, creado = _guardar_material_ot_sin_reintento(ot, material_ot)
+    if creado:
+        messages.success(
+            request,
+            'Se agregó el material a la OT; el resumen financiero fue actualizado.',
+        )
+    else:
+        messages.info(request, 'Ese material ya estaba agregado; no se creó otra línea.')
     return redirect('gestionar_ot_admin', ot_id=ot.pk)
 
 
@@ -2233,6 +2235,51 @@ def _crear_material_catalogo(request):
     }, status=201)
 
 
+def _guardar_material_ot_sin_reintento(ot, material_ot):
+    observaciones_vacias = not (material_ot.observaciones or '').strip()
+    sin_foto = not material_ot.foto_factura
+
+    with transaction.atomic():
+        ot_bloqueada = OrdenTrabajo.objects.select_for_update().get(pk=ot.pk)
+        material_ot.orden_trabajo = ot_bloqueada
+
+        if observaciones_vacias and sin_foto:
+            existente = MaterialOT.objects.filter(
+                orden_trabajo=ot_bloqueada,
+                material=material_ot.material,
+                cantidad=material_ot.cantidad,
+                costo_real=material_ot.costo_real,
+                precio_venta_aplicado=material_ot.precio_venta_aplicado,
+            ).filter(
+                (Q(foto_factura='') | Q(foto_factura__isnull=True))
+                & (Q(observaciones='') | Q(observaciones__isnull=True))
+            ).order_by('pk').first()
+            if existente:
+                return existente, False
+
+        material_ot.save()
+        return material_ot, True
+
+
+def _respuesta_material_ot(material_ot, duplicado=False):
+    return {
+        'ok': True,
+        'id': material_ot.pk,
+        'material': material_ot.material.nombre,
+        'cantidad': str(material_ot.cantidad),
+        'costo_real': str(material_ot.costo_real),
+        'foto_url': material_ot.foto_factura.url if material_ot.foto_factura else '',
+        'fecha_registro': material_ot.fecha_registro.isoformat(),
+        'observaciones': material_ot.observaciones or '',
+        'duplicate': duplicado,
+        'message': (
+            'Este material ya estaba agregado; se conserva la línea existente.'
+            if duplicado
+            else ''
+        ),
+    }
+
+
 @login_required
 @require_POST
 def crear_material_ajax(request, ot_id):
@@ -2274,23 +2321,16 @@ def agregar_material_ot(request, ot_id):
         )
 
     material_ot = form.save(commit=False)
-    material_ot.orden_trabajo = ot
     material_ot.precio_venta_aplicado = _precio_venta_desde_costo(
         material_ot.costo_real,
         material_ot.material.categoria,
     )
-    material_ot.save()
+    material_ot, creado = _guardar_material_ot_sin_reintento(ot, material_ot)
 
-    return JsonResponse({
-        'ok': True,
-        'id': material_ot.pk,
-        'material': material_ot.material.nombre,
-        'cantidad': str(material_ot.cantidad),
-        'costo_real': str(material_ot.costo_real),
-        'foto_url': material_ot.foto_factura.url if material_ot.foto_factura else '',
-        'fecha_registro': material_ot.fecha_registro.isoformat(),
-        'observaciones': material_ot.observaciones or '',
-    }, status=201)
+    return JsonResponse(
+        _respuesta_material_ot(material_ot, duplicado=not creado),
+        status=201 if creado else 200,
+    )
 
 
 @login_required
@@ -2305,23 +2345,16 @@ def agregar_material_rapido_ot(request, ot_id):
         )
 
     material_ot = form.save(commit=False)
-    material_ot.orden_trabajo = ot
     material_ot.precio_venta_aplicado = _precio_venta_desde_costo(
         material_ot.costo_real,
         material_ot.material.categoria,
     )
-    material_ot.save()
+    material_ot, creado = _guardar_material_ot_sin_reintento(ot, material_ot)
 
-    return JsonResponse({
-        'ok': True,
-        'id': material_ot.pk,
-        'material': material_ot.material.nombre,
-        'cantidad': str(material_ot.cantidad),
-        'costo_real': str(material_ot.costo_real),
-        'foto_url': material_ot.foto_factura.url if material_ot.foto_factura else '',
-        'fecha_registro': material_ot.fecha_registro.isoformat(),
-        'observaciones': material_ot.observaciones or '',
-    }, status=201)
+    return JsonResponse(
+        _respuesta_material_ot(material_ot, duplicado=not creado),
+        status=201 if creado else 200,
+    )
 
 
 @login_required

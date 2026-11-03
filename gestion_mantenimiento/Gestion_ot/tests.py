@@ -429,6 +429,110 @@ class MaterialOTAjaxTests(TestCase):
         self.assertEqual(material_ot.cantidad, Decimal('2.00'))
         self.assertIsNotNone(material_ot.fecha_registro)
 
+    def test_repeated_identical_add_request_reuses_existing_ot_material(self):
+        url = reverse('agregar_material_ot', args=[self.ot.pk])
+        payload = {
+            'material': self.material.pk,
+            'cantidad': '2.00',
+            'costo_real': '10.00',
+        }
+
+        first_response = self.client.post(url, payload)
+        retry_response = self.client.post(url, payload)
+
+        self.assertEqual(first_response.status_code, 201)
+        self.assertEqual(retry_response.status_code, 200)
+        self.assertTrue(retry_response.json()['duplicate'])
+        self.assertEqual(retry_response.json()['id'], first_response.json()['id'])
+        self.assertEqual(MaterialOT.objects.filter(orden_trabajo=self.ot).count(), 1)
+
+    def test_quick_add_repeated_identical_request_does_not_create_second_row(self):
+        self.ot.estado = self.estado_en_proceso
+        self.ot.save(update_fields=['estado'])
+        url = reverse('agregar_material_rapido_ot', args=[self.ot.pk])
+        payload = {
+            'material': self.material.pk,
+            'cantidad': '1.00',
+            'costo_real': '10.00',
+        }
+
+        first_response = self.client.post(url, payload)
+        retry_response = self.client.post(url, payload)
+
+        self.assertEqual(first_response.status_code, 201)
+        self.assertEqual(retry_response.status_code, 200)
+        self.assertTrue(retry_response.json()['duplicate'])
+        self.assertEqual(MaterialOT.objects.filter(orden_trabajo=self.ot).count(), 1)
+
+    def test_same_material_with_different_cost_or_observations_remains_a_separate_line(self):
+        url = reverse('agregar_material_ot', args=[self.ot.pk])
+        responses = [
+            self.client.post(url, {
+                'material': self.material.pk,
+                'cantidad': '1.00',
+                'costo_real': '10.00',
+            }),
+            self.client.post(url, {
+                'material': self.material.pk,
+                'cantidad': '1.00',
+                'costo_real': '11.00',
+            }),
+            self.client.post(url, {
+                'material': self.material.pk,
+                'cantidad': '1.00',
+                'costo_real': '10.00',
+                'observaciones': 'Uso independiente del mismo repuesto.',
+            }),
+        ]
+
+        self.assertTrue(all(response.status_code == 201 for response in responses))
+        self.assertEqual(MaterialOT.objects.filter(orden_trabajo=self.ot).count(), 3)
+
+    def test_duplicate_cleanup_command_only_deletes_exact_blank_lines_after_apply(self):
+        original = MaterialOT.objects.create(
+            orden_trabajo=self.ot,
+            material=self.material,
+            cantidad=Decimal('2.00'),
+            costo_real=Decimal('10.00'),
+            precio_venta_aplicado=Decimal('14.29'),
+        )
+        exact_duplicate = MaterialOT.objects.create(
+            orden_trabajo=self.ot,
+            material=self.material,
+            cantidad=Decimal('2.00'),
+            costo_real=Decimal('10.00'),
+            precio_venta_aplicado=Decimal('14.29'),
+        )
+        different_cost = MaterialOT.objects.create(
+            orden_trabajo=self.ot,
+            material=self.material,
+            cantidad=Decimal('2.00'),
+            costo_real=Decimal('11.00'),
+            precio_venta_aplicado=Decimal('15.72'),
+        )
+        with_observations = MaterialOT.objects.create(
+            orden_trabajo=self.ot,
+            material=self.material,
+            cantidad=Decimal('2.00'),
+            costo_real=Decimal('10.00'),
+            precio_venta_aplicado=Decimal('14.29'),
+            observaciones='Línea legítima con detalle propio.',
+        )
+
+        dry_run_output = StringIO()
+        call_command('limpiar_materiales_ot_duplicados', stdout=dry_run_output)
+        self.assertIn('No se modificó ningún registro', dry_run_output.getvalue())
+        self.assertTrue(MaterialOT.objects.filter(pk=exact_duplicate.pk).exists())
+
+        apply_output = StringIO()
+        call_command('limpiar_materiales_ot_duplicados', '--apply', stdout=apply_output)
+
+        self.assertFalse(MaterialOT.objects.filter(pk=exact_duplicate.pk).exists())
+        self.assertTrue(MaterialOT.objects.filter(pk=original.pk).exists())
+        self.assertTrue(MaterialOT.objects.filter(pk=different_cost.pk).exists())
+        self.assertTrue(MaterialOT.objects.filter(pk=with_observations.pk).exists())
+        self.assertIn('Filas duplicadas eliminadas: 1', apply_output.getvalue())
+
     def test_quick_add_saves_observations_for_the_assigned_technician(self):
         self.ot.estado = self.estado_en_proceso
         self.ot.save(update_fields=['estado'])
