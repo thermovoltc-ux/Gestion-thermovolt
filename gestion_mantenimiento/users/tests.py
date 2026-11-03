@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -22,6 +23,77 @@ from .models import (
     RegistroAsistencia,
 )
 from .forms import CalendarioTecnicoForm, ConfiguracionPagoForm
+
+
+class NominaPdfTests(TestCase):
+    def test_pdf_detalla_subtotales_y_descuentos_en_pesos(self):
+        from gestion_mantenimiento.users.nomina_pdf import (
+            _filas_detalle_pago,
+            _filas_descuento,
+            generar_pdf_recibo,
+        )
+
+        recibo = SimpleNamespace(
+            usuario=SimpleNamespace(
+                get_full_name=lambda: 'Ana Técnica',
+                username='ana',
+            ),
+            tipo_periodo='quincenal',
+            get_tipo_periodo_display=lambda: 'Quincenal',
+            fecha_inicio=date(2026, 10, 15),
+            fecha_fin=date(2026, 10, 30),
+            get_estado_display=lambda: 'Borrador',
+            estado='borrador',
+            dias_trabajados=13,
+            horas_normales=Decimal('83.55'),
+            horas_extras=Decimal('15.23'),
+            horas_nocturnas=Decimal('0.00'),
+            horas_festivas=Decimal('0.00'),
+            bruto=Decimal('1953821.10'),
+            total_descuentos=Decimal('50000.00'),
+            neto=Decimal('1903821.10'),
+            detalles={
+                'config': {
+                    'tipo_pago': 'mixto',
+                    'valor_hora_normal': 20000,
+                    'valor_hora_extra': 18570,
+                },
+                'monto_base': 1671000,
+                'monto_extras': 282821.1,
+                'monto_recargo_nocturno': 0,
+                'monto_recargo_festivo': 0,
+                'descuentos': [
+                    {'tipo': 'prestamo', 'monto': 30000, 'descripcion': ''},
+                    {'tipo': 'adelanto', 'monto': 20000, 'descripcion': 'Adelanto de caja'},
+                ],
+            },
+        )
+
+        filas = _filas_detalle_pago(recibo)
+        descuentos = _filas_descuento(recibo)
+        pdf = generar_pdf_recibo(recibo).getvalue()
+
+        self.assertEqual(filas[1], [
+            'Horas normales',
+            '83.55',
+            '$ 20.000',
+            '$ 1.671.000',
+        ])
+        self.assertEqual(filas[2], [
+            'Horas extras',
+            '15.23',
+            '$ 18.570',
+            '$ 282.821',
+        ])
+        self.assertEqual(filas[-1], ['TOTAL BRUTO', '', '', '$ 1.953.821'])
+        self.assertEqual(
+            descuentos,
+            [
+                ('Préstamo', '-$ 30.000'),
+                ('Adelanto: Adelanto de caja', '-$ 20.000'),
+            ],
+        )
+        self.assertTrue(pdf.startswith(b'%PDF-'))
 
 
 class CustomLoginCentroOperacionesTests(TestCase):
