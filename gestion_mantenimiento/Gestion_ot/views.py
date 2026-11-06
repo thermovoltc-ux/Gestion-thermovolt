@@ -855,13 +855,21 @@ def actualizar_estado_solicitud(request):
             nuevo_estado_nombre == 'finalizada'
             and estado_solicitud_anterior != 'finalizada'
         )
-        if solicitud.email_solicitante and (asignacion_nueva or finalizacion_nueva):
+        if solicitud.enviar_email and solicitud.email_solicitante and (asignacion_nueva or finalizacion_nueva):
             if asignacion_nueva:
                 try:
+                    fecha_actividad = (
+                        timezone.localtime(orden_trabajo.fecha_actividad).strftime('%d/%m/%Y %H:%M')
+                        if orden_trabajo.fecha_actividad
+                        else 'Por definir'
+                    )
                     enviar_correo_solicitud(
                         solicitud,
                         'asignacion',
-                        cuerpo_extra=f'Técnico asignado: {tecnico}',
+                        cuerpo_extra=(
+                            f'Técnico asignado: {tecnico}\n'
+                            f'Fecha programada: {fecha_actividad}'
+                        ),
                     )
                 except Exception:
                     logger.exception(

@@ -66,22 +66,21 @@ Equipo de Thermovolt
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=destinatarios,
     )
-    if tipo_evento != 'informe':
-        contexto = {
-            'consecutivo': solicitud.consecutivo,
-            'evento': EVENTOS_SOLICITUD[tipo_evento],
-            'ubicacion': ubicacion,
-            'equipo': equipo,
-            'co': solicitud.co or 'N/A',
-            'estado': estado,
-            'fecha_creacion': fecha_creacion,
-            'cuerpo_extra': cuerpo_extra or '',
-            'email_contacto': settings.DEFAULT_FROM_EMAIL,
-            'telefono_contacto': getattr(settings, 'THERMOVOLT_PHONE', ''),
-            'sitio_web': getattr(settings, 'THERMOVOLT_WEBSITE', ''),
-            'logo_url': getattr(settings, 'THERMOVOLT_LOGO_URL', ''),
-        }
-        html_content = render_to_string('emails/correo_solicitud.html', contexto)
-        email.attach_alternative(html_content, 'text/html')
+    contexto = {
+        'consecutivo': solicitud.consecutivo,
+        'evento': EVENTOS_SOLICITUD[tipo_evento],
+        'ubicacion': ubicacion,
+        'equipo': equipo,
+        'co': solicitud.co or 'N/A',
+        'estado': estado,
+        'fecha_creacion': fecha_creacion,
+        'cuerpo_extra': cuerpo_extra or '',
+        'email_contacto': settings.DEFAULT_FROM_EMAIL,
+        'telefono_contacto': getattr(settings, 'THERMOVOLT_PHONE', ''),
+        'sitio_web': getattr(settings, 'THERMOVOLT_WEBSITE', ''),
+        'logo_url': getattr(settings, 'THERMOVOLT_LOGO_URL', ''),
+    }
+    html_content = render_to_string('emails/correo_solicitud.html', contexto)
+    email.attach_alternative(html_content, 'text/html')
 
     return bool(email.send(fail_silently=False))

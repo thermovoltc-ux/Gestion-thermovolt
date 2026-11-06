@@ -63,7 +63,7 @@ class EnviarCorreoSolicitudTests(TestCase):
         self.assertNotIn('cid:', html)
         self.assertEqual(mensaje.attachments, [])
 
-    def test_report_email_remains_plain_text_without_attachments(self):
+    def test_report_email_has_html_and_plain_text_without_attachments(self):
         enviado = enviar_correo_solicitud(
             self.solicitud,
             'informe',
@@ -73,7 +73,11 @@ class EnviarCorreoSolicitudTests(TestCase):
         self.assertTrue(enviado)
         mensaje = mail.outbox[0]
         self.assertIn('https://example.com/informe.pdf', mensaje.body)
-        self.assertEqual(mensaje.alternatives, [])
+        self.assertEqual(len(mensaje.alternatives), 1)
+        html, content_type = mensaje.alternatives[0]
+        self.assertEqual(content_type, 'text/html')
+        self.assertIn('https://example.com/informe.pdf', html)
+        self.assertIn('Informe de mantenimiento disponible', html)
         self.assertEqual(mensaje.attachments, [])
 
 
@@ -272,6 +276,7 @@ class CrearSolicitudCoTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         solicitud = Solicitud.objects.get(equipo=self.equipo)
+        self.assertTrue(solicitud.enviar_email)
         send_email.assert_called_once_with(
             solicitud,
             'creacion',
@@ -287,4 +292,6 @@ class CrearSolicitudCoTests(TestCase):
         response = self._post_solicitud(self.equipo)
 
         self.assertEqual(response.status_code, 302)
+        solicitud = Solicitud.objects.get(equipo=self.equipo)
+        self.assertFalse(solicitud.enviar_email)
         send_email.assert_not_called()

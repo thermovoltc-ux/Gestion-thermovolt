@@ -82,6 +82,7 @@ class EnviarPdfPorEmailTests(TestCase):
             co='CO-42',
             estado=SimpleNamespace(nombre='en revision'),
             fecha_creacion=datetime(2026, 9, 30, tzinfo=datetime_timezone.utc),
+            enviar_email=False,
         )
         self.cierre_ot = SimpleNamespace(
             orden_trabajo=SimpleNamespace(solicitud=solicitud),
@@ -103,6 +104,10 @@ class EnviarPdfPorEmailTests(TestCase):
         self.assertEqual(message.to, ['tecnico@example.com', 'cliente@example.com'])
         self.assertEqual(message.bcc, [])
         self.assertEqual(message.attachments, [])
+        self.assertEqual(len(message.alternatives), 1)
+        html, content_type = message.alternatives[0]
+        self.assertEqual(content_type, 'text/html')
+        self.assertIn('https://reports.example/informe.pdf', html)
 
     def test_reports_unavailable_without_fallback_attachment(self):
         self.assertTrue(self._send_with_link(None))
@@ -112,6 +117,8 @@ class EnviarPdfPorEmailTests(TestCase):
         self.assertEqual(message.subject, '[Solicitud #42] - PDV prueba - CO CO-42')
         self.assertEqual(message.bcc, [])
         self.assertEqual(message.attachments, [])
+        self.assertEqual(len(message.alternatives), 1)
+        self.assertIn('El informe no está disponible por el momento', message.alternatives[0][0])
 
 
 class GestionOtFilterRegressionTests(TestCase):
@@ -320,30 +327,43 @@ class SolicitudEmailEventTests(TestCase):
             ubicacion=self.ubicacion,
             estado=self.estado_solicitado,
             email_solicitante='solicitante@example.com',
+            enviar_email=True,
         )
 
-    def _actualizar_solicitud(self, estado, tecnico=None):
+    def _actualizar_solicitud(self, estado, tecnico=None, fecha=None):
         return self.client.post(
             reverse('actualizar_estado_solicitud'),
             data=json.dumps({
                 'numero': self.solicitud.consecutivo,
                 'estado': estado,
                 'tecnico': tecnico,
-                'fecha': timezone.now().isoformat(),
+                'fecha': (fecha or timezone.now()).isoformat(),
             }),
             content_type='application/json',
         )
 
     @patch('gestion_mantenimiento.Gestion_ot.views.enviar_correo_solicitud')
     def test_assignment_sends_notification_once_when_technician_changes(self, send_email):
-        response = self._actualizar_solicitud('en proceso', 'tecnico-asignado')
+        fecha_actividad = datetime(2026, 11, 10, 14, 30, tzinfo=datetime_timezone.utc)
+        response = self._actualizar_solicitud(
+            'en proceso',
+            'tecnico-asignado',
+            fecha=fecha_actividad,
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['email_warning'], None)
         send_email.assert_called_once_with(
             self.solicitud,
             'asignacion',
-            cuerpo_extra='Técnico asignado: tecnico-asignado',
+            cuerpo_extra=(
+                'Técnico asignado: tecnico-asignado\n'
+                f'Fecha programada: {timezone.localtime(fecha_actividad).strftime("%d/%m/%Y %H:%M")}'
+            ),
+        )
+        self.assertEqual(
+            self.solicitud.orden_trabajo.fecha_actividad,
+            fecha_actividad,
         )
 
         response = self._actualizar_solicitud('en proceso', 'tecnico-asignado')
@@ -355,6 +375,16 @@ class SolicitudEmailEventTests(TestCase):
     def test_assignment_does_not_send_without_requester_email(self, send_email):
         self.solicitud.email_solicitante = ''
         self.solicitud.save(update_fields=['email_solicitante'])
+
+        response = self._actualizar_solicitud('en proceso', 'tecnico-asignado')
+
+        self.assertEqual(response.status_code, 200)
+        send_email.assert_not_called()
+
+    @patch('gestion_mantenimiento.Gestion_ot.views.enviar_correo_solicitud')
+    def test_assignment_does_not_send_when_email_checkbox_was_unselected(self, send_email):
+        self.solicitud.enviar_email = False
+        self.solicitud.save(update_fields=['enviar_email'])
 
         response = self._actualizar_solicitud('en proceso', 'tecnico-asignado')
 
@@ -401,6 +431,24 @@ class SolicitudEmailEventTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         send_email.assert_called_once()
+
+    @patch('gestion_mantenimiento.Gestion_ot.views.enviar_correo_solicitud')
+    def test_finalization_does_not_send_when_email_checkbox_was_unselected(self, send_email):
+        self.solicitud.enviar_email = False
+        self.solicitud.save(update_fields=['enviar_email'])
+        estado_revision = Estado.objects.get_or_create(nombre='en revision')[0]
+        self.solicitud.estado = estado_revision
+        self.solicitud.save(update_fields=['estado'])
+        OrdenTrabajo.objects.create(
+            solicitud=self.solicitud,
+            tecnico_asignado='tecnico-asignado',
+            estado=estado_revision,
+        )
+
+        response = self._actualizar_solicitud('finalizada')
+
+        self.assertEqual(response.status_code, 200)
+        send_email.assert_not_called()
 
 
 class PreventiveRequestCoTests(TestCase):
