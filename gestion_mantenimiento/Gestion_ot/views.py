@@ -3202,8 +3202,13 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot, drive_link):
     guardar_copia_pdf_envio(pdf_buffer, cierre_ot)
 
     try:
+        estado_en_revision, _ = Estado.objects.get_or_create(nombre='en revision')
+        if not solicitud.estado or solicitud.estado.nombre != 'en revision':
+            solicitud.estado = estado_en_revision
+            solicitud.save(update_fields=['estado'])
+
         if drive_link:
-            mensaje_informe = f'El informe de la OT está disponible. Enlace de descarga: {drive_link}'
+            mensaje_informe = 'El informe de la OT está disponible.'
         else:
             mensaje_informe = 'El informe no está disponible por el momento. Por favor contacte al administrador.'
 
@@ -3216,6 +3221,7 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot, drive_link):
                 f'Cliente: {cliente_nombre} | Fecha: {fecha_str}'
             ),
             destinatarios=recipient_list,
+            enlace_descarga=drive_link,
         )
         if enviado:
             logger.info('Informe de solicitud %s enviado a %s', consecutivo, recipient_list)

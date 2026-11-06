@@ -63,20 +63,24 @@ class EnviarCorreoSolicitudTests(TestCase):
         self.assertNotIn('cid:', html)
         self.assertEqual(mensaje.attachments, [])
 
-    def test_report_email_has_html_and_plain_text_without_attachments(self):
+    def test_report_email_renders_download_link_in_html_and_plain_text(self):
+        download_url = 'https://example.com/informe.pdf?token=test-token'
         enviado = enviar_correo_solicitud(
             self.solicitud,
             'informe',
-            cuerpo_extra='Informe disponible: https://example.com/informe.pdf',
+            cuerpo_extra='Informe disponible.',
+            enlace_descarga=download_url,
         )
 
         self.assertTrue(enviado)
         mensaje = mail.outbox[0]
-        self.assertIn('https://example.com/informe.pdf', mensaje.body)
+        self.assertIn(f'Descargar informe (PDF): {download_url}', mensaje.body)
         self.assertEqual(len(mensaje.alternatives), 1)
         html, content_type = mensaje.alternatives[0]
         self.assertEqual(content_type, 'text/html')
-        self.assertIn('https://example.com/informe.pdf', html)
+        self.assertIn(f'href="{download_url}"', html)
+        self.assertIn('>Descargar informe (PDF)</a>', html)
+        self.assertNotIn(f'> {download_url}<', html)
         self.assertIn('Informe de mantenimiento disponible', html)
         self.assertEqual(mensaje.attachments, [])
 

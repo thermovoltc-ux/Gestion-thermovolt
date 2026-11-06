@@ -12,7 +12,13 @@ EVENTOS_SOLICITUD = {
 }
 
 
-def enviar_correo_solicitud(solicitud, tipo_evento, cuerpo_extra='', destinatarios=None):
+def enviar_correo_solicitud(
+    solicitud,
+    tipo_evento,
+    cuerpo_extra='',
+    destinatarios=None,
+    enlace_descarga=None,
+):
     if tipo_evento not in EVENTOS_SOLICITUD:
         raise ValueError(f'Tipo de evento no válido: {tipo_evento}')
 
@@ -42,6 +48,8 @@ Información de la solicitud:
 - Fecha de creación: {fecha_creacion}
 
 {cuerpo_extra or ''}
+
+{f'Descargar informe (PDF): {enlace_descarga}' if enlace_descarga else ''}
 
 Saludos,
 Equipo de Thermovolt
@@ -75,6 +83,7 @@ Equipo de Thermovolt
         'estado': estado,
         'fecha_creacion': fecha_creacion,
         'cuerpo_extra': cuerpo_extra or '',
+        'enlace_descarga': enlace_descarga or '',
         'email_contacto': settings.DEFAULT_FROM_EMAIL,
         'telefono_contacto': getattr(settings, 'THERMOVOLT_PHONE', ''),
         'sitio_web': getattr(settings, 'THERMOVOLT_WEBSITE', ''),

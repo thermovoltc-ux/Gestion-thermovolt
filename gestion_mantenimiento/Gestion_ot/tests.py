@@ -5,7 +5,7 @@ from io import StringIO
 import json
 import os
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.db import IntegrityError
 from django.core import mail
@@ -80,9 +80,10 @@ class EnviarPdfPorEmailTests(TestCase):
             ubicacion_nombre='PDV prueba',
             email_solicitante='cliente@example.com',
             co='CO-42',
-            estado=SimpleNamespace(nombre='en revision'),
+            estado=SimpleNamespace(nombre='en proceso'),
             fecha_creacion=datetime(2026, 9, 30, tzinfo=datetime_timezone.utc),
             enviar_email=False,
+            save=Mock(),
         )
         self.cierre_ot = SimpleNamespace(
             orden_trabajo=SimpleNamespace(solicitud=solicitud),
@@ -107,7 +108,11 @@ class EnviarPdfPorEmailTests(TestCase):
         self.assertEqual(len(message.alternatives), 1)
         html, content_type = message.alternatives[0]
         self.assertEqual(content_type, 'text/html')
-        self.assertIn('https://reports.example/informe.pdf', html)
+        self.assertIn('href="https://reports.example/informe.pdf"', html)
+        self.assertIn('>Descargar informe (PDF)</a>', html)
+        self.assertNotIn('https://reports.example/informe.pdf', html.split('href=')[0])
+        self.assertEqual(self.cierre_ot.orden_trabajo.solicitud.estado.nombre, 'en revision')
+        self.cierre_ot.orden_trabajo.solicitud.save.assert_called_once_with(update_fields=['estado'])
 
     def test_reports_unavailable_without_fallback_attachment(self):
         self.assertTrue(self._send_with_link(None))
@@ -119,6 +124,7 @@ class EnviarPdfPorEmailTests(TestCase):
         self.assertEqual(message.attachments, [])
         self.assertEqual(len(message.alternatives), 1)
         self.assertIn('El informe no está disponible por el momento', message.alternatives[0][0])
+        self.assertNotIn('Descargar informe (PDF)', message.alternatives[0][0])
 
 
 class GestionOtFilterRegressionTests(TestCase):
