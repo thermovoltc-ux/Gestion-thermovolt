@@ -1,7 +1,4 @@
-from email.mime.image import MIMEImage
-
 from django.conf import settings
-from django.contrib.staticfiles import finders
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -82,17 +79,9 @@ Equipo de Thermovolt
             'email_contacto': settings.DEFAULT_FROM_EMAIL,
             'telefono_contacto': getattr(settings, 'THERMOVOLT_PHONE', ''),
             'sitio_web': getattr(settings, 'THERMOVOLT_WEBSITE', ''),
+            'logo_url': getattr(settings, 'THERMOVOLT_LOGO_URL', ''),
         }
         html_content = render_to_string('emails/correo_solicitud.html', contexto)
         email.attach_alternative(html_content, 'text/html')
-
-        logo_path = finders.find('images/thermovolt-logo.png')
-        if not logo_path:
-            raise FileNotFoundError('No se encontró el logo de Thermovolt en los archivos estáticos.')
-        with open(logo_path, 'rb') as logo_file:
-            logo = MIMEImage(logo_file.read(), _subtype='png')
-        logo.add_header('Content-ID', '<thermovolt-logo>')
-        logo.add_header('Content-Disposition', 'inline', filename='thermovolt-logo.png')
-        email.attach(logo)
 
     return bool(email.send(fail_silently=False))

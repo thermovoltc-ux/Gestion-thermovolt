@@ -360,6 +360,7 @@ ANYMAIL = {
 # Email addresses
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@thermovolt.com')
 EMAIL_ADICIONAL = os.environ.get('EMAIL_ADICIONAL', 'thermovoltc@gmail.com')
+THERMOVOLT_LOGO_URL = os.environ.get('THERMOVOLT_LOGO_URL', '')
 
 # Legacy config (for reference only)
 SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
@@ -403,7 +404,6 @@ LOGGING = {
         },
     },
 }
-
 
 
 

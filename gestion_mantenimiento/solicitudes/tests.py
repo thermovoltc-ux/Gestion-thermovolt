@@ -12,7 +12,10 @@ from gestion_mantenimiento.solicitudes.forms import SolicitudForm
 from gestion_mantenimiento.solicitudes.utils import enviar_correo_solicitud
 
 
-@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+@override_settings(
+    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+    THERMOVOLT_LOGO_URL='',
+)
 class EnviarCorreoSolicitudTests(TestCase):
     def setUp(self):
         self.solicitud = SimpleNamespace(
@@ -25,7 +28,7 @@ class EnviarCorreoSolicitudTests(TestCase):
             email_solicitante='cliente@example.com',
         )
 
-    def test_sends_html_and_plain_text_with_inline_logo(self):
+    def test_sends_html_and_plain_text_without_inline_logo_when_url_is_unset(self):
         enviado = enviar_correo_solicitud(
             self.solicitud,
             'asignacion',
@@ -42,9 +45,23 @@ class EnviarCorreoSolicitudTests(TestCase):
         self.assertIn('Notificación de Solicitud', html)
         self.assertIn('Técnico asignado', html)
         self.assertIn('&lt;Sede prueba&gt;', html)
-        self.assertIn('cid:thermovolt-logo', html)
-        self.assertEqual(len(mensaje.attachments), 1)
-        self.assertEqual(mensaje.attachments[0].get('Content-ID'), '<thermovolt-logo>')
+        self.assertNotIn('cid:', html)
+        self.assertNotIn('<img ', html)
+        self.assertEqual(mensaje.attachments, [])
+
+    @override_settings(THERMOVOLT_LOGO_URL='https://cdn.example.com/thermovolt-logo.png')
+    def test_uses_public_logo_url_when_configured(self):
+        enviado = enviar_correo_solicitud(self.solicitud, 'creacion')
+
+        self.assertTrue(enviado)
+        mensaje = mail.outbox[0]
+        html = mensaje.alternatives[0][0]
+        self.assertIn(
+            '<img src="https://cdn.example.com/thermovolt-logo.png"',
+            html,
+        )
+        self.assertNotIn('cid:', html)
+        self.assertEqual(mensaje.attachments, [])
 
     def test_report_email_remains_plain_text_without_attachments(self):
         enviado = enviar_correo_solicitud(

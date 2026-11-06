@@ -12,7 +12,7 @@
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%; max-width:600px; background:#ffffff; border-radius:12px; overflow:hidden;">
                     <tr>
                         <td style="padding:24px 32px; background:#0f2747; text-align:center;">
-                            <img src="cid:thermovolt-logo" alt="Thermovolt" width="180" style="display:block; width:180px; max-width:100%; height:auto; margin:0 auto 16px;">
+                            {% if logo_url %}<img src="{{ logo_url }}" alt="Thermovolt" width="180" style="display:block; width:180px; max-width:100%; height:auto; margin:0 auto 16px;">{% endif %}
                             <h1 style="margin:0; color:#ffffff; font-size:24px;">Notificación de Solicitud</h1>
                             <p style="margin:8px 0 0; color:#bfdbfe; font-size:15px;">{{ evento }}</p>
                         </td>
