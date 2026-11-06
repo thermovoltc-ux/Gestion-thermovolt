@@ -71,9 +71,6 @@ def crear_solicitud(request):
                     form.instance.ubicacion = ubicacion_seleccionada
 
             co_solicitud = obtener_codigo_co_actual(request, ubicacion_seleccionada if equipo else None)
-            if not co_solicitud:
-                form.add_error(None, 'No se puede crear la solicitud sin un CO asociado a la ubicación o a la sesión.')
-                return render(request, 'solicitudes/crear_solicitud.html', {'form': form})
 
             nueva_solicitud = form.save(commit=False)
 

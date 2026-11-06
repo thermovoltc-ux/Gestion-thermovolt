@@ -341,14 +341,15 @@ class PreventiveRequestCoTests(TestCase):
         solicitud = Solicitud.objects.get(consecutivo=response.json()['consecutivo'])
         self.assertEqual(solicitud.co, 'CO-PREV')
 
-    def test_preventive_request_is_rejected_without_location_or_session_co(self):
+    def test_preventive_request_is_created_without_location_or_session_co(self):
         self.equipo.ubicacion = None
         self.equipo.save()
 
         response = self._asignar_tarea()
 
-        self.assertEqual(response.status_code, 400)
-        self.assertFalse(Solicitud.objects.filter(equipo=self.equipo).exists())
+        self.assertEqual(response.status_code, 200)
+        solicitud = Solicitud.objects.get(consecutivo=response.json()['consecutivo'])
+        self.assertEqual(solicitud.co, '')
 
 
 class ProcesoInformeRetryTests(TestCase):

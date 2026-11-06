@@ -882,14 +882,6 @@ def asignar_tarea_preventiva(request, tarea_id):
 
         ubicacion = equipo.ubicacion
         co_solicitud = obtener_codigo_co_actual(request, ubicacion)
-        if not co_solicitud:
-            return JsonResponse(
-                {
-                    'status': 'error',
-                    'message': 'No se puede crear la solicitud preventiva sin un CO asociado a la ubicación o a la sesión.',
-                },
-                status=400,
-            )
         estado_nombre = 'en proceso' if estado == 'en_progreso' else estado
         estado_obj, _ = Estado.objects.get_or_create(nombre=estado_nombre)
 

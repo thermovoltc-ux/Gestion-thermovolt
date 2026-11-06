@@ -169,7 +169,7 @@ class CrearSolicitudCoTests(TestCase):
         solicitud = Solicitud.objects.get(equipo=self.equipo)
         self.assertEqual(solicitud.co, 'UBI-CO-TEST')
 
-    def test_creation_rejects_missing_co_when_location_and_session_have_none(self):
+    def test_creation_allows_missing_co_when_location_and_session_have_none(self):
         equipo_sin_ubicacion = Equipo.objects.create(
             nombre='Equipo sin ubicación',
             codigo='EQ-SIN-UBICACION',
@@ -177,9 +177,9 @@ class CrearSolicitudCoTests(TestCase):
 
         response = self._post_solicitud(equipo_sin_ubicacion)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'No se puede crear la solicitud sin un CO')
-        self.assertFalse(Solicitud.objects.filter(equipo=equipo_sin_ubicacion).exists())
+        self.assertEqual(response.status_code, 302)
+        solicitud = Solicitud.objects.get(equipo=equipo_sin_ubicacion)
+        self.assertEqual(solicitud.co, '')
 
     def test_creation_uses_session_co_when_equipment_has_no_location(self):
         equipo_sin_ubicacion = Equipo.objects.create(
