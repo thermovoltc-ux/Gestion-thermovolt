@@ -1,0 +1,68 @@
+from django.conf import settings
+from django.core.mail import EmailMessage
+from django.utils import timezone
+
+
+EVENTOS_SOLICITUD = {
+    'creacion': 'Solicitud creada',
+    'asignacion': 'Técnico asignado',
+    'informe': 'Informe de mantenimiento disponible',
+    'finalizacion': 'Orden de trabajo finalizada',
+}
+
+
+def enviar_correo_solicitud(solicitud, tipo_evento, cuerpo_extra='', destinatarios=None):
+    if tipo_evento not in EVENTOS_SOLICITUD:
+        raise ValueError(f'Tipo de evento no válido: {tipo_evento}')
+
+    ubicacion = solicitud.ubicacion_nombre or 'Sin ubicación'
+    asunto = f'[Solicitud #{solicitud.consecutivo}] - {ubicacion} - CO {solicitud.co or "N/A"}'
+
+    fecha_creacion = solicitud.fecha_creacion
+    if fecha_creacion:
+        if timezone.is_naive(fecha_creacion):
+            fecha_creacion = timezone.make_aware(fecha_creacion)
+        fecha_creacion = timezone.localtime(fecha_creacion).strftime('%d/%m/%Y %H:%M')
+    else:
+        fecha_creacion = 'N/A'
+
+    estado = solicitud.estado.nombre if solicitud.estado else 'N/A'
+    equipo = solicitud.equipo.nombre if solicitud.equipo else 'N/A'
+    cuerpo = f"""Hola,
+
+Este es un correo automático sobre la Solicitud #{solicitud.consecutivo}.
+Evento: {EVENTOS_SOLICITUD[tipo_evento]}
+
+Información de la solicitud:
+- Ubicación: {ubicacion}
+- Equipo: {equipo}
+- CO: {solicitud.co or 'N/A'}
+- Estado actual: {estado}
+- Fecha de creación: {fecha_creacion}
+
+{cuerpo_extra or ''}
+
+Saludos,
+Sistema de Mantenimiento
+"""
+
+    if not destinatarios:
+        destinatarios = [solicitud.email_solicitante] if solicitud.email_solicitante else []
+    elif isinstance(destinatarios, str):
+        destinatarios = [destinatarios]
+
+    destinatarios = list(dict.fromkeys(
+        destinatario.strip()
+        for destinatario in destinatarios
+        if destinatario and destinatario.strip()
+    ))
+    if not destinatarios:
+        return False
+
+    email = EmailMessage(
+        subject=asunto,
+        body=cuerpo,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=destinatarios,
+    )
+    return bool(email.send(fail_silently=False))

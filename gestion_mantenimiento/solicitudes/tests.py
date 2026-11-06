@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
+from unittest.mock import patch
 
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.Gestion_ot.models import Estado
@@ -142,7 +143,7 @@ class CrearSolicitudCoTests(TestCase):
             ubicacion=self.ubicacion,
         )
 
-    def _post_solicitud(self, equipo):
+    def _post_solicitud(self, equipo, enviar_email=False):
         return self.client.post(reverse('crear_solicitud'), {
             'creado_por': self.user.username,
             'descripcion_problema': 'Prueba de CO',
@@ -150,6 +151,7 @@ class CrearSolicitudCoTests(TestCase):
             'equipo': equipo.pk,
             'solicitado_por': self.user.username,
             'prioridad': 'media',
+            'enviar_email': '1' if enviar_email else '',
         })
 
     def test_creation_saves_co_from_equipment_location(self):
@@ -195,3 +197,26 @@ class CrearSolicitudCoTests(TestCase):
         self.assertEqual(response.status_code, 302)
         solicitud = Solicitud.objects.get(equipo=equipo_sin_ubicacion)
         self.assertEqual(solicitud.co, 'CO-SESION')
+
+    @patch('gestion_mantenimiento.solicitudes.views.enviar_correo_solicitud')
+    def test_creation_sends_notification_only_when_checkbox_is_selected(self, send_email):
+        response = self._post_solicitud(self.equipo, enviar_email=True)
+
+        self.assertEqual(response.status_code, 302)
+        solicitud = Solicitud.objects.get(equipo=self.equipo)
+        send_email.assert_called_once_with(
+            solicitud,
+            'creacion',
+            cuerpo_extra=(
+                'Descripción: Prueba de CO\n'
+                f'Solicitado por: {self.user.username}\n'
+                f'Creado por: {self.user.username}'
+            ),
+        )
+
+    @patch('gestion_mantenimiento.solicitudes.views.enviar_correo_solicitud')
+    def test_creation_does_not_send_notification_when_checkbox_is_unselected(self, send_email):
+        response = self._post_solicitud(self.equipo)
+
+        self.assertEqual(response.status_code, 302)
+        send_email.assert_not_called()

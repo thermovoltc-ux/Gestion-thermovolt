@@ -20,12 +20,12 @@ from django.http import HttpResponseForbidden
 from django.contrib.auth import login as auth_login
 from django.contrib.auth.forms import AuthenticationForm
 from gestion_mantenimiento.users.forms import CustomAuthenticationForm
-from django.core.mail import send_mail
-from django.conf import settings
+from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import Q
 from gestion_mantenimiento.users.access import obtener_codigo_co_actual, obtener_scope_ubicacion_ids
+from gestion_mantenimiento.solicitudes.utils import enviar_correo_solicitud
 
 # Configurar el logger
 logger = logging.getLogger(__name__)
@@ -100,7 +100,30 @@ def crear_solicitud(request):
                 return render(request, 'solicitudes/crear_solicitud.html', {'form': form})
 
             if form.cleaned_data.get('enviar_email'):
-                enviar_correo_solicitud(nueva_solicitud)
+                try:
+                    email_enviado = enviar_correo_solicitud(
+                        nueva_solicitud,
+                        'creacion',
+                        cuerpo_extra=(
+                            f'Descripción: {nueva_solicitud.descripcion_problema}\n'
+                            f'Solicitado por: {nueva_solicitud.solicitado_por}\n'
+                            f'Creado por: {nueva_solicitud.creado_por}'
+                        ),
+                    )
+                except Exception:
+                    logger.exception(
+                        'Solicitud %s creada, pero no se pudo enviar el correo de creación.',
+                        nueva_solicitud.consecutivo,
+                    )
+                    messages.error(request, 'La solicitud se creó, pero no se pudo enviar el correo.')
+                else:
+                    if email_enviado:
+                        messages.success(request, 'La solicitud se creó y se envió el correo.')
+                    else:
+                        messages.warning(
+                            request,
+                            'La solicitud se creó, pero no se envió correo porque no hay destinatarios.',
+                        )
 
             return redirect('crear_solicitud')
         else:
@@ -142,22 +165,6 @@ def crear_solicitud(request):
         )
 
     return render(request, 'solicitudes/crear_solicitud.html', {'form': form})
-
-def enviar_correo_solicitud(solicitud):
-    subject = 'Nueva Solicitud de Mantenimiento'
-    message = f"""
-    Se ha creado una nueva solicitud de mantenimiento.
-    
-    CO: {solicitud.ubicacion_co}
-    Creado por: {solicitud.creado_por}
-    PDV: {solicitud.ubicacion_nombre}
-    Equipo: {solicitud.equipo}
-    Descripción solicitud: {solicitud.descripcion_problema}
-    Solicitado por: {solicitud.solicitado_por}
-    Email del solicitante: {solicitud.email_solicitante}
-    """
-    recipient_list = [solicitud.email_solicitante, 'correo1@ejemplo.com', 'correo2@ejemplo.com']
-    send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, recipient_list)
 
 @login_required
 def lista_solicitudes(request):

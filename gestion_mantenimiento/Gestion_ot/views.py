@@ -32,6 +32,7 @@ from .forms import (
     ServicioOTForm,
 )
 from gestion_mantenimiento.solicitudes.models import Solicitud
+from gestion_mantenimiento.solicitudes.utils import enviar_correo_solicitud
 from gestion_mantenimiento.users.access import obtener_codigo_co_actual, obtener_scope_ubicacion_ids
 import logging
 from django.contrib.auth.models import User
@@ -50,7 +51,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Tabl
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
-from django.core.mail import EmailMessage
 from django.conf import settings
 from io import BytesIO
 import tempfile
@@ -794,6 +794,7 @@ def actualizar_estado_solicitud(request):
         solicitud = Solicitud.objects.get(consecutivo=numero_solicitud)
         logger.debug(f"Solicitud encontrada: {solicitud}")
 
+        estado_solicitud_anterior = solicitud.estado.nombre if solicitud.estado else None
         nuevo_estado, _ = Estado.objects.get_or_create(nombre=nuevo_estado_nombre)
         solicitud.estado = nuevo_estado
         
@@ -828,6 +829,7 @@ def actualizar_estado_solicitud(request):
                 return JsonResponse({'status': 'error', 'message': f'Fecha inválida: {fecha}'}, status=400)
 
         orden_trabajo = OrdenTrabajo.objects.filter(solicitud=solicitud).first()
+        tecnico_anterior = orden_trabajo.tecnico_asignado if orden_trabajo else ''
         if orden_trabajo:
             if tecnico:
                 orden_trabajo.tecnico_asignado = tecnico
@@ -847,7 +849,46 @@ def actualizar_estado_solicitud(request):
 
         logger.debug(f"Orden de Trabajo {'creada' if created else 'actualizada'}: {orden_trabajo}")
 
-        return JsonResponse({'status': 'ok', 'message': 'Solicitud y Orden de Trabajo actualizadas correctamente'})
+        email_warning = None
+        asignacion_nueva = bool(tecnico and tecnico != tecnico_anterior)
+        finalizacion_nueva = (
+            nuevo_estado_nombre == 'finalizada'
+            and estado_solicitud_anterior != 'finalizada'
+        )
+        if solicitud.email_solicitante and (asignacion_nueva or finalizacion_nueva):
+            if asignacion_nueva:
+                try:
+                    enviar_correo_solicitud(
+                        solicitud,
+                        'asignacion',
+                        cuerpo_extra=f'Técnico asignado: {tecnico}',
+                    )
+                except Exception:
+                    logger.exception(
+                        'Solicitud %s actualizada, pero falló el correo de asignación.',
+                        solicitud.consecutivo,
+                    )
+                    email_warning = 'La OT se actualizó, pero no se pudo enviar el correo de asignación.'
+
+            if finalizacion_nueva:
+                try:
+                    enviar_correo_solicitud(
+                        solicitud,
+                        'finalizacion',
+                        cuerpo_extra=f'La orden de trabajo OT-{solicitud.consecutivo} ha sido finalizada.',
+                    )
+                except Exception:
+                    logger.exception(
+                        'Solicitud %s finalizada, pero falló el correo de finalización.',
+                        solicitud.consecutivo,
+                    )
+                    email_warning = 'La OT se finalizó, pero no se pudo enviar el correo de finalización.'
+
+        return JsonResponse({
+            'status': 'ok',
+            'message': 'Solicitud y Orden de Trabajo actualizadas correctamente',
+            'email_warning': email_warning,
+        })
 
     except Solicitud.DoesNotExist:
         logger.error("Solicitud no encontrada.")
@@ -3094,33 +3135,17 @@ def descargar_informe_pdf(request, filename):
 
 
 def enviar_pdf_por_email(pdf_buffer, cierre_ot, drive_link):
-    """Envía el PDF por email usando Brevo API con formato HTML presentable."""
-    from django.core.mail import EmailMultiAlternatives
-    
+    """Envía el enlace al informe manteniendo el asunto común de la solicitud."""
     solicitud = cierre_ot.orden_trabajo.solicitud
     consecutivo = solicitud.consecutivo
     equipo_nombre = solicitud.equipo.nombre if solicitud.equipo else "N/A"
-    
-    # Usar PDV como nombre del cliente
     cliente_nombre = solicitud.ubicacion_nombre or "N/A"
-    
     fecha_str = cierre_ot.fecha_inicio_actividad.strftime('%d/%m/%Y') if cierre_ot.fecha_inicio_actividad else datetime.datetime.now().strftime('%d/%m/%Y')
-    
-    subject = f"Informe de Mantenimiento OT-{consecutivo}"
-    
-    # Nombre del PDF: OT - 115 - 20/6/2026 8:51:39
-    fecha_obj = cierre_ot.fecha_inicio_actividad or datetime.datetime.now()
-    fecha_hora_str = fecha_obj.strftime('%d/%m/%Y %H:%M:%S')
-    pdf_filename = f"OT - {consecutivo} - {fecha_hora_str}.pdf"
-    
-    from_email = "thermovoltc@gmail.com"
-    
-    # Build recipient list
+
     recipient_list = []
     if cierre_ot.correo_tecnico:
         recipient_list.append(cierre_ot.correo_tecnico)
 
-    # Try to resolve client/PDV email
     pdv_name = None
     try:
         pdv_name = solicitud.ubicacion_nombre or (solicitud.equipo.ubicacion.nombre if solicitud.equipo and solicitud.equipo.ubicacion else None)
@@ -3155,17 +3180,12 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot, drive_link):
                 except Exception:
                     continue
 
-    # Fallback to solicitud.email_solicitante
-    if not client_emails:
-        try:
-            if getattr(solicitud, 'email_solicitante', None):
-                client_emails = [solicitud.email_solicitante]
-        except Exception:
-            pass
-
     for e in client_emails:
         if e and e not in recipient_list:
             recipient_list.append(e)
+
+    if solicitud.email_solicitante and solicitud.email_solicitante not in recipient_list:
+        recipient_list.append(solicitud.email_solicitante)
     
     if not recipient_list:
         logger.warning("No hay destinatarios principales para enviar el email")
@@ -3174,80 +3194,26 @@ def enviar_pdf_por_email(pdf_buffer, cierre_ot, drive_link):
     guardar_copia_pdf_envio(pdf_buffer, cierre_ot)
 
     try:
-        # Crear mensaje HTML presentable
-        html_content = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
-                <!-- Header -->
-                <div style="background-color: #1a3a52; color: white; padding: 30px 20px; text-align: center;">
-                    <h2 style="margin: 0; font-size: 24px;">Informe de Mantenimiento</h2>
-                    <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Thermovolt Servicios</p>
-                </div>
-                
-                <!-- Body -->
-                <div style="padding: 30px 20px;">
-                    <p style="margin-top: 0;">Cordial saludo,</p>
-                    
-                    <p>El informe de los trabajos realizados en <strong>{cliente_nombre}</strong> queda disponible en Google Drive.</p>
-                    
-                    <!-- Info Box -->
-                    <div style="background-color: #f5f5f5; border-left: 4px solid #2c5aa0; padding: 15px; margin: 20px 0; border-radius: 4px;">
-                        <p style="margin: 5px 0;"><strong>Orden de Trabajo:</strong> OT-{consecutivo}</p>
-                        <p style="margin: 5px 0;"><strong>Equipo:</strong> {equipo_nombre}</p>
-                        <p style="margin: 5px 0;"><strong>Cliente:</strong> {cliente_nombre}</p>
-                        <p style="margin: 5px 0;"><strong>Fecha:</strong> {fecha_str}</p>
-                        <p style="margin: 5px 0;"><strong>Documento:</strong> {pdf_filename}</p>
-                    </div>
-                    
-                    <!-- LINK_INFORME -->
-                    
-                    <p>Si tiene preguntas o necesita aclaraciones adicionales, no dude en contactarnos.</p>
-                </div>
-                
-                <!-- Footer -->
-                <div style="background-color: #f9f9f9; padding: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666;">
-                    <p style="margin: 0; text-align: center;">
-                        <strong>Thermovolt</strong> | Servicios de Mantenimiento Industrial<br>
-                        <a href="mailto:info@thermovolt.com" style="color: #2c5aa0; text-decoration: none;">info@thermovolt.com</a>
-                    </p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        text_content = f"Cordial saludo,\n\nInforme de Mantenimiento OT-{consecutivo}\nEquipo: {equipo_nombre}\nCliente: {cliente_nombre}\nFecha: {fecha_str}\n"
-
-        pdf_bytes = pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else bytes(pdf_buffer)
-        attachment_size_mb = len(pdf_bytes) / (1024 * 1024)
-        logger.info(f"📬 Enviando email via Brevo")
-        logger.info(f"   - Destinatarios: {recipient_list}")
-        logger.info(f"   - Archivo: {pdf_filename} ({attachment_size_mb:.2f} MB)")
-
         if drive_link:
-            logger.info("🔗 Link público para informe generado en Drive/storage: %s", drive_link)
-            link_block = f"<div style=\"background:#f5f5f5;padding:15px;border:1px solid #d1d5db;border-radius:6px;margin:20px 0;\"><p>El informe completo está disponible aquí: <a href=\"{drive_link}\">Descargar informe (PDF)</a></p></div>"
-            html_content = html_content.replace('<!-- LINK_INFORME -->', link_block)
-            text_content += f"\nDescargar informe: {drive_link}\n\nThermovolt Servicios"
+            mensaje_informe = f'El informe de la OT está disponible. Enlace de descarga: {drive_link}'
         else:
-            unavailable_message = 'El informe no está disponible por el momento. Por favor contacte al administrador.'
-            html_content = html_content.replace('<!-- LINK_INFORME -->', f'<p>{unavailable_message}</p>')
-            text_content += f"\n{unavailable_message}\n\nThermovolt Servicios"
+            mensaje_informe = 'El informe no está disponible por el momento. Por favor contacte al administrador.'
 
-        email = EmailMultiAlternatives(
-            subject=subject,
-            body=text_content,
-            from_email=from_email,
-            to=recipient_list,
+        enviado = enviar_correo_solicitud(
+            solicitud,
+            'informe',
+            cuerpo_extra=(
+                f'{mensaje_informe}\n'
+                f'OT-{consecutivo} | Equipo: {equipo_nombre} | '
+                f'Cliente: {cliente_nombre} | Fecha: {fecha_str}'
+            ),
+            destinatarios=recipient_list,
         )
-
-        # Agregar versión HTML con el contenido final, incluyendo posible enlace.
-        email.attach_alternative(html_content, "text/html")
-        email.send(fail_silently=False)
-
-        logger.info("✅ Email enviado EXITOSAMENTE via Brevo")
-        return True
+        if enviado:
+            logger.info('Informe de solicitud %s enviado a %s', consecutivo, recipient_list)
+        else:
+            logger.warning('No se envió el informe de solicitud %s: sin destinatarios', consecutivo)
+        return enviado
 
     except Exception as e:
         logger.error("❌ Error enviando email: %s", str(e))

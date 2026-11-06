@@ -78,7 +78,10 @@ class EnviarPdfPorEmailTests(TestCase):
             consecutivo=42,
             equipo=equipo,
             ubicacion_nombre='PDV prueba',
-            email_solicitante=None,
+            email_solicitante='cliente@example.com',
+            co='CO-42',
+            estado=SimpleNamespace(nombre='en revision'),
+            fecha_creacion=datetime(2026, 9, 30, tzinfo=datetime_timezone.utc),
         )
         self.cierre_ot = SimpleNamespace(
             orden_trabajo=SimpleNamespace(solicitud=solicitud),
@@ -91,29 +94,24 @@ class EnviarPdfPorEmailTests(TestCase):
         with patch.object(views, 'guardar_copia_pdf_envio'):
             return views.enviar_pdf_por_email(self.pdf_buffer, self.cierre_ot, drive_link)
 
-    def test_sends_link_in_plain_text_and_html_without_bcc_or_attachment(self):
+    def test_sends_link_with_shared_subject_and_without_attachment(self):
         self.assertTrue(self._send_with_link('https://reports.example/informe.pdf'))
 
         message = mail.outbox[0]
         self.assertIn('https://reports.example/informe.pdf', message.body)
+        self.assertEqual(message.subject, '[Solicitud #42] - PDV prueba - CO CO-42')
+        self.assertEqual(message.to, ['tecnico@example.com', 'cliente@example.com'])
         self.assertEqual(message.bcc, [])
         self.assertEqual(message.attachments, [])
-        self.assertTrue(any(
-            mimetype == 'text/html' and 'https://reports.example/informe.pdf' in content
-            for content, mimetype in message.alternatives
-        ))
 
     def test_reports_unavailable_without_fallback_attachment(self):
         self.assertTrue(self._send_with_link(None))
 
         message = mail.outbox[0]
         self.assertIn('El informe no está disponible por el momento', message.body)
+        self.assertEqual(message.subject, '[Solicitud #42] - PDV prueba - CO CO-42')
         self.assertEqual(message.bcc, [])
         self.assertEqual(message.attachments, [])
-        self.assertTrue(any(
-            mimetype == 'text/html' and 'El informe no está disponible por el momento' in content
-            for content, mimetype in message.alternatives
-        ))
 
 
 class GestionOtFilterRegressionTests(TestCase):
@@ -294,6 +292,115 @@ class GestionOtFilterRegressionTests(TestCase):
             list(response.context['ordenes_trabajo']),
             [ot_en_proceso],
         )
+
+
+class SolicitudEmailEventTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = get_user_model().objects.create_user(
+            username='tecnico-email-eventos',
+            password='test-password',
+        )
+        self.client.force_login(self.user)
+        self.ubicacion = Ubicacion.objects.create(
+            nombre='Ubicación correo eventos',
+            codigo='UBI-CORREO',
+            co='CO-CORREO',
+        )
+        self.equipo = Equipo.objects.create(
+            nombre='Equipo correo eventos',
+            codigo='EQ-CORREO',
+            ubicacion=self.ubicacion,
+        )
+        self.estado_solicitado = Estado.objects.get_or_create(nombre='solicitado')[0]
+        self.solicitud = Solicitud.objects.create(
+            creado_por=self.user.username,
+            descripcion_problema='Solicitud con eventos de correo',
+            equipo=self.equipo,
+            ubicacion=self.ubicacion,
+            estado=self.estado_solicitado,
+            email_solicitante='solicitante@example.com',
+        )
+
+    def _actualizar_solicitud(self, estado, tecnico=None):
+        return self.client.post(
+            reverse('actualizar_estado_solicitud'),
+            data=json.dumps({
+                'numero': self.solicitud.consecutivo,
+                'estado': estado,
+                'tecnico': tecnico,
+                'fecha': timezone.now().isoformat(),
+            }),
+            content_type='application/json',
+        )
+
+    @patch('gestion_mantenimiento.Gestion_ot.views.enviar_correo_solicitud')
+    def test_assignment_sends_notification_once_when_technician_changes(self, send_email):
+        response = self._actualizar_solicitud('en proceso', 'tecnico-asignado')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['email_warning'], None)
+        send_email.assert_called_once_with(
+            self.solicitud,
+            'asignacion',
+            cuerpo_extra='Técnico asignado: tecnico-asignado',
+        )
+
+        response = self._actualizar_solicitud('en proceso', 'tecnico-asignado')
+
+        self.assertEqual(response.status_code, 200)
+        send_email.assert_called_once()
+
+    @patch('gestion_mantenimiento.Gestion_ot.views.enviar_correo_solicitud')
+    def test_assignment_does_not_send_without_requester_email(self, send_email):
+        self.solicitud.email_solicitante = ''
+        self.solicitud.save(update_fields=['email_solicitante'])
+
+        response = self._actualizar_solicitud('en proceso', 'tecnico-asignado')
+
+        self.assertEqual(response.status_code, 200)
+        send_email.assert_not_called()
+
+    @patch(
+        'gestion_mantenimiento.Gestion_ot.views.enviar_correo_solicitud',
+        side_effect=RuntimeError('provider unavailable'),
+    )
+    def test_assignment_email_failure_is_reported_without_undoing_assignment(self, send_email):
+        response = self._actualizar_solicitud('en proceso', 'tecnico-asignado')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('no se pudo enviar el correo de asignación', response.json()['email_warning'])
+        self.solicitud.refresh_from_db()
+        self.assertEqual(
+            self.solicitud.orden_trabajo.tecnico_asignado,
+            'tecnico-asignado',
+        )
+        send_email.assert_called_once()
+
+    @patch('gestion_mantenimiento.Gestion_ot.views.enviar_correo_solicitud')
+    def test_finalization_sends_notification_only_on_transition(self, send_email):
+        estado_revision = Estado.objects.get_or_create(nombre='en revision')[0]
+        self.solicitud.estado = estado_revision
+        self.solicitud.save(update_fields=['estado'])
+        OrdenTrabajo.objects.create(
+            solicitud=self.solicitud,
+            tecnico_asignado='tecnico-asignado',
+            estado=estado_revision,
+        )
+
+        response = self._actualizar_solicitud('finalizada')
+
+        self.assertEqual(response.status_code, 200)
+        send_email.assert_called_once_with(
+            self.solicitud,
+            'finalizacion',
+            cuerpo_extra=f'La orden de trabajo OT-{self.solicitud.consecutivo} ha sido finalizada.',
+        )
+
+        response = self._actualizar_solicitud('finalizada')
+
+        self.assertEqual(response.status_code, 200)
+        send_email.assert_called_once()
 
 
 class PreventiveRequestCoTests(TestCase):
