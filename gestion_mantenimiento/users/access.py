@@ -14,6 +14,34 @@ def obtener_cliente_actual(user):
     return getattr(perfil, 'cliente', None)
 
 
+def obtener_codigo_co_actual(request, ubicacion=None):
+    if ubicacion:
+        codigo = (ubicacion.co or '').strip() or (ubicacion.codigo or '').strip()
+        if codigo:
+            return codigo
+
+    if 'centro_operaciones_id' in request.session:
+        try:
+            centro_operaciones_id = int(request.session.get('centro_operaciones_id'))
+        except (TypeError, ValueError):
+            return ''
+
+        centro = CentroOperaciones.objects.filter(
+            pk=centro_operaciones_id,
+            activo=True,
+        ).first()
+        cliente = obtener_cliente_actual(getattr(request, 'user', None))
+        if (
+            not centro
+            or not cliente
+            or not centro.clientes.filter(pk=cliente.pk).exists()
+        ):
+            return ''
+        return centro.codigo.strip()
+
+    return (request.session.get('co') or '').strip()
+
+
 def _collect_descendants_ids(ubicacion_id):
     ids = {int(ubicacion_id)}
     children = Ubicacion.objects.filter(parent_id=ubicacion_id).values_list('id', flat=True)

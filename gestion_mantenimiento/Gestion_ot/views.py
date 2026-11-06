@@ -32,7 +32,7 @@ from .forms import (
     ServicioOTForm,
 )
 from gestion_mantenimiento.solicitudes.models import Solicitud
-from gestion_mantenimiento.users.access import obtener_scope_ubicacion_ids
+from gestion_mantenimiento.users.access import obtener_codigo_co_actual, obtener_scope_ubicacion_ids
 import logging
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
@@ -611,7 +611,6 @@ def gestion_ot(request):
             ).order_by('-fecha_actividad', '-id')
             solicitudes_pendientes = Solicitud.objects.filter(
                 Q(ubicacion_id__in=scope_ids) | Q(equipo__ubicacion_id__in=scope_ids),
-                orden_trabajo__isnull=True,
             )
             tareas_mantenimiento = TareaMantenimiento.objects.filter(
                 plan__equipo__ubicacion_id__in=scope_ids,
@@ -621,10 +620,19 @@ def gestion_ot(request):
         ordenes_trabajo = OrdenTrabajo.objects.select_related(
             'solicitud__equipo', 'solicitud__ubicacion', 'estado'
         ).order_by('-fecha_actividad', '-id')
-        solicitudes_pendientes = Solicitud.objects.filter(orden_trabajo__isnull=True)
+        solicitudes_pendientes = Solicitud.objects.all()
         tareas_mantenimiento = TareaMantenimiento.objects.filter(
             estado__in=['pendiente', 'en_progreso']
         ).select_related('plan', 'actividad', 'tecnico').order_by('fecha_programada')
+    solicitudes_pendientes = solicitudes_pendientes.filter(
+        estado__nombre='solicitado',
+    ).filter(
+        Q(orden_trabajo__isnull=True)
+        | Q(
+            orden_trabajo__estado__nombre='solicitado',
+            orden_trabajo__tecnico_asignado='',
+        )
+    )
     tecnicos = User.objects.filter(groups__name='Tecnico')
 
     # Filtros
@@ -873,6 +881,15 @@ def asignar_tarea_preventiva(request, tarea_id):
             descripcion += f" - {tarea.actividad.nombre}"
 
         ubicacion = equipo.ubicacion
+        co_solicitud = obtener_codigo_co_actual(request, ubicacion)
+        if not co_solicitud:
+            return JsonResponse(
+                {
+                    'status': 'error',
+                    'message': 'No se puede crear la solicitud preventiva sin un CO asociado a la ubicación o a la sesión.',
+                },
+                status=400,
+            )
         estado_nombre = 'en proceso' if estado == 'en_progreso' else estado
         estado_obj, _ = Estado.objects.get_or_create(nombre=estado_nombre)
 
@@ -884,7 +901,8 @@ def asignar_tarea_preventiva(request, tarea_id):
             estado=estado_obj,
             solicitado_por=request.user.username,
             prioridad='media',
-            ubicacion=ubicacion
+            ubicacion=ubicacion,
+            co=co_solicitud,
         )
 
         fecha_dt = datetime.datetime.strptime(fecha, '%Y-%m-%d')

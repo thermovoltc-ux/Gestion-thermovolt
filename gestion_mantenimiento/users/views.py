@@ -181,8 +181,11 @@ def dashboard(request):
     solicitudes_solicitadas = solicitudes_qs.filter(
         estado__nombre='solicitado',
     ).filter(
-        Q(orden_trabajo__isnull=True) |
-        Q(orden_trabajo__tecnico_asignado='')
+        Q(orden_trabajo__isnull=True)
+        | Q(
+            orden_trabajo__estado__nombre='solicitado',
+            orden_trabajo__tecnico_asignado='',
+        )
     ).count()
 
     tareas_planificadas_qs = TareaMantenimiento.objects.select_related('plan__equipo__ubicacion')

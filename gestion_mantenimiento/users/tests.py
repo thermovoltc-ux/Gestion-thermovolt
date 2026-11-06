@@ -860,6 +860,13 @@ class DashboardSolicitudesSinTecnicoTests(TestCase):
         estado_en_proceso = Estado.objects.get_or_create(nombre='en proceso')[0]
         self.crear_solicitud('No solicitada', estado=estado_en_proceso)
 
+        solicitud_ot_en_proceso_sin_tecnico = self.crear_solicitud('OT en proceso sin técnico')
+        OrdenTrabajo.objects.create(
+            solicitud=solicitud_ot_en_proceso_sin_tecnico,
+            tecnico_asignado='',
+            estado=estado_en_proceso,
+        )
+
         response = self.client.get(reverse('dashboard'))
 
         self.assertEqual(response.status_code, 200)

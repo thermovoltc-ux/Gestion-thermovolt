@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from django.db import IntegrityError
 from django.core import mail
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.files import File
@@ -188,6 +189,47 @@ class GestionOtFilterRegressionTests(TestCase):
         self.assertNotIn(self.ot_otra_ubicacion.solicitud.consecutivo, [ot.solicitud.consecutivo for ot in ordenes])
         self.assertNotIn(self.ot_finalizada.solicitud.consecutivo, [ot.solicitud.consecutivo for ot in ordenes])
 
+    def test_kanban_shows_unassigned_requested_ot_with_its_solicitud(self):
+        solicitud_sin_tecnico = Solicitud.objects.create(
+            creado_por='tester',
+            descripcion_problema='Solicitud con OT sin técnico',
+            equipo=self.equipo_a,
+            ubicacion=self.ubicacion_a,
+            estado=self.estado_solicitado,
+            fecha_creacion=timezone.now(),
+        )
+        OrdenTrabajo.objects.create(
+            solicitud=solicitud_sin_tecnico,
+            tecnico_asignado='',
+            estado=self.estado_solicitado,
+        )
+
+        estado_en_proceso, _ = Estado.objects.get_or_create(nombre='en proceso')
+        solicitud_ot_en_proceso = Solicitud.objects.create(
+            creado_por='tester',
+            descripcion_problema='Solicitud con OT en proceso',
+            equipo=self.equipo_a,
+            ubicacion=self.ubicacion_a,
+            estado=self.estado_solicitado,
+            fecha_creacion=timezone.now(),
+        )
+        OrdenTrabajo.objects.create(
+            solicitud=solicitud_ot_en_proceso,
+            tecnico_asignado='',
+            estado=estado_en_proceso,
+        )
+
+        response = self.client.get(reverse('gestion_ot'))
+
+        self.assertEqual(response.status_code, 200)
+        consecutivos = {
+            solicitud.consecutivo
+            for solicitud in response.context['solicitudes']
+        }
+        self.assertIn(solicitud_sin_tecnico.consecutivo, consecutivos)
+        self.assertNotIn(solicitud_ot_en_proceso.consecutivo, consecutivos)
+        self.assertNotIn(self.ot_actual.solicitud.consecutivo, consecutivos)
+
     def test_dashboard_late_filter_combines_with_pending_state(self):
         plan = PlanMantenimiento.objects.create(
             equipo=self.equipo_a,
@@ -252,6 +294,61 @@ class GestionOtFilterRegressionTests(TestCase):
             list(response.context['ordenes_trabajo']),
             [ot_en_proceso],
         )
+
+
+class PreventiveRequestCoTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = get_user_model().objects.create_user(
+            username='tecnico-preventivo-co',
+            password='test-password',
+        )
+        self.client.force_login(self.user)
+        self.ubicacion = Ubicacion.objects.create(
+            nombre='Ubicación preventivo CO',
+            codigo='UBI-PREV-CO',
+            co='CO-PREV',
+        )
+        self.equipo = Equipo.objects.create(
+            nombre='Equipo preventivo CO',
+            codigo='EQ-PREV-CO',
+            ubicacion=self.ubicacion,
+        )
+        self.plan = PlanMantenimiento.objects.create(
+            equipo=self.equipo,
+            nombre='Plan preventivo CO',
+            fecha_inicio=timezone.localdate(),
+        )
+        self.tarea = TareaMantenimiento.objects.create(
+            plan=self.plan,
+            fecha_programada=timezone.localdate(),
+        )
+
+    def _asignar_tarea(self):
+        return self.client.post(
+            reverse('asignar_tarea_preventiva', args=[self.tarea.pk]),
+            data=json.dumps({
+                'tecnico': 'tecnico-asignado',
+                'fecha': timezone.localdate().isoformat(),
+            }),
+            content_type='application/json',
+        )
+
+    def test_preventive_request_saves_co_from_equipment_location(self):
+        response = self._asignar_tarea()
+
+        self.assertEqual(response.status_code, 200)
+        solicitud = Solicitud.objects.get(consecutivo=response.json()['consecutivo'])
+        self.assertEqual(solicitud.co, 'CO-PREV')
+
+    def test_preventive_request_is_rejected_without_location_or_session_co(self):
+        self.equipo.ubicacion = None
+        self.equipo.save()
+
+        response = self._asignar_tarea()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Solicitud.objects.filter(equipo=self.equipo).exists())
 
 
 class ProcesoInformeRetryTests(TestCase):

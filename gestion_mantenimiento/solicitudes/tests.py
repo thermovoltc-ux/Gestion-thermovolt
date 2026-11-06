@@ -1,4 +1,6 @@
-from django.test import TestCase
+from django.contrib.auth import get_user_model
+from django.test import Client, TestCase
+from django.urls import reverse
 
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.Gestion_ot.models import Estado
@@ -117,3 +119,79 @@ class SolicitudEquipoActivoTests(TestCase):
         form = self._form()
 
         self.assertTrue(form.is_valid(), form.errors)
+
+
+class CrearSolicitudCoTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = get_user_model().objects.create_user(
+            username='creador-solicitud',
+            password='test-password',
+        )
+        self.client.force_login(self.user)
+        self.client.session['tipo_cuenta'] = 'tecnico'
+        self.client.session.save()
+        self.ubicacion = Ubicacion.objects.create(
+            nombre='Ubicación con CO',
+            codigo='UBI-CO-TEST',
+            co='CO-TEST',
+        )
+        self.equipo = Equipo.objects.create(
+            nombre='Equipo con CO',
+            codigo='EQ-CO-TEST',
+            ubicacion=self.ubicacion,
+        )
+
+    def _post_solicitud(self, equipo):
+        return self.client.post(reverse('crear_solicitud'), {
+            'creado_por': self.user.username,
+            'descripcion_problema': 'Prueba de CO',
+            'email_solicitante': 'solicitante@example.com',
+            'equipo': equipo.pk,
+            'solicitado_por': self.user.username,
+            'prioridad': 'media',
+        })
+
+    def test_creation_saves_co_from_equipment_location(self):
+        response = self._post_solicitud(self.equipo)
+
+        self.assertEqual(response.status_code, 302)
+        solicitud = Solicitud.objects.get(equipo=self.equipo)
+        self.assertEqual(solicitud.co, 'CO-TEST')
+
+    def test_creation_uses_location_code_when_location_has_no_co(self):
+        self.ubicacion.co = ''
+        self.ubicacion.save()
+
+        response = self._post_solicitud(self.equipo)
+
+        self.assertEqual(response.status_code, 302)
+        solicitud = Solicitud.objects.get(equipo=self.equipo)
+        self.assertEqual(solicitud.co, 'UBI-CO-TEST')
+
+    def test_creation_rejects_missing_co_when_location_and_session_have_none(self):
+        equipo_sin_ubicacion = Equipo.objects.create(
+            nombre='Equipo sin ubicación',
+            codigo='EQ-SIN-UBICACION',
+        )
+
+        response = self._post_solicitud(equipo_sin_ubicacion)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'No se puede crear la solicitud sin un CO')
+        self.assertFalse(Solicitud.objects.filter(equipo=equipo_sin_ubicacion).exists())
+
+    def test_creation_uses_session_co_when_equipment_has_no_location(self):
+        equipo_sin_ubicacion = Equipo.objects.create(
+            nombre='Equipo con CO en sesión',
+            codigo='EQ-CO-SESION',
+        )
+        session = self.client.session
+        session['co'] = 'CO-SESION'
+        session.save()
+
+        response = self._post_solicitud(equipo_sin_ubicacion)
+
+        self.assertEqual(response.status_code, 302)
+        solicitud = Solicitud.objects.get(equipo=equipo_sin_ubicacion)
+        self.assertEqual(solicitud.co, 'CO-SESION')

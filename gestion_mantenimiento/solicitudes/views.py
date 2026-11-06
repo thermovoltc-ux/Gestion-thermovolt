@@ -25,7 +25,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import Q
-from gestion_mantenimiento.users.access import obtener_scope_ubicacion_ids
+from gestion_mantenimiento.users.access import obtener_codigo_co_actual, obtener_scope_ubicacion_ids
 
 # Configurar el logger
 logger = logging.getLogger(__name__)
@@ -70,10 +70,16 @@ def crear_solicitud(request):
                 if ubicacion_seleccionada:
                     form.instance.ubicacion = ubicacion_seleccionada
 
+            co_solicitud = obtener_codigo_co_actual(request, ubicacion_seleccionada if equipo else None)
+            if not co_solicitud:
+                form.add_error(None, 'No se puede crear la solicitud sin un CO asociado a la ubicación o a la sesión.')
+                return render(request, 'solicitudes/crear_solicitud.html', {'form': form})
+
             nueva_solicitud = form.save(commit=False)
 
             ultimo_consecutivo = Solicitud.objects.aggregate(models.Max('consecutivo'))['consecutivo__max'] or 0
             nueva_solicitud.consecutivo = ultimo_consecutivo + 1
+            nueva_solicitud.co = co_solicitud
 
             estado_solicitado, _ = Estado.objects.get_or_create(nombre='solicitado')
             nueva_solicitud.estado = estado_solicitado
