@@ -1,12 +1,63 @@
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
+from django.core import mail
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.Gestion_ot.models import Estado
 from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
 from gestion_mantenimiento.solicitudes.forms import SolicitudForm
+from gestion_mantenimiento.solicitudes.utils import enviar_correo_solicitud
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class EnviarCorreoSolicitudTests(TestCase):
+    def setUp(self):
+        self.solicitud = SimpleNamespace(
+            consecutivo=42,
+            ubicacion_nombre='<Sede prueba>',
+            co='CO-42',
+            fecha_creacion=None,
+            estado=SimpleNamespace(nombre='solicitado'),
+            equipo=SimpleNamespace(nombre='Equipo prueba'),
+            email_solicitante='cliente@example.com',
+        )
+
+    def test_sends_html_and_plain_text_with_inline_logo(self):
+        enviado = enviar_correo_solicitud(
+            self.solicitud,
+            'asignacion',
+            cuerpo_extra='Técnico asignado: Ana',
+        )
+
+        self.assertTrue(enviado)
+        mensaje = mail.outbox[0]
+        self.assertEqual(mensaje.subject, '[Solicitud #42] - <Sede prueba> - CO CO-42')
+        self.assertIn('Técnico asignado: Ana', mensaje.body)
+        self.assertEqual(len(mensaje.alternatives), 1)
+        html, content_type = mensaje.alternatives[0]
+        self.assertEqual(content_type, 'text/html')
+        self.assertIn('Notificación de Solicitud', html)
+        self.assertIn('Técnico asignado', html)
+        self.assertIn('&lt;Sede prueba&gt;', html)
+        self.assertIn('cid:thermovolt-logo', html)
+        self.assertEqual(len(mensaje.attachments), 1)
+        self.assertEqual(mensaje.attachments[0].get('Content-ID'), '<thermovolt-logo>')
+
+    def test_report_email_remains_plain_text_without_attachments(self):
+        enviado = enviar_correo_solicitud(
+            self.solicitud,
+            'informe',
+            cuerpo_extra='Informe disponible: https://example.com/informe.pdf',
+        )
+
+        self.assertTrue(enviado)
+        mensaje = mail.outbox[0]
+        self.assertIn('https://example.com/informe.pdf', mensaje.body)
+        self.assertEqual(mensaje.alternatives, [])
+        self.assertEqual(mensaje.attachments, [])
 
 
 class SolicitudConsecutivoTests(TestCase):

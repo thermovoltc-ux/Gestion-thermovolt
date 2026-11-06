@@ -1,5 +1,9 @@
+from email.mime.image import MIMEImage
+
 from django.conf import settings
-from django.core.mail import EmailMessage
+from django.contrib.staticfiles import finders
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
 from django.utils import timezone
 
 
@@ -43,7 +47,7 @@ Información de la solicitud:
 {cuerpo_extra or ''}
 
 Saludos,
-Sistema de Mantenimiento
+Equipo de Thermovolt
 """
 
     if not destinatarios:
@@ -59,10 +63,36 @@ Sistema de Mantenimiento
     if not destinatarios:
         return False
 
-    email = EmailMessage(
+    email = EmailMultiAlternatives(
         subject=asunto,
         body=cuerpo,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=destinatarios,
     )
+    if tipo_evento != 'informe':
+        contexto = {
+            'consecutivo': solicitud.consecutivo,
+            'evento': EVENTOS_SOLICITUD[tipo_evento],
+            'ubicacion': ubicacion,
+            'equipo': equipo,
+            'co': solicitud.co or 'N/A',
+            'estado': estado,
+            'fecha_creacion': fecha_creacion,
+            'cuerpo_extra': cuerpo_extra or '',
+            'email_contacto': settings.DEFAULT_FROM_EMAIL,
+            'telefono_contacto': getattr(settings, 'THERMOVOLT_PHONE', ''),
+            'sitio_web': getattr(settings, 'THERMOVOLT_WEBSITE', ''),
+        }
+        html_content = render_to_string('emails/correo_solicitud.html', contexto)
+        email.attach_alternative(html_content, 'text/html')
+
+        logo_path = finders.find('images/thermovolt-logo.png')
+        if not logo_path:
+            raise FileNotFoundError('No se encontró el logo de Thermovolt en los archivos estáticos.')
+        with open(logo_path, 'rb') as logo_file:
+            logo = MIMEImage(logo_file.read(), _subtype='png')
+        logo.add_header('Content-ID', '<thermovolt-logo>')
+        logo.add_header('Content-Disposition', 'inline', filename='thermovolt-logo.png')
+        email.attach(logo)
+
     return bool(email.send(fail_silently=False))

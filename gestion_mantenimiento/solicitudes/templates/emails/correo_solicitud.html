@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Notificación de Solicitud</title>
+</head>
+<body style="margin:0; padding:24px 12px; background:#f1f5f9; color:#1e293b; font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+            <td align="center">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%; max-width:600px; background:#ffffff; border-radius:12px; overflow:hidden;">
+                    <tr>
+                        <td style="padding:24px 32px; background:#0f2747; text-align:center;">
+                            <img src="cid:thermovolt-logo" alt="Thermovolt" width="180" style="display:block; width:180px; max-width:100%; height:auto; margin:0 auto 16px;">
+                            <h1 style="margin:0; color:#ffffff; font-size:24px;">Notificación de Solicitud</h1>
+                            <p style="margin:8px 0 0; color:#bfdbfe; font-size:15px;">{{ evento }}</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:28px 32px;">
+                            <p style="margin:0 0 18px; color:#475569; font-size:15px; line-height:1.6;">
+                                Se ha actualizado la solicitud <strong>#{{ consecutivo }}</strong>. A continuación encontrarás sus datos:
+                            </p>
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse; font-size:14px;">
+                                <tr>
+                                    <td style="width:38%; padding:11px 12px; border-bottom:1px solid #e2e8f0; color:#64748b;">Ubicación</td>
+                                    <td style="padding:11px 12px; border-bottom:1px solid #e2e8f0; color:#1e293b; font-weight:600;">{{ ubicacion }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:11px 12px; border-bottom:1px solid #e2e8f0; color:#64748b;">Equipo</td>
+                                    <td style="padding:11px 12px; border-bottom:1px solid #e2e8f0; color:#1e293b; font-weight:600;">{{ equipo }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:11px 12px; border-bottom:1px solid #e2e8f0; color:#64748b;">CO</td>
+                                    <td style="padding:11px 12px; border-bottom:1px solid #e2e8f0; color:#1e293b; font-weight:600;">{{ co }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:11px 12px; border-bottom:1px solid #e2e8f0; color:#64748b;">Estado</td>
+                                    <td style="padding:11px 12px; border-bottom:1px solid #e2e8f0; color:#1e293b; font-weight:600;">{{ estado }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:11px 12px; color:#64748b;">Fecha de creación</td>
+                                    <td style="padding:11px 12px; color:#1e293b; font-weight:600;">{{ fecha_creacion }}</td>
+                                </tr>
+                            </table>
+
+                            {% if cuerpo_extra %}
+                            <div style="margin-top:22px; padding:18px 20px; border-left:4px solid #14b8a6; border-radius:6px; background:#f0fdfa; color:#134e4a; font-size:15px; line-height:1.6;">
+                                {{ cuerpo_extra|linebreaksbr }}
+                            </div>
+                            {% endif %}
+
+                            <p style="margin:24px 0 0; color:#475569; font-size:14px; line-height:1.6;">
+                                Saludos,<br><strong>Equipo de Thermovolt</strong>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:18px 32px; background:#f8fafc; border-top:1px solid #e2e8f0; color:#64748b; text-align:center; font-size:12px; line-height:1.8;">
+                            {% if email_contacto %}<div><a href="mailto:{{ email_contacto }}" style="color:#0f766e; text-decoration:none;">{{ email_contacto }}</a></div>{% endif %}
+                            {% if telefono_contacto %}<div>{{ telefono_contacto }}</div>{% endif %}
+                            {% if sitio_web %}<div><a href="{{ sitio_web }}" style="color:#0f766e; text-decoration:none;">{{ sitio_web }}</a></div>{% endif %}
+                            <div>Este es un mensaje automático de Thermovolt. Por favor, no respondas a este correo.</div>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
