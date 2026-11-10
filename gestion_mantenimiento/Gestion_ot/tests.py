@@ -688,6 +688,62 @@ class MaterialOTAjaxTests(TestCase):
         self.assertEqual(material_ot.cantidad, Decimal('2.00'))
         self.assertIsNotNone(material_ot.fecha_registro)
 
+    def test_standard_and_quick_add_accept_pdf_invoices(self):
+        from tempfile import TemporaryDirectory
+
+        self.ot_ajena.tecnico_asignado = self.user.username
+        self.ot_ajena.estado = self.estado_en_proceso
+        self.ot_ajena.save(update_fields=['tecnico_asignado', 'estado'])
+        pdf_content = b'%PDF-1.7\ninvoice'
+
+        with TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                for order, route_name, filename in (
+                    (self.ot, 'agregar_material_ot', 'factura-cierre.pdf'),
+                    (self.ot_ajena, 'agregar_material_rapido_ot', 'factura-rapida.pdf'),
+                ):
+                    with self.subTest(route=route_name):
+                        response = self.client.post(
+                            reverse(route_name, args=[order.pk]),
+                            {
+                                'material': self.material.pk,
+                                'cantidad': '1',
+                                'costo_real': '10.00',
+                                'foto_factura': SimpleUploadedFile(
+                                    filename,
+                                    pdf_content,
+                                    content_type='application/pdf',
+                                ),
+                            },
+                        )
+
+                        self.assertEqual(response.status_code, 201)
+                        material_ot = MaterialOT.objects.get(orden_trabajo=order)
+                        self.assertTrue(material_ot.foto_factura.name.endswith('.pdf'))
+                        with material_ot.foto_factura.open('rb') as uploaded_file:
+                            self.assertEqual(uploaded_file.read(), pdf_content)
+
+    def test_quick_add_rejects_invoice_with_unsupported_extension(self):
+        self.ot.estado = self.estado_en_proceso
+        self.ot.save(update_fields=['estado'])
+
+        response = self.client.post(
+            reverse('agregar_material_rapido_ot', args=[self.ot.pk]),
+            {
+                'material': self.material.pk,
+                'cantidad': '1',
+                'costo_real': '10.00',
+                'foto_factura': SimpleUploadedFile(
+                    'factura.exe',
+                    b'not an invoice',
+                    content_type='application/octet-stream',
+                ),
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Extensiones permitidas', str(response.json()['errors']))
+
     def test_repeated_identical_add_request_reuses_existing_ot_material(self):
         url = reverse('agregar_material_ot', args=[self.ot.pk])
         payload = {
@@ -1067,6 +1123,8 @@ class MaterialOTAjaxTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Agregar Material / Repuesto')
+        self.assertContains(response, 'accept="image/*,application/pdf"')
+        self.assertNotContains(response, 'capture="environment"')
         self.assertContains(response, 'Rodamiento')
         self.assertContains(response, 'materiales_ot.js')
         self.assertContains(response, 'id="buscar-material-unificado" class="form-control" list="materiales-catalogo"')
@@ -1890,6 +1948,8 @@ class RentabilidadAdminTests(TestCase):
         self.assertNotContains(response, 'OT Finalizada')
         self.assertNotContains(response, 'Estado de la OT</strong>')
         self.assertContains(response, 'Agregar material (Admin)')
+        self.assertContains(response, 'accept="image/*,application/pdf"')
+        self.assertNotContains(response, 'capture="environment"')
         self.assertContains(response, 'id="admin-material-search" list="admin-materials-datalist"')
         self.assertContains(
             response,
@@ -2044,6 +2104,48 @@ class RentabilidadAdminTests(TestCase):
         self.assertEqual(material.precio_venta_sugerido, Decimal('100000.00'))
         material_ot = MaterialOT.objects.get(orden_trabajo=self.ot, material=material)
         self.assertEqual(material_ot.precio_venta_aplicado, Decimal('100000.00'))
+
+    def test_admin_can_add_pdf_invoice_to_material(self):
+        from tempfile import TemporaryDirectory
+
+        self.client.force_login(self.admin)
+        material = Material.objects.create(
+            codigo='MAT-RENT-PDF',
+            nombre='Material con factura PDF',
+            costo_base=Decimal('50.00'),
+            precio_venta_sugerido=Decimal('100.00'),
+        )
+        pdf_content = b'%PDF-1.7\ninvoice'
+
+        with TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                response = self.client.post(
+                    reverse('agregar_material_ot_admin', args=[self.ot.pk]),
+                    {
+                        'categoria': 'R',
+                        'material': material.pk,
+                        'cantidad': '1.00',
+                        'costo_real': '50.00',
+                        'aplicar_margen': '0',
+                        'foto_factura': SimpleUploadedFile(
+                            'factura-supervisor.pdf',
+                            pdf_content,
+                            content_type='application/pdf',
+                        ),
+                    },
+                )
+
+                self.assertRedirects(
+                    response,
+                    reverse('gestionar_ot_admin', args=[self.ot.pk]),
+                )
+                material_ot = MaterialOT.objects.get(
+                    orden_trabajo=self.ot,
+                    material=material,
+                )
+                self.assertTrue(material_ot.foto_factura.name.endswith('.pdf'))
+                with material_ot.foto_factura.open('rb') as uploaded_file:
+                    self.assertEqual(uploaded_file.read(), pdf_content)
 
     def test_admin_can_add_new_material_without_applying_margin(self):
         self.client.force_login(self.admin)

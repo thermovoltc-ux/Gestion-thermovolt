@@ -1,4 +1,5 @@
 from django import forms
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.forms import inlineformset_factory
@@ -13,6 +14,7 @@ from .models import (
     CierreOtActividad,
     Material,
     MaterialOT,
+    MATERIALOT_FACTURA_ALLOWED_EXTENSIONS,
 )
 
 # Formulario para OrdenTrabajo
@@ -298,8 +300,7 @@ class MaterialOTForm(forms.ModelForm):
             'material': forms.Select(attrs={'class': 'form-control'}),
             'foto_factura': forms.FileInput(attrs={
                 'class': 'form-control',
-                'accept': 'image/*',
-                'capture': 'environment',
+                'accept': 'image/*,application/pdf',
             }),
             'observaciones': forms.Textarea(attrs={
                 'class': 'form-control',
@@ -307,6 +308,18 @@ class MaterialOTForm(forms.ModelForm):
                 'maxlength': '5000',
             }),
         }
+
+    def clean_foto_factura(self):
+        archivo = self.cleaned_data.get('foto_factura')
+        if archivo:
+            extension = archivo.name.rsplit('.', 1)[-1].lower() if '.' in archivo.name else ''
+            if extension not in MATERIALOT_FACTURA_ALLOWED_EXTENSIONS:
+                extensiones = ', '.join(MATERIALOT_FACTURA_ALLOWED_EXTENSIONS)
+                raise ValidationError(
+                    f'Selecciona una imagen JPG, JPEG o PNG, o un archivo PDF. '
+                    f'Extensiones permitidas: {extensiones}.'
+                )
+        return archivo
 
 
 class ServicioOTForm(forms.Form):

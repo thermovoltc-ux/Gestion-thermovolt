@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 from django.contrib.auth.models import User
@@ -10,6 +11,8 @@ import re
 import unicodedata
 import uuid
 from .storage import GoogleDriveMediaStorage
+
+MATERIALOT_FACTURA_ALLOWED_EXTENSIONS = ('jpg', 'jpeg', 'png', 'pdf')
 
 # Modelo de Estado
 class Estado(models.Model):
@@ -463,11 +466,16 @@ class MaterialOT(models.Model):
     )
     cantidad = models.DecimalField(max_digits=10, decimal_places=2)
     costo_real = models.DecimalField(max_digits=12, decimal_places=2)
-    foto_factura = models.ImageField(
+    foto_factura = models.FileField(
         upload_to='materiales/facturas/',
         blank=True,
         null=True,
         storage=GoogleDriveMediaStorage(),
+        validators=[
+            FileExtensionValidator(
+                allowed_extensions=MATERIALOT_FACTURA_ALLOWED_EXTENSIONS,
+            ),
+        ],
     )
     fecha_registro = models.DateTimeField(auto_now_add=True)
     precio_venta_aplicado = models.DecimalField(
