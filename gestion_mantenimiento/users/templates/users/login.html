@@ -37,8 +37,20 @@
                         </div>
                     {% endif %}
                     
-                    <div class="form-group" id="div_id_co">
-                        <label for="id_co">Centro de Operaciones (obligatorio para clientes, opcional para jefes de área)</label>
+                    <div class="form-group">
+                        <label for="id_tipo_cuenta">Tipo de cuenta</label>
+                        {{ form.tipo_cuenta }}
+                        {% if form.tipo_cuenta.errors %}
+                            <ul class="error-list">
+                                {% for error in form.tipo_cuenta.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group hidden" id="div_id_co">
+                        <label for="id_co">Centro de Operaciones</label>
                         {{ form.co }}
                         {% if form.co.errors %}
                             <ul class="error-list">

@@ -126,6 +126,14 @@ class CustomLoginCentroOperacionesTests(TestCase):
             },
         )
 
+    def test_login_restores_account_type_selector_and_hides_co_initially(self):
+        response = self.client.get(self.url)
+
+        self.assertContains(response, 'id="id_tipo_cuenta"')
+        self.assertContains(response, '<option value="jefe_de_area">Jefe de Área</option>')
+        self.assertContains(response, '<option value="administrador" selected>Administrador</option>')
+        self.assertContains(response, 'class="form-group hidden" id="div_id_co"')
+
     def test_admin_login_stores_assigned_center_id(self):
         response = self._login(self.centro.codigo)
 

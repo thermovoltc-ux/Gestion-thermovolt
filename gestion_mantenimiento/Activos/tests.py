@@ -74,6 +74,11 @@ class ArbolActivosCOFilterTests(TestCase):
             codigo='EQ-DESPOSTE-CO-TEST',
             ubicacion=self.child,
         )
+        self.grandchild_equipo = Equipo.objects.create(
+            nombre='Equipo línea uno',
+            codigo='EQ-LINEA-CO-TEST',
+            ubicacion=self.grandchild,
+        )
         session = self.client.session
         session['tipo_cuenta'] = 'administrador'
         session['centro_operaciones_id'] = self.centers['100'].pk
@@ -85,24 +90,48 @@ class ArbolActivosCOFilterTests(TestCase):
         self.last_scope = obtener_alcance(response.wsgi_request)
         return response.json()['data']
 
-    def test_center_scope_excludes_locations_assigned_to_other_centers(self):
+    def test_parent_center_scope_includes_descendants_with_different_centers(self):
         nodes = self._get_nodes()
 
         self.assertEqual(self.last_scope.rol, 'administrador')
         self.assertEqual(
             self.last_scope.ubicacion_ids,
-            {self.root.pk},
+            {
+                self.root.pk,
+                self.child.pk,
+                self.sibling.pk,
+                self.grandchild.pk,
+            },
         )
         self.assertEqual([node['id'] for node in nodes], [f'ubicacion-{self.root.pk}'])
-        root_node = nodes[0]
-        child_nodes = [
-            node for node in root_node['children']
-            if node['type'] == 'ubicacion'
-        ]
-        self.assertEqual(child_nodes, [])
+        node_ids = set()
+        equipment_ids = set()
+
+        def collect_ids(node):
+            if node['type'] == 'ubicacion':
+                node_ids.add(node['id'])
+            elif node['type'] == 'equipo':
+                equipment_ids.add(node['id'])
+            for child in node['children']:
+                collect_ids(child)
+
+        for node in nodes:
+            collect_ids(node)
+
+        self.assertEqual(
+            node_ids,
+            {
+                f'ubicacion-{self.root.pk}',
+                f'ubicacion-{self.child.pk}',
+                f'ubicacion-{self.sibling.pk}',
+                f'ubicacion-{self.grandchild.pk}',
+            },
+        )
+        self.assertIn(f'equipo-{self.child_equipo.pk}', equipment_ids)
+        self.assertIn(f'equipo-{self.grandchild_equipo.pk}', equipment_ids)
         self.assertIn(
             f'equipo-{self.root_equipo.pk}',
-            [node['id'] for node in root_node['children']],
+            equipment_ids,
         )
 
     def test_child_center_scope_returns_child_and_its_descendants(self):
@@ -116,7 +145,7 @@ class ArbolActivosCOFilterTests(TestCase):
         self.assertEqual(nodes[0]['parent'], '#')
         self.assertEqual(
             [node['id'] for node in nodes[0]['children'] if node['type'] == 'ubicacion'],
-            [],
+            [f'ubicacion-{self.grandchild.pk}'],
         )
         self.assertIn(
             f'equipo-{self.child_equipo.pk}',
@@ -190,6 +219,7 @@ class ArbolActivosCOFilterTests(TestCase):
             co='900',
             centro_operaciones=self.centers['900'],
         )
+        self.user.groups.clear()
         self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
         session = self.client.session
         session['tipo_cuenta'] = 'jefe_de_area'
@@ -214,6 +244,7 @@ class ArbolActivosCOFilterTests(TestCase):
         )
 
     def test_area_manager_with_center_sees_only_that_center(self):
+        self.user.groups.clear()
         self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
         session = self.client.session
         session['centro_operaciones_id'] = self.centers['100'].pk
@@ -222,7 +253,10 @@ class ArbolActivosCOFilterTests(TestCase):
         nodes = self._get_nodes()
 
         self.assertEqual([node['id'] for node in nodes], [f'ubicacion-{self.root.pk}'])
-        self.assertNotIn(f'ubicacion-{self.child.pk}', str(nodes))
+        descendants = str(nodes)
+        self.assertIn(f'ubicacion-{self.child.pk}', descendants)
+        self.assertIn(f'ubicacion-{self.sibling.pk}', descendants)
+        self.assertIn(f'ubicacion-{self.grandchild.pk}', descendants)
 
     def test_client_can_use_unassociated_center_but_not_other_fk_with_matching_text(self):
         outside = Ubicacion.objects.create(

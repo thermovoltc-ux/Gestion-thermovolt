@@ -58,12 +58,7 @@ def _ubicaciones_del_centro(centro):
         ubicaciones.add(actual.pk)
 
         for hijo in Ubicacion.objects.filter(parent_id=actual.pk):
-            if hijo.centro_operaciones_id == centro.pk:
-                pendientes.append(hijo)
-            elif hijo.centro_operaciones_id is None and (
-                not hijo.co or hijo.co.strip().casefold() == codigo.casefold()
-            ):
-                pendientes.append(hijo)
+            pendientes.append(hijo)
 
     return ubicaciones
 

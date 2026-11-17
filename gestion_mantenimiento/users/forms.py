@@ -28,6 +28,19 @@ class CustomUserCreationForm(UserCreationForm):
         return email
 
 class CustomAuthenticationForm(AuthenticationForm):
+    TIPO_CUENTA_CHOICES = [
+        ('jefe_de_area', 'Jefe de Área'),
+        ('administrador', 'Administrador'),
+        ('tecnico', 'Técnico'),
+    ]
+
+    tipo_cuenta = forms.ChoiceField(
+        choices=TIPO_CUENTA_CHOICES,
+        required=True,
+        initial='administrador',
+        label='Tipo de cuenta',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
     co = forms.CharField(max_length=100, required=False, label="CO del PDV")
 
     class Meta:
