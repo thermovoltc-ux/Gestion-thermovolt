@@ -142,25 +142,107 @@ class CustomLoginCentroOperacionesTests(TestCase):
         self.assertContains(response, reverse('lista_activos'))
 
     def test_area_manager_without_co_sees_assets_navigation(self):
+        self.user.groups.clear()
         self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
+        otra_ubicacion = Ubicacion.objects.create(
+            nombre='Ubicación de otro cliente',
+            codigo='UBI-OTRO-CLIENTE-MANAGER',
+            centro_operaciones=CentroOperaciones.objects.create(
+                nombre='CO global manager',
+                codigo='CO-GLOBAL-MANAGER',
+            ),
+        )
         response = self._login('', tipo_cuenta='jefe_de_area')
 
         self.assertRedirects(response, reverse('dashboard'))
         session = self.client.session
         self.assertNotIn('co', session)
         self.assertNotIn('centro_operaciones_id', session)
+        self.assertEqual(session['tipo_cuenta'], 'jefe_de_area')
 
         response = self.client.get(reverse('dashboard'))
         self.assertContains(response, reverse('lista_activos'))
+        tree_response = self.client.get(reverse('api_arbol_json'))
+        self.assertIn(f'ubicacion-{otra_ubicacion.pk}', str(tree_response.json()))
 
-    def test_client_account_cannot_login_without_co(self):
+    def test_area_manager_with_center_sees_only_that_center(self):
+        self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
+        own_location = Ubicacion.objects.create(
+            nombre='Ubicación CO propio',
+            codigo='UBI-MANAGER-PROPIO',
+            centro_operaciones=self.centro,
+        )
+        other_center = CentroOperaciones.objects.create(
+            nombre='CO de otro cliente',
+            codigo='CO-MANAGER-AJENO',
+        )
+        other_location = Ubicacion.objects.create(
+            nombre='Ubicación CO ajeno',
+            codigo='UBI-MANAGER-AJENO',
+            centro_operaciones=other_center,
+        )
+
+        self.assertRedirects(
+            self._login(self.centro.codigo, tipo_cuenta='administrador'),
+            reverse('dashboard'),
+        )
+        response = self.client.get(reverse('api_arbol_json'))
+
+        self.assertIn(f'ubicacion-{own_location.pk}', str(response.json()))
+        self.assertNotIn(f'ubicacion-{other_location.pk}', str(response.json()))
+
+    def test_area_manager_login_without_co_is_allowed(self):
+        self.user.groups.clear()
+        self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
+
+        response = self._login('')
+
+        self.assertRedirects(response, reverse('dashboard'))
+        self.assertTrue(response.wsgi_request.user.is_authenticated)
+        session = self.client.session
+        self.assertNotIn('co', session)
+        self.assertNotIn('centro_operaciones_id', session)
+
+    def test_client_login_without_co_is_blocked(self):
         response = self._login('')
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.wsgi_request.user.is_authenticated)
-        self.assertIn('co', response.context['form'].errors)
+        self.assertIn(
+            'Los clientes deben ingresar un Centro de Operaciones',
+            response.context['form'].errors['co'],
+        )
 
-    def test_admin_login_rejects_center_assigned_to_another_client(self):
+    def test_admin_and_client_groups_resolve_to_client_role(self):
+        self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
+
+        response = self._login(self.centro.codigo)
+
+        self.assertRedirects(response, reverse('dashboard'))
+        self.assertEqual(self.client.session['tipo_cuenta'], 'administrador')
+
+    def test_admin_and_technician_groups_resolve_to_technician_role(self):
+        self.user.groups.clear()
+        self.user.groups.add(
+            Group.objects.get_or_create(name='Admin')[0],
+            Group.objects.get_or_create(name='Tecnico')[0],
+        )
+
+        response = self._login(self.centro.codigo)
+
+        self.assertRedirects(response, reverse('dashboard'))
+        self.assertEqual(self.client.session['tipo_cuenta'], 'tecnico')
+
+    def test_superuser_with_client_group_resolves_to_area_manager(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+
+        response = self._login('')
+
+        self.assertRedirects(response, reverse('dashboard'))
+        self.assertEqual(self.client.session['tipo_cuenta'], 'jefe_de_area')
+
+    def test_client_can_use_center_unassociated_with_its_profile(self):
         otro_cliente = Cliente.objects.create(
             nombre='Otro cliente login',
             codigo='OTRO-CLIENTE-LOGIN-CO',
@@ -170,17 +252,33 @@ class CustomLoginCentroOperacionesTests(TestCase):
             codigo='CO-LOGIN-900',
         )
         otro_cliente.centros_operaciones.add(centro_ajeno)
+        ubicacion_ajena = Ubicacion.objects.create(
+            nombre='Ubicación de otro cliente',
+            codigo='UBI-OTRO-CLIENTE-LOGIN',
+            centro_operaciones=centro_ajeno,
+        )
 
         response = self._login(centro_ajeno.codigo)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.wsgi_request.user.is_authenticated)
-        self.assertIn(
-            'El Centro de Operaciones no está habilitado para tu cliente.',
-            response.context['form'].errors['co'],
+        self.assertRedirects(response, reverse('dashboard'))
+        self.assertTrue(response.wsgi_request.user.is_authenticated)
+        self.assertEqual(
+            self.client.session['centro_operaciones_id'],
+            centro_ajeno.pk,
         )
 
-    def test_admin_login_uses_legacy_text_for_active_center_without_clients(self):
+        response = self.client.get(reverse('api_arbol_json'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(ubicacion_ajena.nombre, str(response.json()))
+
+    def test_posted_account_type_does_not_change_server_role(self):
+        self._login(self.centro.codigo, tipo_cuenta='jefe_de_area')
+
+        self.assertEqual(self.client.session['tipo_cuenta'], 'administrador')
+        response = self.client.get(reverse('api_arbol_json'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_admin_login_stores_existing_center_without_client_assignment(self):
         centro_huerfano = CentroOperaciones.objects.create(
             nombre='Centro sin clientes',
             codigo='CO-LOGIN-ORPHAN',
@@ -190,10 +288,10 @@ class CustomLoginCentroOperacionesTests(TestCase):
 
         self.assertRedirects(response, reverse('dashboard'))
         session = self.client.session
-        self.assertNotIn('centro_operaciones_id', session)
-        self.assertEqual(session['co'], centro_huerfano.codigo)
+        self.assertEqual(session['centro_operaciones_id'], centro_huerfano.pk)
+        self.assertNotIn('co', session)
 
-    def test_admin_login_rejects_inactive_center_without_clients(self):
+    def test_login_rejects_existing_inactive_center(self):
         centro_inactivo = CentroOperaciones.objects.create(
             nombre='Centro inactivo sin clientes',
             codigo='CO-LOGIN-INACTIVE',
@@ -204,17 +302,69 @@ class CustomLoginCentroOperacionesTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.wsgi_request.user.is_authenticated)
-        self.assertIn('co', response.context['form'].errors)
+        self.assertIn(
+            'El Centro de Operaciones está inactivo.',
+            response.context['form'].errors['co'],
+        )
 
-    def test_admin_login_uses_legacy_text_for_unregistered_center(self):
+    def test_admin_login_rejects_unknown_center(self):
         response = self._login('LEGACY-CO-77')
 
-        self.assertRedirects(response, reverse('dashboard'))
-        session = self.client.session
-        self.assertNotIn('centro_operaciones_id', session)
-        self.assertEqual(session['co'], 'LEGACY-CO-77')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.wsgi_request.user.is_authenticated)
+        self.assertIn(
+            'El Centro de Operaciones no existe.',
+            response.context['form'].errors['co'],
+        )
+
+    def test_client_without_co_has_empty_scope(self):
+        own_location = Ubicacion.objects.create(
+            nombre='Ubicación del cliente',
+            codigo='UBI-CLIENTE-SIN-CO',
+            centro_operaciones=self.centro,
+        )
+        segundo_centro_propio = CentroOperaciones.objects.create(
+            nombre='Segundo centro propio',
+            codigo='CO-SEGUNDO-PROPIO-SIN-CO',
+        )
+        self.cliente.centros_operaciones.add(segundo_centro_propio)
+        segunda_ubicacion_propia = Ubicacion.objects.create(
+            nombre='Segunda ubicación del cliente',
+            codigo='UBI-CLIENTE-SEGUNDA-SIN-CO',
+            centro_operaciones=segundo_centro_propio,
+        )
+        otro_cliente = Cliente.objects.create(
+            nombre='Otro cliente sin CO',
+            codigo='OTRO-CLIENTE-SIN-CO',
+        )
+        centro_ajeno = CentroOperaciones.objects.create(
+            nombre='Centro ajeno sin CO',
+            codigo='CO-AJENO-SIN-CO',
+        )
+        otro_cliente.centros_operaciones.add(centro_ajeno)
+        Ubicacion.objects.create(
+            nombre='Ubicación ajena',
+            codigo='UBI-AJENA-SIN-CO',
+            centro_operaciones=centro_ajeno,
+        )
+
+        response = self._login('', tipo_cuenta='jefe_de_area')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.wsgi_request.user.is_authenticated)
+        self.assertIn(
+            'Los clientes deben ingresar un Centro de Operaciones',
+            response.context['form'].errors['co'],
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('api_arbol_json'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'data': []})
+        self.assertNotIn(own_location.nombre, str(response.json()))
+        self.assertNotIn(segunda_ubicacion_propia.nombre, str(response.json()))
 
     def test_technician_login_does_not_set_center_scope(self):
+        self.user.groups.clear()
         self.user.groups.add(Group.objects.get_or_create(name='Tecnico')[0])
 
         response = self._login('', tipo_cuenta='tecnico')
@@ -223,6 +373,29 @@ class CustomLoginCentroOperacionesTests(TestCase):
         session = self.client.session
         self.assertNotIn('centro_operaciones_id', session)
         self.assertNotIn('co', session)
+        self.assertEqual(session['tipo_cuenta'], 'tecnico')
+
+    def test_public_registration_creates_unprivileged_user(self):
+        response = self.client.post(
+            reverse('register'),
+            {
+                'username': 'public-registration',
+                'email': 'public@example.test',
+                'password1': 'Safe-password-113!',
+                'password2': 'Safe-password-113!',
+                'is_staff': 'on',
+                'is_superuser': 'on',
+                'tipo_cuenta': 'jefe_de_area',
+                'groups': 'Admin',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        created_user = get_user_model().objects.get(username='public-registration')
+        self.assertFalse(created_user.is_staff)
+        self.assertFalse(created_user.is_superuser)
+        self.assertFalse(created_user.groups.exists())
+        self.assertFalse(PerfilUsuario.objects.filter(user=created_user).exists())
 
 
 class RegistroAsistenciaTests(TestCase):
@@ -817,6 +990,7 @@ class DashboardSolicitudesSinTecnicoTests(TestCase):
             username='jefe-dashboard-solicitudes',
             password='test-password',
         )
+        self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
         self.client.force_login(self.user)
         self.client.session['tipo_cuenta'] = 'jefe_de_area'
         self.client.session.save()

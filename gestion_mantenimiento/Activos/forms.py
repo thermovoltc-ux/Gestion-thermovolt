@@ -13,9 +13,12 @@ class UbicacionForm(forms.ModelForm):
         model = Ubicacion
         fields = ['nombre', 'codigo', 'co', 'descripcion', 'direccion', 'pais', 'ciudad', 'imagen', 'parent']
 
-    def __init__(self, *args, user=None, **kwargs):
+    def __init__(self, *args, user=None, scope_ids=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['parent'].queryset = Ubicacion.objects.all()
+        parent_queryset = Ubicacion.objects.all()
+        if scope_ids is not None:
+            parent_queryset = parent_queryset.filter(id__in=scope_ids)
+        self.fields['parent'].queryset = parent_queryset
 
 class EquipoForm(forms.ModelForm):
     ubicacion = forms.ModelChoiceField(queryset=Ubicacion.objects.none(), required=False, label="Ubicación")
@@ -29,7 +32,12 @@ class EquipoForm(forms.ModelForm):
             'valor_actual', 'imagen', 'ubicacion', 'parent'
         ]
 
-    def __init__(self, *args, user=None, **kwargs):
+    def __init__(self, *args, user=None, scope_ids=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['ubicacion'].queryset = Ubicacion.objects.all()
-        self.fields['parent'].queryset = Equipo.objects.all()
+        ubicaciones = Ubicacion.objects.all()
+        equipos = Equipo.objects.all()
+        if scope_ids is not None:
+            ubicaciones = ubicaciones.filter(id__in=scope_ids)
+            equipos = equipos.filter(ubicacion_id__in=scope_ids)
+        self.fields['ubicacion'].queryset = ubicaciones
+        self.fields['parent'].queryset = equipos

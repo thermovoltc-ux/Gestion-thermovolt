@@ -30,16 +30,13 @@ from allauth.socialaccount.models import SocialApp
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo, TareaMantenimiento
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.Activos.models import CentroOperaciones, Equipo, Ubicacion
-from gestion_mantenimiento.users.access import obtener_cliente_actual, obtener_scope_ubicacion_ids
+from gestion_mantenimiento.users.access import (
+    obtener_alcance,
+    obtener_scope_ots,
+    obtener_scope_solicitudes,
+)
 from .models import CalendarioTecnico, ConfiguracionPago, Descuento, ReciboPago, RegistroAsistencia
 from .nomina_pdf import generar_nombre_pdf, generar_pdf_recibo
-
-TIPO_CUENTA_A_GRUPO = {
-    'jefe_de_area': 'Admin',
-    'administrador': 'Cliente',
-    'tecnico': 'Tecnico',
-}
-
 
 def register(request):
     if request.method == 'POST':
@@ -67,55 +64,42 @@ def custom_login(request):
         form = CustomAuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
-            tipo_cuenta = form.cleaned_data.get('tipo_cuenta')
+            co_ingresado = (form.cleaned_data.get('co') or '').strip()
             centro_operaciones = None
-            co_legacy = None
 
-            if tipo_cuenta == 'administrador':
-                co_ingresado = (form.cleaned_data.get('co') or '').strip()
+            if co_ingresado:
                 centro_operaciones = CentroOperaciones.objects.filter(
                     codigo__iexact=co_ingresado,
                 ).first()
-                if centro_operaciones:
-                    cliente = obtener_cliente_actual(user)
-                    if not centro_operaciones.activo:
-                        form.add_error(
-                            'co',
-                            'El Centro de Operaciones no está habilitado para tu cliente.',
-                        )
-                    elif centro_operaciones.clientes.exists():
-                        if (
-                            not cliente
-                            or not centro_operaciones.clientes.filter(pk=cliente.pk).exists()
-                        ):
-                            form.add_error(
-                                'co',
-                                'El Centro de Operaciones no está habilitado para tu cliente.',
-                            )
-                    else:
-                        co_legacy = co_ingresado
-                else:
-                    co_legacy = co_ingresado
+                if centro_operaciones is None:
+                    form.add_error('co', 'El Centro de Operaciones no existe.')
+                elif not centro_operaciones.activo:
+                    form.add_error('co', 'El Centro de Operaciones está inactivo.')
 
-            if not user.is_superuser and not user.is_staff:
-                grupo_esperado = TIPO_CUENTA_A_GRUPO.get(tipo_cuenta)
-                if not grupo_esperado:
-                    form.add_error('tipo_cuenta', 'Tipo de cuenta inválido.')
-                elif not user.groups.filter(name=grupo_esperado).exists():
+            if not form.errors:
+                alcance = obtener_alcance(
+                    request,
+                    user=user,
+                    centro_operaciones=centro_operaciones,
+                )
+                if alcance.rol == 'desconocido':
                     form.add_error(
-                        'tipo_cuenta',
-                        f'No perteneces al grupo {grupo_esperado}.',
+                        None,
+                        'Tu cuenta no tiene un rol habilitado para acceder.',
+                    )
+                elif alcance.rol == 'administrador' and not co_ingresado:
+                    form.add_error(
+                        'co',
+                        'Los clientes deben ingresar un Centro de Operaciones',
                     )
 
             if not form.errors:
                 auth_login(request, user)
-                request.session['tipo_cuenta'] = tipo_cuenta
                 request.session.pop('co', None)
                 request.session.pop('centro_operaciones_id', None)
-                if centro_operaciones and not co_legacy:
+                if centro_operaciones:
                     request.session['centro_operaciones_id'] = centro_operaciones.pk
-                elif co_legacy:
-                    request.session['co'] = co_legacy
+                request.session['tipo_cuenta'] = alcance.rol
                 return redirect('dashboard')
     else:
         form = CustomAuthenticationForm()
@@ -134,48 +118,32 @@ def dashboard(request):
     equipo_id = request.GET.get('equipo_id')
     ubicacion_id = request.GET.get('ubicacion_id')
 
-    tipo_cuenta = request.session.get('tipo_cuenta', 'tecnico')
-    scope_ids = set()
-    cliente = obtener_cliente_actual(request.user)
-    if tipo_cuenta == 'administrador':
-        scope_ids = obtener_scope_ubicacion_ids(request)
-        cliente = obtener_cliente_actual(request.user)
-        if cliente is None or not scope_ids:
-            scope_ids = set()
+    alcance = obtener_alcance(request)
+    tipo_cuenta = alcance.rol
+    scope_ids = alcance.ubicacion_ids
 
-    equipos = Equipo.objects.none()
-    ubicaciones = Ubicacion.objects.none()
-    if tipo_cuenta == 'administrador' and scope_ids:
-        equipos = Equipo.objects.filter(ubicacion_id__in=scope_ids).order_by('nombre')
-        ubicaciones = Ubicacion.objects.filter(id__in=scope_ids).order_by('nombre')
-    elif tipo_cuenta != 'administrador':
+    if scope_ids is None:
         equipos = Equipo.objects.all().order_by('nombre')
         ubicaciones = Ubicacion.objects.all().order_by('nombre')
+    elif scope_ids:
+        equipos = Equipo.objects.filter(ubicacion_id__in=scope_ids).order_by('nombre')
+        ubicaciones = Ubicacion.objects.filter(id__in=scope_ids).order_by('nombre')
+    else:
+        equipos = Equipo.objects.none()
+        ubicaciones = Ubicacion.objects.none()
 
-    ots_base = OrdenTrabajo.objects.all()
+    ots_base = obtener_scope_ots(request)
     if tipo_cuenta == 'tecnico':
         ots_base = ots_base.filter(tecnico_asignado=request.user.username)
-    elif tipo_cuenta == 'administrador' and scope_ids:
-        ots_base = ots_base.filter(
-            Q(solicitud__ubicacion_id__in=scope_ids) | Q(solicitud__equipo__ubicacion_id__in=scope_ids)
-        )
-    elif tipo_cuenta == 'administrador':
-        ots_base = OrdenTrabajo.objects.none()
 
     ot_en_proceso = ots_base.filter(estado__nombre='en proceso').count()
     ot_en_revision = ots_base.filter(estado__nombre='en revision').count()
     ot_finalizada = ots_base.filter(estado__nombre='finalizada').count()
     ot_pendientes = ots_base.exclude(estado__nombre='finalizada').count()
 
-    solicitudes_qs = Solicitud.objects.all()
+    solicitudes_qs = obtener_scope_solicitudes(request)
     if tipo_cuenta == 'tecnico':
         solicitudes_qs = solicitudes_qs.filter(creado_por=request.user.username)
-    elif tipo_cuenta == 'administrador' and scope_ids:
-        solicitudes_qs = solicitudes_qs.filter(
-            Q(ubicacion_id__in=scope_ids) | Q(equipo__ubicacion_id__in=scope_ids)
-        )
-    elif tipo_cuenta == 'administrador':
-        solicitudes_qs = Solicitud.objects.none()
 
     solicitudes_totales = solicitudes_qs.count()
     solicitudes_solicitadas = solicitudes_qs.filter(
@@ -189,16 +157,15 @@ def dashboard(request):
     ).count()
 
     tareas_planificadas_qs = TareaMantenimiento.objects.select_related('plan__equipo__ubicacion')
-    tareas_no_planificadas_qs = Solicitud.objects.select_related('equipo__ubicacion', 'ubicacion')
+    tareas_no_planificadas_qs = obtener_scope_solicitudes(request).select_related(
+        'equipo__ubicacion',
+        'ubicacion',
+    )
 
-    if tipo_cuenta == 'administrador' and scope_ids:
+    if scope_ids is not None and scope_ids:
         tareas_planificadas_qs = tareas_planificadas_qs.filter(plan__equipo__ubicacion_id__in=scope_ids)
-        tareas_no_planificadas_qs = tareas_no_planificadas_qs.filter(
-            Q(ubicacion_id__in=scope_ids) | Q(equipo__ubicacion_id__in=scope_ids)
-        )
-    elif tipo_cuenta == 'administrador':
-        tareas_planificadas_qs = TareaMantenimiento.objects.none()
-        tareas_no_planificadas_qs = Solicitud.objects.none()
+    elif scope_ids is not None:
+        tareas_planificadas_qs = tareas_planificadas_qs.none()
 
     if equipo_id:
         tareas_planificadas_qs = tareas_planificadas_qs.filter(plan__equipo_id=equipo_id)
@@ -221,15 +188,15 @@ def dashboard(request):
 
     tareas_planificadas = tareas_planificadas_qs.count()
     tareas_no_planificadas = tareas_no_planificadas_qs.count()
-    tareas_atrasadas = TareaMantenimiento.objects.filter(estado='pendiente', fecha_programada__lt=today).count()
-    if tipo_cuenta == 'administrador' and scope_ids:
-        tareas_atrasadas = TareaMantenimiento.objects.filter(
+    tareas_atrasadas_qs = TareaMantenimiento.objects.filter(
             estado='pendiente',
             fecha_programada__lt=today,
+        )
+    if scope_ids is not None:
+        tareas_atrasadas_qs = tareas_atrasadas_qs.filter(
             plan__equipo__ubicacion_id__in=scope_ids,
-        ).count()
-    elif tipo_cuenta == 'administrador':
-        tareas_atrasadas = 0
+        )
+    tareas_atrasadas = tareas_atrasadas_qs.count()
     activos_detenidos = ots_base.filter(estado__nombre__in=['en proceso', 'en revision']).count()
     porcentaje_cumplimiento = 0
     total_ots = ot_en_proceso + ot_en_revision + ot_finalizada

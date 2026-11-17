@@ -158,10 +158,13 @@ class MultipleFileInput(forms.ClearableFileInput):
 # ============================================================================
 
 class PlanMantenimientoForm(forms.ModelForm):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, scope_ids=None, **kwargs):
         super().__init__(*args, **kwargs)
         from gestion_mantenimiento.Activos.models import Equipo
-        self.fields['equipo'].queryset = Equipo.objects.all()
+        equipos = Equipo.objects.all()
+        if scope_ids is not None:
+            equipos = equipos.filter(ubicacion_id__in=scope_ids)
+        self.fields['equipo'].queryset = equipos
         self.fields['equipo'].label_from_instance = lambda obj: obj.display_label
     class Meta:
         model = PlanMantenimiento

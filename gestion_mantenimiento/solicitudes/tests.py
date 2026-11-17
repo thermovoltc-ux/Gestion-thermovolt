@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core import mail
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -7,7 +8,15 @@ from unittest.mock import patch
 
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.Gestion_ot.models import Estado
-from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
+from gestion_mantenimiento.Activos.models import (
+    Activo,
+    Area,
+    CentroCostos,
+    CentroOperaciones,
+    Equipo,
+    Regional,
+    Ubicacion,
+)
 from gestion_mantenimiento.solicitudes.forms import SolicitudForm
 from gestion_mantenimiento.solicitudes.utils import enviar_correo_solicitud
 
@@ -205,6 +214,7 @@ class CrearSolicitudCoTests(TestCase):
             username='creador-solicitud',
             password='test-password',
         )
+        self.user.groups.add(Group.objects.get_or_create(name='Tecnico')[0])
         self.client.force_login(self.user)
         self.client.session['tipo_cuenta'] = 'tecnico'
         self.client.session.save()
@@ -299,3 +309,208 @@ class CrearSolicitudCoTests(TestCase):
         solicitud = Solicitud.objects.get(equipo=self.equipo)
         self.assertFalse(solicitud.enviar_email)
         send_email.assert_not_called()
+
+
+class SolicitudEndpointIsolationTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='cliente-solicitud-scope',
+            password='test-password',
+        )
+        self.user.groups.add(Group.objects.get_or_create(name='Cliente')[0])
+        self.client.force_login(self.user)
+        self.allowed_center = CentroOperaciones.objects.create(
+            nombre='CO solicitudes permitido',
+            codigo='CO-SOL-PERMITIDO',
+        )
+        self.other_center = CentroOperaciones.objects.create(
+            nombre='CO solicitudes ajeno',
+            codigo='CO-SOL-AJENO',
+        )
+        self.allowed_location = Ubicacion.objects.create(
+            nombre='Ubicación solicitudes permitida',
+            codigo='UBI-SOL-PERMITIDA',
+            centro_operaciones=self.allowed_center,
+        )
+        self.foreign_location = Ubicacion.objects.create(
+            nombre='Ubicación solicitudes privada',
+            codigo='UBI-SOL-AJENA',
+            centro_operaciones=self.other_center,
+        )
+        self.allowed_equipment = Equipo.objects.create(
+            nombre='Equipo solicitudes permitido',
+            codigo='EQ-SOL-PERMITIDO',
+            serie='SERIE-SOL-PERMITIDA',
+            ubicacion=self.allowed_location,
+        )
+        self.foreign_equipment = Equipo.objects.create(
+            nombre='Equipo solicitudes privado',
+            codigo='EQ-SOL-AJENO',
+            serie='SERIE-SOL-AJENA',
+            ubicacion=self.foreign_location,
+        )
+        self.requested = Estado.objects.get_or_create(nombre='solicitado')[0]
+        self.allowed_request = Solicitud.objects.create(
+            creado_por=self.user.username,
+            descripcion_problema='Solicitud CO permitida',
+            equipo=self.allowed_equipment,
+            ubicacion=self.allowed_location,
+            estado=self.requested,
+        )
+        self.foreign_request = Solicitud.objects.create(
+            creado_por='usuario-otro-cliente',
+            descripcion_problema='Solicitud privada de otro cliente',
+            equipo=self.foreign_equipment,
+            ubicacion=self.foreign_location,
+            estado=self.requested,
+        )
+        self.allowed_area = Area.objects.create(
+            nombre='Área solicitudes permitida',
+            ubicacion=self.allowed_location,
+        )
+        self.foreign_area = Area.objects.create(
+            nombre='Área solicitudes privada',
+            ubicacion=self.foreign_location,
+        )
+        self.foreign_cost_center = CentroCostos.objects.create(
+            nombre='Centro costos privado',
+            area=self.foreign_area,
+        )
+        regional = Regional.objects.create(nombre='Regional aislamiento')
+        self.foreign_asset = Activo.objects.create(
+            nombre='Activo solicitudes privado',
+            numero_serie='ACTIVO-SOL-AJENO',
+            ubicacion=self.foreign_location,
+            regional=regional,
+            centro_costos=self.foreign_cost_center,
+        )
+        session = self.client.session
+        session['centro_operaciones_id'] = self.allowed_center.pk
+        session['tipo_cuenta'] = 'jefe_de_area'
+        session.save()
+
+    def test_request_list_only_contains_selected_center_requests(self):
+        response = self.client.get(reverse('lista_solicitudes'))
+
+        self.assertEqual(response.status_code, 200)
+        visible_ids = set(response.context['solicitudes'].values_list('pk', flat=True))
+        self.assertEqual(visible_ids, {self.allowed_request.pk})
+
+    def test_json_location_and_equipment_lookups_hide_foreign_objects(self):
+        responses = [
+            self.client.get(
+                reverse('get-ubicacion-por-codigo'),
+                {'codigo': self.foreign_location.codigo},
+            ),
+            self.client.get(
+                reverse('get_equipos_por_ubicacion'),
+                {'ubicacion_id': self.foreign_location.pk},
+            ),
+            self.client.get(
+                reverse('get_ubicacion_equipos'),
+                {'codigo': self.foreign_location.codigo},
+            ),
+            self.client.get(
+                reverse('get_equipo_por_codigo'),
+                {'codigo': self.foreign_equipment.codigo},
+            ),
+            self.client.get(
+                reverse('get_numero_activo'),
+                {'activo_id': self.foreign_asset.pk},
+            ),
+        ]
+
+        self.assertTrue(
+            all(response.status_code in {200, 403, 404} for response in responses),
+        )
+        self.assertTrue(
+            all(
+                self.foreign_location.nombre not in response.content.decode()
+                and self.foreign_equipment.nombre not in response.content.decode()
+                and str(self.foreign_location.pk) not in response.content.decode()
+                and str(self.foreign_equipment.pk) not in response.content.decode()
+                for response in responses
+            )
+        )
+
+    def test_search_area_cost_center_and_duplicate_apis_do_not_leak_foreign_data(self):
+        search_response = self.client.get(
+            reverse('buscar_ubicaciones'),
+            {'q': 'privada'},
+        )
+        area_response = self.client.get(
+            reverse('get_equipos_por_area'),
+            {'area_id': self.foreign_area.pk},
+        )
+        cost_response = self.client.get(
+            reverse('get_centro_costo'),
+            {'area_id': self.foreign_area.pk},
+        )
+        duplicate_response = self.client.get(
+            reverse('verificar_solicitud'),
+            {'equipo_id': self.foreign_equipment.pk},
+        )
+
+        self.assertEqual(search_response.json(), {'results': []})
+        self.assertNotIn(self.foreign_asset.nombre, str(area_response.json()))
+        self.assertNotIn(self.foreign_cost_center.nombre, str(cost_response.json()))
+        self.assertEqual(duplicate_response.json(), {'exists': False, 'count': 0})
+
+    def test_client_without_center_gets_empty_request_and_json_scopes(self):
+        session = self.client.session
+        session.pop('centro_operaciones_id', None)
+        session['tipo_cuenta'] = 'jefe_de_area'
+        session.save()
+
+        list_response = self.client.get(reverse('lista_solicitudes'))
+        search_response = self.client.get(
+            reverse('buscar_ubicaciones'),
+            {'q': 'permitida'},
+        )
+        json_responses = [
+            self.client.get(
+                reverse('get-ubicacion-por-codigo'),
+                {'codigo': self.allowed_location.codigo},
+            ),
+            self.client.get(
+                reverse('get_equipos_por_ubicacion'),
+                {'ubicacion_id': self.allowed_location.pk},
+            ),
+            self.client.get(
+                reverse('get_ubicacion_equipos'),
+                {'codigo': self.allowed_location.codigo},
+            ),
+            self.client.get(
+                reverse('get_equipo_por_codigo'),
+                {'codigo': self.allowed_equipment.codigo},
+            ),
+            self.client.get(
+                reverse('get_numero_activo'),
+                {'activo_id': self.foreign_asset.pk},
+            ),
+            self.client.get(
+                reverse('get_equipos_por_area'),
+                {'area_id': self.allowed_area.pk},
+            ),
+            self.client.get(
+                reverse('get_centro_costo'),
+                {'area_id': self.allowed_area.pk},
+            ),
+            self.client.get(
+                reverse('verificar_solicitud'),
+                {'equipo_id': self.allowed_equipment.pk},
+            ),
+        ]
+
+        self.assertFalse(list_response.context['solicitudes'].exists())
+        self.assertEqual(search_response.json(), {'results': []})
+        self.assertTrue(
+            all(response.status_code in {200, 403, 404} for response in json_responses),
+        )
+        self.assertTrue(
+            all(
+                self.allowed_location.nombre not in response.content.decode()
+                and self.allowed_equipment.nombre not in response.content.decode()
+                for response in json_responses
+            )
+        )

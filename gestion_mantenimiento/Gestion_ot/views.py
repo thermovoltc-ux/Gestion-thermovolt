@@ -33,7 +33,14 @@ from .forms import (
 )
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.solicitudes.utils import enviar_correo_solicitud
-from gestion_mantenimiento.users.access import obtener_codigo_co_actual, obtener_scope_ubicacion_ids
+from gestion_mantenimiento.users.access import (
+    obtener_alcance,
+    obtener_codigo_co_actual,
+    obtener_scope_ots,
+    obtener_scope_solicitudes,
+    obtener_scope_tareas,
+    obtener_scope_ubicacion_ids,
+)
 import logging
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
@@ -68,10 +75,42 @@ from .drive_utils import subir_pdf_a_drive, subir_pdf_privado_a_drive, descargar
 from .storage import GoogleDriveMediaStorage
 from googleapiclient.errors import HttpError
 
+
+def _ordenes_filtradas_por_co(request, queryset=None):
+    queryset = queryset if queryset is not None else OrdenTrabajo.objects.all()
+    alcance = obtener_alcance(request)
+    if alcance.ubicacion_ids is None:
+        return queryset
+    return queryset.filter(pk__in=obtener_scope_ots(request).values('pk'))
+
+
+def _solicitudes_filtradas_por_co(request, queryset=None):
+    queryset = queryset if queryset is not None else Solicitud.objects.all()
+    alcance = obtener_alcance(request)
+    if alcance.ubicacion_ids is None:
+        return queryset
+    return queryset.filter(
+        pk__in=obtener_scope_solicitudes(request).values('pk'),
+    )
+
+
+def _tareas_filtradas_por_co(request, queryset=None):
+    queryset = queryset if queryset is not None else TareaMantenimiento.objects.all()
+    alcance = obtener_alcance(request)
+    if alcance.ubicacion_ids is None:
+        return queryset
+    return queryset.filter(pk__in=obtener_scope_tareas(request).values('pk'))
+
 try:
     import pythoncom
 except ImportError:
     pythoncom = None
+
+
+def _solicitud_permitida_en_sesion(request, solicitud):
+    if not request.user.is_authenticated:
+        return False
+    return _solicitudes_filtradas_por_co(request).filter(pk=solicitud.pk).exists()
 
 
 def convertir_docx_a_pdf(docx_path, pdf_path):
@@ -549,7 +588,7 @@ def _procesar_proceso_informe(operation_id):
 
 @login_required
 def estado_proceso_informe(request, ot_id, operation_id):
-    ot = get_object_or_404(OrdenTrabajo, id=ot_id)
+    ot = get_object_or_404(_ordenes_filtradas_por_co(request), id=ot_id)
     cierre_ot = get_object_or_404(CierreOt, orden_trabajo=ot)
     proceso = get_object_or_404(ProcesoInforme, operation_id=operation_id, cierre_ot=cierre_ot)
     return JsonResponse({
@@ -593,37 +632,17 @@ logger = logging.getLogger(__name__)
 @login_required
 # Vista para gestionar órdenes de trabajo
 def gestion_ot(request):
-    tipo_cuenta = request.session.get('tipo_cuenta')
-    scope_ids = set()
-    if tipo_cuenta == 'administrador':
-        scope_ids = obtener_scope_ubicacion_ids(request)
-
-    if tipo_cuenta == 'administrador':
-        if not scope_ids:
-            ordenes_trabajo = OrdenTrabajo.objects.none()
-            solicitudes_pendientes = Solicitud.objects.none()
-            tareas_mantenimiento = TareaMantenimiento.objects.none()
-        else:
-            ordenes_trabajo = OrdenTrabajo.objects.filter(
-                Q(solicitud__ubicacion_id__in=scope_ids) | Q(solicitud__equipo__ubicacion_id__in=scope_ids)
-            ).select_related(
-                'solicitud__equipo', 'solicitud__ubicacion', 'estado'
-            ).order_by('-fecha_actividad', '-id')
-            solicitudes_pendientes = Solicitud.objects.filter(
-                Q(ubicacion_id__in=scope_ids) | Q(equipo__ubicacion_id__in=scope_ids),
-            )
-            tareas_mantenimiento = TareaMantenimiento.objects.filter(
-                plan__equipo__ubicacion_id__in=scope_ids,
-                estado__in=['pendiente', 'en_progreso'],
-            ).select_related('plan', 'actividad', 'tecnico').order_by('fecha_programada')
-    else:
-        ordenes_trabajo = OrdenTrabajo.objects.select_related(
-            'solicitud__equipo', 'solicitud__ubicacion', 'estado'
-        ).order_by('-fecha_actividad', '-id')
-        solicitudes_pendientes = Solicitud.objects.all()
-        tareas_mantenimiento = TareaMantenimiento.objects.filter(
-            estado__in=['pendiente', 'en_progreso']
-        ).select_related('plan', 'actividad', 'tecnico').order_by('fecha_programada')
+    scope_ids = obtener_scope_ubicacion_ids(request)
+    ordenes_trabajo = _ordenes_filtradas_por_co(
+        request,
+        OrdenTrabajo.objects.all(),
+    ).select_related(
+        'solicitud__equipo', 'solicitud__ubicacion', 'estado'
+    ).order_by('-fecha_actividad', '-id')
+    solicitudes_pendientes = _solicitudes_filtradas_por_co(request)
+    tareas_mantenimiento = _tareas_filtradas_por_co(request).filter(
+        estado__in=['pendiente', 'en_progreso']
+    ).select_related('plan', 'actividad', 'tecnico').order_by('fecha_programada')
     solicitudes_pendientes = solicitudes_pendientes.filter(
         estado__nombre='solicitado',
     ).filter(
@@ -650,12 +669,24 @@ def gestion_ot(request):
             ids.extend(get_descendant_ids(child))
         return ids
 
-    ubicaciones = list(Ubicacion.objects.order_by('nombre').values_list('id', 'nombre'))
+    ubicaciones_queryset = Ubicacion.objects.all()
+    if scope_ids is not None:
+        ubicaciones_queryset = ubicaciones_queryset.filter(id__in=scope_ids)
+    ubicaciones = list(
+        ubicaciones_queryset.order_by('nombre').values_list('id', 'nombre')
+    )
     filtro_ubicacion_ids = None
     try:
         if filtro_ubicacion_id:
             filtro_ubicacion_id = int(filtro_ubicacion_id)
-            ubicacion = Ubicacion.objects.filter(id=filtro_ubicacion_id).first()
+            ubicaciones_disponibles = Ubicacion.objects.all()
+            if scope_ids is not None:
+                ubicaciones_disponibles = ubicaciones_disponibles.filter(
+                    id__in=scope_ids,
+                )
+            ubicacion = ubicaciones_disponibles.filter(
+                id=filtro_ubicacion_id,
+            ).first()
             if ubicacion:
                 filtro_ubicacion_ids = get_descendant_ids(ubicacion)
     except (TypeError, ValueError):
@@ -791,7 +822,9 @@ def actualizar_estado_solicitud(request):
             logger.error("Fecha de actividad es requerida.")
             return JsonResponse({'status': 'error', 'message': 'Fecha de actividad es requerida.'}, status=400)
 
-        solicitud = Solicitud.objects.get(consecutivo=numero_solicitud)
+        solicitud = _solicitudes_filtradas_por_co(request).get(
+            consecutivo=numero_solicitud,
+        )
         logger.debug(f"Solicitud encontrada: {solicitud}")
 
         estado_solicitud_anterior = solicitud.estado.nombre if solicitud.estado else None
@@ -920,7 +953,10 @@ def asignar_tarea_preventiva(request, tarea_id):
         if not tecnico or not fecha:
             return JsonResponse({'status': 'error', 'message': 'Técnico y fecha son requeridos.'}, status=400)
 
-        tarea = TareaMantenimiento.objects.select_related('plan__equipo', 'actividad').get(id=tarea_id)
+        tarea = _tareas_filtradas_por_co(request).select_related(
+            'plan__equipo',
+            'actividad',
+        ).get(id=tarea_id)
         equipo = tarea.plan.equipo
         if not equipo:
             return JsonResponse({'status': 'error', 'message': 'La tarea no tiene equipo asociado.'}, status=400)
@@ -976,19 +1012,12 @@ def listar_ot(request):
     ubicacion_id = request.GET.get('ubicacion_id') or request.GET.get('ubicacion')
     tecnico_filtro = request.GET.get('tecnico', '').strip()
 
-    tipo_cuenta = request.session.get('tipo_cuenta')
-    if tipo_cuenta == 'administrador':
-        scope_ids = obtener_scope_ubicacion_ids(request)
-        if not scope_ids:
-            ots = OrdenTrabajo.objects.none()
-        else:
-            ots = OrdenTrabajo.objects.filter(
-                Q(solicitud__ubicacion_id__in=scope_ids) | Q(solicitud__equipo__ubicacion_id__in=scope_ids)
-            )
-    elif _es_admin_rentabilidad(request.user):
-        ots = OrdenTrabajo.objects.all()
-    else:
+    alcance = obtener_alcance(request)
+    scope_ids = alcance.ubicacion_ids
+    if alcance.rol == 'tecnico':
         ots = OrdenTrabajo.objects.filter(tecnico_asignado=request.user.username)
+    else:
+        ots = _ordenes_filtradas_por_co(request)
 
     if tecnico_filtro:
         ots = ots.filter(tecnico_asignado__iexact=tecnico_filtro)
@@ -1016,7 +1045,10 @@ def listar_ot(request):
                 ids.extend(get_descendant_ids(child))
             return ids
 
-        ubicacion = Ubicacion.objects.filter(id=ubicacion_id).first()
+        ubicaciones_disponibles = Ubicacion.objects.all()
+        if scope_ids is not None:
+            ubicaciones_disponibles = ubicaciones_disponibles.filter(id__in=scope_ids)
+        ubicacion = ubicaciones_disponibles.filter(id=ubicacion_id).first()
         if ubicacion:
             ubicacion_ids = get_descendant_ids(ubicacion)
             ots = ots.filter(
@@ -1027,11 +1059,7 @@ def listar_ot(request):
         else:
             filter_label = f'Historial de OT para Ubicación ID {ubicacion_id}'
 
-    es_tecnico = (
-        request.user.groups.filter(name='Tecnico').exists()
-        and not request.user.is_staff
-        and not request.user.is_superuser
-    )
+    es_tecnico = alcance.rol == 'tecnico'
     ots = ots.annotate(materiales_count=models.Count('materiales'))
 
     def get_ot_event_color(estado_nombre):
@@ -1168,10 +1196,10 @@ def facturacion_admin(request):
         messages.error(request, 'No tenés permiso para acceder a Facturación.')
         return redirect('dashboard')
 
-    ots = OrdenTrabajo.objects.filter(
+    ots = _ordenes_filtradas_por_co(request, OrdenTrabajo.objects.filter(
         estado__nombre__in=['en revision', 'finalizada'],
         cierreot__estado_facturacion__in=['pendiente', 'sin_prefactura'],
-    ).select_related(
+    )).select_related(
         'estado',
         'solicitud__equipo',
         'solicitud__ubicacion',
@@ -1315,11 +1343,14 @@ def gestionar_ot_admin(request, ot_id):
         return redirect('dashboard')
 
     ot = get_object_or_404(
-        OrdenTrabajo.objects.select_related(
-            'solicitud__equipo',
-            'solicitud__ubicacion',
-            'estado',
-        ).prefetch_related('materiales__material'),
+        _ordenes_filtradas_por_co(
+            request,
+            OrdenTrabajo.objects.select_related(
+                'solicitud__equipo',
+                'solicitud__ubicacion',
+                'estado',
+            ).prefetch_related('materiales__material'),
+        ),
         pk=ot_id,
     )
     cierre, _ = CierreOt.objects.get_or_create(orden_trabajo=ot)
@@ -1386,7 +1417,7 @@ def agregar_material_ot_admin(request, ot_id):
         messages.error(request, 'No tenés permiso para agregar materiales a esta OT.')
         return redirect('dashboard')
 
-    ot = get_object_or_404(OrdenTrabajo, pk=ot_id)
+    ot = get_object_or_404(_ordenes_filtradas_por_co(request), pk=ot_id)
     post_data = request.POST.copy()
     aplicar_margen = post_data.get('aplicar_margen', '1')
     if aplicar_margen not in {'0', '1'}:
@@ -1465,7 +1496,7 @@ def agregar_servicio_ot_admin(request, ot_id):
         messages.error(request, 'No tenés permiso para agregar servicios a esta OT.')
         return redirect('dashboard')
 
-    ot = get_object_or_404(OrdenTrabajo, pk=ot_id)
+    ot = get_object_or_404(_ordenes_filtradas_por_co(request), pk=ot_id)
     form = ServicioOTForm(request.POST)
     if not form.is_valid():
         messages.error(
@@ -1527,7 +1558,10 @@ def eliminar_servicio_ot_admin(request, ot_id, servicio_id):
 
     with transaction.atomic():
         ot = get_object_or_404(
-            OrdenTrabajo.objects.select_for_update(),
+            _ordenes_filtradas_por_co(
+                request,
+                OrdenTrabajo.objects.select_for_update(),
+            ),
             pk=ot_id,
         )
         servicio = get_object_or_404(
@@ -1577,7 +1611,10 @@ def actualizar_mano_obra(request, ot_id):
         return JsonResponse({'ok': False, 'error': 'No tenés permiso para modificar la facturación.'}, status=403)
 
     ot = get_object_or_404(
-        OrdenTrabajo.objects.select_related('cierreot').prefetch_related('materiales'),
+        _ordenes_filtradas_por_co(
+            request,
+            OrdenTrabajo.objects.select_related('cierreot').prefetch_related('materiales'),
+        ),
         pk=ot_id,
     )
     post_data = request.POST.copy()
@@ -1617,7 +1654,9 @@ def actualizar_material_ot_admin(request, ot_id, material_ot_id):
         return redirect('dashboard')
 
     material_ot = get_object_or_404(
-        MaterialOT.objects.select_related('orden_trabajo'),
+        MaterialOT.objects.select_related('orden_trabajo').filter(
+            orden_trabajo__in=_ordenes_filtradas_por_co(request),
+        ),
         pk=material_ot_id,
         orden_trabajo_id=ot_id,
     )
@@ -1637,7 +1676,9 @@ def eliminar_material_ot_admin(request, ot_id, material_ot_id):
         return redirect('dashboard')
 
     material_ot = get_object_or_404(
-        MaterialOT.objects.select_related('orden_trabajo'),
+        MaterialOT.objects.select_related('orden_trabajo').filter(
+            orden_trabajo__in=_ordenes_filtradas_por_co(request),
+        ),
         pk=material_ot_id,
         orden_trabajo_id=ot_id,
     )
@@ -1667,10 +1708,10 @@ def rentabilidad_admin(request):
 
     tecnicos = User.objects.filter(groups__name='Tecnico').order_by('username').distinct()
     tecnico_id = request.GET.get('tecnico', '').strip()
-    ots = OrdenTrabajo.objects.filter(
+    ots = _ordenes_filtradas_por_co(request, OrdenTrabajo.objects.filter(
         cierreot__fecha_inicio_actividad__date__range=(fecha_inicio, fecha_fin),
         cierreot__estado_facturacion__in=('pendiente', 'facturada'),
-    )
+    ))
     if tecnico_id:
         try:
             tecnico = tecnicos.get(pk=int(tecnico_id))
@@ -1920,13 +1961,16 @@ def detalle_factura_ot(request, ot_id):
         )
 
     ot = get_object_or_404(
-        OrdenTrabajo.objects.select_related(
-            'solicitud__equipo',
-            'solicitud__ubicacion',
-            'cierreot',
-        ).prefetch_related(
-            'materiales__material',
-            'servicios_facturados',
+        _ordenes_filtradas_por_co(
+            request,
+            OrdenTrabajo.objects.select_related(
+                'solicitud__equipo',
+                'solicitud__ubicacion',
+                'cierreot',
+            ).prefetch_related(
+                'materiales__material',
+                'servicios_facturados',
+            ),
         ),
         pk=ot_id,
     )
@@ -2027,7 +2071,9 @@ def subir_factura_dian(request, ot_id):
         )
 
     cierre = get_object_or_404(
-        CierreOt.objects.select_related('orden_trabajo'),
+        CierreOt.objects.select_related('orden_trabajo').filter(
+            orden_trabajo__in=_ordenes_filtradas_por_co(request),
+        ),
         orden_trabajo_id=ot_id,
     )
     ot = cierre.orden_trabajo
@@ -2114,7 +2160,9 @@ def descargar_factura_dian(request, ot_id):
         raise Http404('No tenés permiso para descargar esta factura.')
 
     cierre = get_object_or_404(
-        CierreOt.objects.select_related('orden_trabajo'),
+        CierreOt.objects.select_related('orden_trabajo').filter(
+            orden_trabajo__in=_ordenes_filtradas_por_co(request),
+        ),
         orden_trabajo_id=ot_id,
     )
     if not cierre.factura_dian_drive_id:
@@ -2133,19 +2181,9 @@ def descargar_factura_dian(request, ot_id):
 
 # Vista para cerrar una OT
 def _ordenes_visibles_para_usuario(request):
-    if request.session.get('tipo_cuenta') == 'administrador':
-        scope_ids = obtener_scope_ubicacion_ids(request)
-        if not scope_ids:
-            return OrdenTrabajo.objects.none()
-        return OrdenTrabajo.objects.filter(
-            Q(solicitud__ubicacion_id__in=scope_ids)
-            | Q(solicitud__equipo__ubicacion_id__in=scope_ids)
-        )
-
-    if request.user.is_superuser or request.user.groups.filter(name='Admin').exists():
-        return OrdenTrabajo.objects.all()
-
-    return OrdenTrabajo.objects.filter(tecnico_asignado=request.user.username)
+    if obtener_alcance(request).rol == 'tecnico':
+        return OrdenTrabajo.objects.filter(tecnico_asignado=request.user.username)
+    return _ordenes_filtradas_por_co(request)
 
 
 def _ot_es_solo_lectura(ot):
@@ -2160,11 +2198,7 @@ def _errores_formulario_json(form):
 
 
 def _ot_tecnico_en_proceso(request, ot_id):
-    if (
-        request.user.is_staff
-        or request.user.is_superuser
-        or not request.user.groups.filter(name='Tecnico').exists()
-    ):
+    if obtener_alcance(request).rol != 'tecnico':
         return get_object_or_404(OrdenTrabajo.objects.none(), pk=ot_id)
 
     return get_object_or_404(
@@ -2193,13 +2227,8 @@ def drive_media(request, file_id):
     stored_name = material_name or image_name
 
     if not stored_name:
-        tipo_cuenta = request.session.get('tipo_cuenta')
-        scope_ids = (
-            obtener_scope_ubicacion_ids(request)
-            if tipo_cuenta == 'administrador'
-            else None
-        )
-        if tipo_cuenta == 'administrador' and not scope_ids:
+        scope_ids = obtener_scope_ubicacion_ids(request)
+        if scope_ids is not None and not scope_ids:
             raise Http404('Imagen no encontrada.')
 
         location_images = Ubicacion.objects.filter(imagen__startswith=stored_prefix)
@@ -2343,7 +2372,7 @@ def _respuesta_material_ot(material_ot, duplicado=False):
 @require_POST
 def crear_material_ajax(request, ot_id):
     if _es_admin_rentabilidad(request.user):
-        get_object_or_404(OrdenTrabajo, pk=ot_id)
+        get_object_or_404(_ordenes_filtradas_por_co(request), pk=ot_id)
     else:
         ot = get_object_or_404(_ordenes_visibles_para_usuario(request), pk=ot_id)
         if _ot_es_solo_lectura(ot):
@@ -2604,7 +2633,13 @@ def cierre_ot(request, ot_id):
 # Detalles de la solicitud
 @login_required
 def detalles_solicitud(request, consecutivo):
-    solicitud = get_object_or_404(Solicitud.objects.select_related('equipo__ubicacion'), consecutivo=consecutivo)
+    solicitud = get_object_or_404(
+        _solicitudes_filtradas_por_co(
+            request,
+            Solicitud.objects.select_related('equipo__ubicacion'),
+        ),
+        consecutivo=consecutivo,
+    )
     orden_trabajo = None
     try:
         orden_trabajo = solicitud.orden_trabajo
@@ -3107,6 +3142,11 @@ def descargar_informe_token(request, token):
     record = get_object_or_404(InformeDriveArchivo, download_token=token)
     if not record.download_enabled:
         raise Http404('Este enlace de descarga no está habilitado.')
+    if not _solicitud_permitida_en_sesion(
+        request,
+        record.cierre_ot.orden_trabajo.solicitud,
+    ):
+        raise Http404('Informe no encontrado.')
 
     try:
         response = StreamingHttpResponse(
@@ -3126,8 +3166,19 @@ def descargar_informe_token(request, token):
 
 def descargar_informe_pdf(request, filename):
     """Sirve un informe PDF guardado localmente en MEDIA_ROOT/email_copies/informes."""
+    if not request.user.is_authenticated:
+        raise Http404('Informe no encontrado.')
     if not filename or '..' in filename or filename.startswith('/'):
         raise Http404("Nombre de archivo inválido")
+
+    filename_match = re.match(r'^informe_ot_(\d+)_', filename)
+    if not filename_match:
+        raise Http404('Informe no encontrado.')
+    solicitud = _solicitudes_filtradas_por_co(request).filter(
+        consecutivo=filename_match.group(1),
+    ).first()
+    if not solicitud:
+        raise Http404('Informe no encontrado.')
 
     allowed_dir = os.path.normpath(os.path.join(settings.MEDIA_ROOT, 'email_copies', 'informes'))
     file_path = os.path.normpath(os.path.join(allowed_dir, filename))

@@ -24,27 +24,68 @@ from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import Q
-from gestion_mantenimiento.users.access import obtener_codigo_co_actual, obtener_scope_ubicacion_ids
+from gestion_mantenimiento.users.access import (
+    obtener_alcance,
+    obtener_codigo_co_actual,
+    obtener_scope_solicitudes,
+    obtener_scope_ubicacion_ids,
+)
 from gestion_mantenimiento.solicitudes.utils import enviar_correo_solicitud
 
 # Configurar el logger
 logger = logging.getLogger(__name__)
 
+
+def _ubicaciones_visibles(request):
+    ubicaciones = Ubicacion.objects.all()
+    scope_ids = obtener_scope_ubicacion_ids(request)
+    return ubicaciones if scope_ids is None else ubicaciones.filter(id__in=scope_ids)
+
+
+def _equipos_visibles(request):
+    equipos = Equipo.objects.all()
+    scope_ids = obtener_scope_ubicacion_ids(request)
+    return equipos if scope_ids is None else equipos.filter(ubicacion_id__in=scope_ids)
+
+
+def _solicitudes_visibles(request):
+    solicitudes = Solicitud.objects.all()
+    scope_ids = obtener_scope_ubicacion_ids(request)
+    if scope_ids is None:
+        return solicitudes
+    return solicitudes.filter(pk__in=obtener_scope_solicitudes(request).values('pk'))
+
+
+def _activos_visibles(request):
+    activos = Activo.objects.all()
+    scope_ids = obtener_scope_ubicacion_ids(request)
+    if scope_ids is None:
+        return activos
+    if not scope_ids:
+        return activos.none()
+    return activos.filter(
+        Q(ubicacion_id__in=scope_ids)
+        | Q(
+            ubicacion__isnull=True,
+            centro_costos__area__ubicacion_id__in=scope_ids,
+        )
+    ).distinct()
+
+
 @login_required
 def crear_solicitud(request):
+    scope_ids = obtener_scope_ubicacion_ids(request)
     if request.method == 'POST':
-        form = SolicitudForm(request.POST)
+        form = SolicitudForm(request.POST, scope_ids=scope_ids)
 
         if form.is_valid():
             equipo = form.cleaned_data.get('equipo')
             ubicacion_id = request.POST.get('ubicacion_id')
 
-            if request.session.get('tipo_cuenta') == 'administrador':
-                scope_ids = obtener_scope_ubicacion_ids(request)
+            if scope_ids is not None:
                 if not scope_ids:
                     form.add_error(None, 'No tienes acceso a ningún alcance de CO válido.')
                     return render(request, 'solicitudes/crear_solicitud.html', {'form': form})
-
                 if equipo and equipo.ubicacion_id not in scope_ids:
                     form.add_error(None, 'El equipo seleccionado no pertenece a tu alcance de CO.')
                     return render(request, 'solicitudes/crear_solicitud.html', {'form': form})
@@ -81,7 +122,7 @@ def crear_solicitud(request):
             estado_solicitado, _ = Estado.objects.get_or_create(nombre='solicitado')
             nueva_solicitud.estado = estado_solicitado
 
-            if request.session.get('tipo_cuenta') == 'tecnico':
+            if obtener_alcance(request).rol == 'tecnico':
                 nueva_solicitud.creado_por = request.user.username
 
             if not nueva_solicitud.fecha_creacion:
@@ -142,9 +183,8 @@ def crear_solicitud(request):
         if equipo_id is not None:
             equipo = Equipo.objects.select_related('ubicacion').filter(id=equipo_id).first()
 
-        if equipo and request.session.get('tipo_cuenta') == 'administrador':
-            scope_ids = obtener_scope_ubicacion_ids(request)
-            if not scope_ids or not equipo.ubicacion_id or equipo.ubicacion_id not in scope_ids:
+        if equipo and scope_ids is not None:
+            if not equipo.ubicacion_id or equipo.ubicacion_id not in scope_ids:
                 equipo = None
 
         if equipo:
@@ -157,7 +197,7 @@ def crear_solicitud(request):
                 'precarga_nombre_equipo': equipo.nombre,
             }
 
-        form = SolicitudForm(initial=initial)
+        form = SolicitudForm(initial=initial, scope_ids=scope_ids)
         return render(
             request,
             'solicitudes/crear_solicitud.html',
@@ -168,21 +208,10 @@ def crear_solicitud(request):
 
 @login_required
 def lista_solicitudes(request):
-    tipo_cuenta = request.session.get('tipo_cuenta')
-    co = request.session.get('co')
-
-    if tipo_cuenta == 'tecnico':
+    if obtener_alcance(request).rol == 'tecnico':
         solicitudes = Solicitud.objects.filter(creado_por=request.user.username)
-    elif tipo_cuenta == 'administrador':
-        scope_ids = obtener_scope_ubicacion_ids(request)
-        if not scope_ids:
-            solicitudes = Solicitud.objects.none()
-        else:
-            solicitudes = Solicitud.objects.filter(
-                Q(ubicacion_id__in=scope_ids) | Q(equipo__ubicacion_id__in=scope_ids)
-            )
     else:
-        solicitudes = Solicitud.objects.all()
+        solicitudes = _solicitudes_visibles(request)
 
     return render(request, 'solicitudes/lista_solicitudes.html', {'solicitudes': solicitudes})
 
@@ -191,7 +220,10 @@ def get_centro_costo(request):
     area_id = request.GET.get('area_id')
     if area_id:
         try:
-            area = Area.objects.get(id=area_id)
+            areas = Area.objects.filter(
+                ubicacion_id__in=_ubicaciones_visibles(request).values('id'),
+            )
+            area = areas.get(id=area_id)
             centro_costo = CentroCostos.objects.filter(area=area).first()
             if centro_costo:
                 return JsonResponse({'centro_costo': centro_costo.nombre})
@@ -208,9 +240,11 @@ def get_ubicacion_por_codigo(request):
         return JsonResponse({'error': 'Código no proporcionado'}, status=400)
 
     try:
-        ubicacion = Ubicacion.objects.get(codigo=codigo)
-        areas = ubicacion.children.all()
-        equipos = Equipo.objects.filter(ubicacion=ubicacion)
+        ubicacion = _ubicaciones_visibles(request).get(codigo=codigo)
+        areas = ubicacion.children.filter(
+            id__in=_ubicaciones_visibles(request).values('id'),
+        )
+        equipos = _equipos_visibles(request).filter(ubicacion=ubicacion)
 
         response_data = {
             'ubicacion': ubicacion.nombre,
@@ -240,13 +274,7 @@ def buscar_ubicaciones(request):
     query = (request.GET.get('q') or '').strip()
     logger.info('[UBICACION-SEARCH] q=%s', query)
 
-    if request.session.get('tipo_cuenta') == 'administrador':
-        scope_ids = obtener_scope_ubicacion_ids(request)
-        if not scope_ids:
-            return JsonResponse({'results': []})
-        ubicaciones_base = Ubicacion.objects.filter(id__in=scope_ids)
-    else:
-        ubicaciones_base = Ubicacion.objects.all()
+    ubicaciones_base = _ubicaciones_visibles(request)
 
     if not query:
         logger.info('[UBICACION-SEARCH] Resultados vacíos')
@@ -291,13 +319,13 @@ def get_equipos_por_ubicacion(request):
     if not ubicacion_id:
         return JsonResponse({'error': 'ubicacion_id no proporcionado'}, status=400)
 
-    if request.session.get('tipo_cuenta') == 'administrador':
-        scope_ids = obtener_scope_ubicacion_ids(request)
-        if not scope_ids or int(ubicacion_id) not in scope_ids:
-            return JsonResponse({'results': []})
+    try:
+        ubicacion_id = int(ubicacion_id)
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'ubicacion_id no es válido'}, status=400)
 
-    ubicacion = get_object_or_404(Ubicacion, id=ubicacion_id)
-    equipos_qs = Equipo.objects.filter(ubicacion_id=ubicacion.id)
+    ubicacion = get_object_or_404(_ubicaciones_visibles(request), id=ubicacion_id)
+    equipos_qs = _equipos_visibles(request).filter(ubicacion_id=ubicacion.id)
     if query:
         equipos_qs = equipos_qs.filter(nombre__icontains=query)
     equipos_qs = equipos_qs.order_by('nombre')[:20]
@@ -319,8 +347,11 @@ def get_equipos_por_area(request):
     area_id = request.GET.get('area_id')
     if area_id:
         try:
-            area = Area.objects.get(id=area_id)
-            activos = Activo.objects.filter(centro_costos__area=area)
+            areas = Area.objects.filter(
+                ubicacion_id__in=_ubicaciones_visibles(request).values('id'),
+            )
+            area = areas.get(id=area_id)
+            activos = _activos_visibles(request).filter(centro_costos__area=area)
             activos_data = [{'id': activo.id, 'nombre': activo.nombre} for activo in activos]
             return JsonResponse({'activos': activos_data})
         except Area.DoesNotExist:
@@ -332,8 +363,11 @@ def get_ubicacion_equipos(request):
     codigo = request.GET.get('codigo')
     if codigo:
         try:
-            ubicacion = Ubicacion.objects.get(codigo=codigo)
-            activos = Activo.objects.filter(ubicacion=ubicacion, centro_costos__isnull=True)
+            ubicacion = _ubicaciones_visibles(request).get(codigo=codigo)
+            activos = _activos_visibles(request).filter(
+                ubicacion=ubicacion,
+                centro_costos__isnull=True,
+            )
             activos_data = [{'id': activo.id, 'nombre': activo.nombre} for activo in activos]
             return JsonResponse({'ubicacion': ubicacion.nombre, 'activos': activos_data})
         except Ubicacion.DoesNotExist:
@@ -345,7 +379,7 @@ def get_numero_activo(request):
     activo_id = request.GET.get('activo_id')
     if activo_id:
         try:
-            activo = Activo.objects.get(id=activo_id)
+            activo = _activos_visibles(request).get(id=activo_id)
             return JsonResponse({'numero_serie': activo.numero_serie})
         except Activo.DoesNotExist:
             return JsonResponse({'error': 'Activo no encontrado'})
@@ -364,7 +398,9 @@ def verificar_solicitud(request):
             print(f"DEBUG verificar_solicitud: Error al obtener estado finalizada: {e}")
             return JsonResponse({'error': str(e)}, status=500)
 
-        solicitudes_existentes = Solicitud.objects.exclude(estado=estado_finalizada)
+        solicitudes_existentes = _solicitudes_visibles(request).exclude(
+            estado=estado_finalizada,
+        )
         if equipo_id:
             try:
                 equipo_id_int = int(equipo_id)
@@ -390,7 +426,7 @@ def get_equipo_por_codigo(request):
         return JsonResponse({'error': 'Código no proporcionado'}, status=400)
 
     try:
-        equipo = Equipo.objects.get(codigo=codigo)
+        equipo = _equipos_visibles(request).get(codigo=codigo)
         ubicacion = equipo.ubicacion
 
         response_data = {

@@ -8,6 +8,7 @@ from django.urls import reverse
 from unittest.mock import patch
 
 from gestion_mantenimiento.Gestion_ot.storage import GoogleDriveMediaStorage
+from gestion_mantenimiento.users.access import obtener_alcance
 from gestion_mantenimiento.users.models import Cliente, PerfilUsuario
 
 from . import views
@@ -81,29 +82,24 @@ class ArbolActivosCOFilterTests(TestCase):
     def _get_nodes(self):
         response = self.client.get(reverse('api_arbol_json'))
         self.assertEqual(response.status_code, 200)
+        self.last_scope = obtener_alcance(response.wsgi_request)
         return response.json()['data']
 
-    def test_center_scope_includes_full_descendant_hierarchy(self):
+    def test_center_scope_excludes_locations_assigned_to_other_centers(self):
         nodes = self._get_nodes()
 
+        self.assertEqual(self.last_scope.rol, 'administrador')
+        self.assertEqual(
+            self.last_scope.ubicacion_ids,
+            {self.root.pk},
+        )
         self.assertEqual([node['id'] for node in nodes], [f'ubicacion-{self.root.pk}'])
         root_node = nodes[0]
         child_nodes = [
             node for node in root_node['children']
             if node['type'] == 'ubicacion'
         ]
-        self.assertCountEqual(
-            [node['id'] for node in child_nodes],
-            [f'ubicacion-{self.child.pk}', f'ubicacion-{self.sibling.pk}'],
-        )
-        desposte = next(
-            node for node in child_nodes
-            if node['id'] == f'ubicacion-{self.child.pk}'
-        )
-        self.assertEqual(
-            [node['id'] for node in desposte['children'] if node['type'] == 'ubicacion'],
-            [f'ubicacion-{self.grandchild.pk}'],
-        )
+        self.assertEqual(child_nodes, [])
         self.assertIn(
             f'equipo-{self.root_equipo.pk}',
             [node['id'] for node in root_node['children']],
@@ -120,7 +116,7 @@ class ArbolActivosCOFilterTests(TestCase):
         self.assertEqual(nodes[0]['parent'], '#')
         self.assertEqual(
             [node['id'] for node in nodes[0]['children'] if node['type'] == 'ubicacion'],
-            [f'ubicacion-{self.grandchild.pk}'],
+            [],
         )
         self.assertIn(
             f'equipo-{self.child_equipo.pk}',
@@ -161,7 +157,7 @@ class ArbolActivosCOFilterTests(TestCase):
     def test_legacy_co_session_remains_supported(self):
         session = self.client.session
         session.pop('centro_operaciones_id', None)
-        session['co'] = '101'
+        session['co'] = self.centers['101'].codigo
         session.save()
 
         nodes = self._get_nodes()
@@ -170,6 +166,8 @@ class ArbolActivosCOFilterTests(TestCase):
         self.assertEqual(nodes[0]['parent'], '#')
 
     def test_non_admin_cannot_read_tree_roots_or_location_children(self):
+        self.user.groups.clear()
+        self.user.groups.add(Group.objects.get_or_create(name='Tecnico')[0])
         session = self.client.session
         session['tipo_cuenta'] = 'tecnico'
         session.save()
@@ -192,6 +190,7 @@ class ArbolActivosCOFilterTests(TestCase):
             co='900',
             centro_operaciones=self.centers['900'],
         )
+        self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
         session = self.client.session
         session['tipo_cuenta'] = 'jefe_de_area'
         session.pop('centro_operaciones_id', None)
@@ -214,23 +213,40 @@ class ArbolActivosCOFilterTests(TestCase):
             [node['id'] for node in children_response.json()['data']],
         )
 
-    def test_client_cannot_request_children_outside_its_center_scope(self):
+    def test_area_manager_with_center_sees_only_that_center(self):
+        self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
+        session = self.client.session
+        session['centro_operaciones_id'] = self.centers['100'].pk
+        session.save()
+
+        nodes = self._get_nodes()
+
+        self.assertEqual([node['id'] for node in nodes], [f'ubicacion-{self.root.pk}'])
+        self.assertNotIn(f'ubicacion-{self.child.pk}', str(nodes))
+
+    def test_client_can_use_unassociated_center_but_not_other_fk_with_matching_text(self):
         outside = Ubicacion.objects.create(
             nombre='Ubicación fuera del CO',
             codigo='OUTSIDE-CO-CHILDREN',
-            co='900',
+            co=self.centers['100'].codigo,
             centro_operaciones=self.centers['900'],
+        )
+        legacy = Ubicacion.objects.create(
+            nombre='Ubicación texto CO',
+            codigo='LEGACY-TEXT-CO',
+            co=self.centers['100'].codigo,
         )
 
         response = self.client.get(
             reverse('api_arbol_json'),
-            {'node': f'ubicacion-{outside.pk}'},
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {'data': []})
+        ids = [node['id'] for node in response.json()['data']]
+        self.assertIn(f'ubicacion-{legacy.pk}', ids)
+        self.assertNotIn(f'ubicacion-{outside.pk}', ids)
 
-    def test_invalid_center_session_does_not_fall_back_to_legacy_co(self):
+    def test_client_scope_uses_center_without_client_association(self):
         other_cliente = Cliente.objects.create(
             nombre='Otro cliente',
             codigo='OTRO-CLIENTE-ARBOL',
@@ -251,11 +267,8 @@ class ArbolActivosCOFilterTests(TestCase):
         session['co'] = '100'
         session.save()
 
-        self.assertEqual(self._get_nodes(), [])
-        self.assertNotIn(
-            f'ubicacion-{unauthorized_location.pk}',
-            [node['id'] for node in self._get_nodes()],
-        )
+        nodes = self._get_nodes()
+        self.assertEqual([node['id'] for node in nodes], [f'ubicacion-{unauthorized_location.pk}'])
 
     def test_malformed_center_session_does_not_fall_back_to_legacy_co(self):
         session = self.client.session
@@ -264,6 +277,130 @@ class ArbolActivosCOFilterTests(TestCase):
         session.save()
 
         self.assertEqual(self._get_nodes(), [])
+
+
+class CentroOperacionesEndpointIsolationTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='cliente-activos-scope',
+            password='test-password',
+        )
+        self.user.groups.add(Group.objects.get_or_create(name='Cliente')[0])
+        self.client.force_login(self.user)
+        self.allowed_center = CentroOperaciones.objects.create(
+            nombre='CO permitido',
+            codigo='CO-ACTIVOS-PERMITIDO',
+        )
+        self.other_center = CentroOperaciones.objects.create(
+            nombre='CO ajeno',
+            codigo='CO-ACTIVOS-AJENO',
+        )
+        self.allowed_location = Ubicacion.objects.create(
+            nombre='Ubicación permitida',
+            codigo='UBI-ACTIVOS-PERMITIDA',
+            centro_operaciones=self.allowed_center,
+        )
+        self.foreign_location = Ubicacion.objects.create(
+            nombre='Ubicación privada ajena',
+            codigo='UBI-ACTIVOS-AJENA',
+            centro_operaciones=self.other_center,
+        )
+        self.allowed_equipment = Equipo.objects.create(
+            nombre='Equipo permitido',
+            codigo='EQ-ACTIVOS-PERMITIDO',
+            ubicacion=self.allowed_location,
+        )
+        self.foreign_equipment = Equipo.objects.create(
+            nombre='Equipo privado ajeno',
+            codigo='EQ-ACTIVOS-AJENO',
+            ubicacion=self.foreign_location,
+        )
+        session = self.client.session
+        session['centro_operaciones_id'] = self.allowed_center.pk
+        session['tipo_cuenta'] = 'jefe_de_area'
+        session.save()
+
+    def test_asset_list_only_returns_selected_center(self):
+        response = self.client.get(reverse('lista_activos'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.allowed_location.nombre)
+        self.assertNotContains(response, self.foreign_location.nombre)
+        self.assertEqual(
+            list(response.context['ubicaciones_all']),
+            [self.allowed_location],
+        )
+
+    def test_direct_foreign_location_and_equipment_crud_is_not_accessible(self):
+        responses = [
+            self.client.get(
+                reverse('editar_ubicacion', args=[self.foreign_location.pk]),
+            ),
+            self.client.post(
+                reverse('eliminar_ubicacion', args=[self.foreign_location.pk]),
+            ),
+            self.client.get(
+                reverse('editar_equipo', args=[self.foreign_equipment.pk]),
+            ),
+            self.client.post(
+                reverse('eliminar_equipo', args=[self.foreign_equipment.pk]),
+            ),
+        ]
+
+        self.assertTrue(all(response.status_code == 404 for response in responses))
+        self.assertTrue(
+            Ubicacion.objects.filter(pk=self.foreign_location.pk).exists(),
+        )
+        self.assertTrue(
+            Equipo.objects.filter(pk=self.foreign_equipment.pk).exists(),
+        )
+
+    def test_foreign_equipment_pdf_and_location_zip_are_not_accessible(self):
+        pdf_response = self.client.get(
+            reverse('hoja_vida_equipo', args=[self.foreign_equipment.pk]),
+        )
+        zip_response = self.client.get(
+            reverse(
+                'descargar_hojas_vida_ubicacion',
+                args=[self.foreign_location.pk],
+            ),
+        )
+
+        self.assertEqual(pdf_response.status_code, 404)
+        self.assertEqual(zip_response.status_code, 404)
+
+    def test_client_without_center_has_empty_asset_scope_even_if_session_role_is_internal(self):
+        session = self.client.session
+        session.pop('centro_operaciones_id', None)
+        session['tipo_cuenta'] = 'jefe_de_area'
+        session.save()
+
+        tree_response = self.client.get(reverse('api_arbol_json'))
+        list_response = self.client.get(reverse('lista_activos'))
+        create_response = self.client.get(reverse('crear_ubicacion'))
+        edit_location_response = self.client.get(
+            reverse('editar_ubicacion', args=[self.allowed_location.pk]),
+        )
+        edit_equipment_response = self.client.get(
+            reverse('editar_equipo', args=[self.allowed_equipment.pk]),
+        )
+        pdf_response = self.client.get(
+            reverse('hoja_vida_equipo', args=[self.allowed_equipment.pk]),
+        )
+        zip_response = self.client.get(
+            reverse(
+                'descargar_hojas_vida_ubicacion',
+                args=[self.allowed_location.pk],
+            ),
+        )
+
+        self.assertEqual(tree_response.json(), {'data': []})
+        self.assertEqual(list(list_response.context['ubicaciones_all']), [])
+        self.assertEqual(create_response.status_code, 404)
+        self.assertEqual(edit_location_response.status_code, 404)
+        self.assertEqual(edit_equipment_response.status_code, 404)
+        self.assertEqual(pdf_response.status_code, 404)
+        self.assertEqual(zip_response.status_code, 404)
 
 
 class CentroOperacionesModelTests(TestCase):
@@ -305,6 +442,7 @@ class AssetDriveMediaTests(TestCase):
             username='asset-drive-user',
             password='test-password',
         )
+        self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
         self.location = Ubicacion.objects.create(
             nombre='Ubicación con foto Drive',
             codigo='UBI-ASSET-DRIVE',

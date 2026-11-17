@@ -20,10 +20,11 @@ from django.urls import reverse
 from django.utils import timezone
 from dateutil.relativedelta import relativedelta
 
-from gestion_mantenimiento.Activos.models import Equipo, Ubicacion
+from gestion_mantenimiento.Activos.models import CentroOperaciones, Equipo, Ubicacion
 from gestion_mantenimiento.Gestion_ot.models import (
     CierreOt,
     Estado,
+    InformeDriveArchivo,
     Material,
     MaterialOT,
     OrdenTrabajo,
@@ -64,6 +65,255 @@ class OrdenTrabajoIntegridadTests(TestCase):
                 tecnico_asignado='Tecnico 2',
                 estado=self.estado,
             )
+
+
+class CentroOperacionesGestionOtIsolationTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='cliente-ot-scope',
+            password='test-password',
+        )
+        self.user.groups.add(Group.objects.get_or_create(name='Cliente')[0])
+        self.client.force_login(self.user)
+        self.allowed_center = CentroOperaciones.objects.create(
+            nombre='CO OT permitido',
+            codigo='CO-OT-PERMITIDO',
+        )
+        self.other_center = CentroOperaciones.objects.create(
+            nombre='CO OT ajeno',
+            codigo='CO-OT-AJENO',
+        )
+        self.allowed_location = Ubicacion.objects.create(
+            nombre='Ubicación OT permitida',
+            codigo='UBI-OT-PERMITIDA',
+            centro_operaciones=self.allowed_center,
+        )
+        self.foreign_location = Ubicacion.objects.create(
+            nombre='Ubicación OT privada',
+            codigo='UBI-OT-AJENA',
+            centro_operaciones=self.other_center,
+        )
+        self.allowed_equipment = Equipo.objects.create(
+            nombre='Equipo OT permitido',
+            codigo='EQ-OT-PERMITIDO',
+            ubicacion=self.allowed_location,
+        )
+        self.foreign_equipment = Equipo.objects.create(
+            nombre='Equipo OT privado',
+            codigo='EQ-OT-AJENO',
+            ubicacion=self.foreign_location,
+        )
+        self.requested = Estado.objects.get_or_create(nombre='solicitado')[0]
+        self.finalized = Estado.objects.get_or_create(nombre='finalizada')[0]
+        self.allowed_request = Solicitud.objects.create(
+            creado_por=self.user.username,
+            descripcion_problema='Solicitud OT permitida',
+            equipo=self.allowed_equipment,
+            ubicacion=self.allowed_location,
+            estado=self.finalized,
+        )
+        self.foreign_request = Solicitud.objects.create(
+            creado_por='cliente-externo',
+            descripcion_problema='Solicitud OT privada',
+            equipo=self.foreign_equipment,
+            ubicacion=self.foreign_location,
+            estado=self.finalized,
+        )
+        self.allowed_ot = OrdenTrabajo.objects.create(
+            solicitud=self.allowed_request,
+            tecnico_asignado='Tecnico scope',
+            estado=self.finalized,
+        )
+        self.foreign_ot = OrdenTrabajo.objects.create(
+            solicitud=self.foreign_request,
+            tecnico_asignado='Tecnico externo',
+            estado=self.finalized,
+        )
+        self.allowed_closure = CierreOt.objects.create(
+            orden_trabajo=self.allowed_ot,
+            fecha_inicio_actividad=timezone.now(),
+            hora_inicio=datetime.min.time().replace(hour=9),
+            hora_fin=datetime.min.time().replace(hour=10),
+            estado_facturacion='pendiente',
+        )
+        self.foreign_closure = CierreOt.objects.create(
+            orden_trabajo=self.foreign_ot,
+            fecha_inicio_actividad=timezone.now(),
+            hora_inicio=datetime.min.time().replace(hour=9),
+            hora_fin=datetime.min.time().replace(hour=10),
+            estado_facturacion='pendiente',
+        )
+        self.allowed_plan = PlanMantenimiento.objects.create(
+            equipo=self.allowed_equipment,
+            nombre='Plan CO permitido',
+            fecha_inicio=timezone.localdate(),
+        )
+        self.foreign_plan = PlanMantenimiento.objects.create(
+            equipo=self.foreign_equipment,
+            nombre='Plan CO privado',
+            fecha_inicio=timezone.localdate(),
+        )
+        self.allowed_task = TareaMantenimiento.objects.create(
+            plan=self.allowed_plan,
+            fecha_programada=timezone.localdate(),
+        )
+        self.foreign_task = TareaMantenimiento.objects.create(
+            plan=self.foreign_plan,
+            fecha_programada=timezone.localdate(),
+        )
+        session = self.client.session
+        session['centro_operaciones_id'] = self.allowed_center.pk
+        session['tipo_cuenta'] = 'jefe_de_area'
+        session.save()
+
+    @staticmethod
+    def _ids(queryset):
+        return set(queryset.values_list('pk', flat=True))
+
+    def test_dashboard_ot_boards_and_preventive_list_are_scoped(self):
+        dashboard = self.client.get(reverse('dashboard'))
+        board = self.client.get(reverse('gestion_ot'))
+        ot_list = self.client.get(reverse('listar_ot'))
+        plans = self.client.get(reverse('lista_planes'))
+
+        self.assertEqual(dashboard.context['solicitudes_totales'], 1)
+        self.assertEqual(
+            self._ids(board.context['ordenes_trabajo']),
+            {self.allowed_ot.pk},
+        )
+        self.assertEqual(self._ids(ot_list.context['ots']), {self.allowed_ot.pk})
+        self.assertEqual(self._ids(plans.context['planes']), {self.allowed_plan.pk})
+        self.assertNotContains(board, self.foreign_request.descripcion_problema)
+        self.assertNotContains(plans, self.foreign_plan.nombre)
+
+    def test_direct_ot_request_plan_and_report_details_reject_foreign_co(self):
+        responses = [
+            self.client.get(reverse('cierre_ot', args=[self.foreign_ot.pk])),
+            self.client.get(
+                reverse('detalles_solicitud', args=[self.foreign_request.consecutivo]),
+            ),
+            self.client.get(reverse('detalle_plan', args=[self.foreign_plan.pk])),
+            self.client.get(
+                reverse(
+                    'estado_proceso_informe',
+                    args=[self.foreign_ot.pk, 'foreign-operation'],
+                ),
+            ),
+        ]
+
+        self.assertTrue(all(response.status_code == 404 for response in responses))
+        self.assertEqual(
+            self.client.get(reverse('cierre_ot', args=[self.allowed_ot.pk])).status_code,
+            200,
+        )
+
+    def test_foreign_report_downloads_and_client_financial_routes_do_not_expose_data(self):
+        report = InformeDriveArchivo.objects.create(
+            cierre_ot=self.foreign_closure,
+            drive_file_id='foreign-drive-report',
+            nombre_archivo='informe-privado.pdf',
+            download_token='foreign-download-token',
+        )
+        token_response = self.client.get(
+            reverse('descargar_informe_token', args=[report.download_token]),
+        )
+        local_response = self.client.get(
+            reverse(
+                'descargar_informe_pdf',
+                args=[f'informe_ot_{self.foreign_request.consecutivo}_privado.pdf'],
+            ),
+        )
+        rentabilidad_response = self.client.get(reverse('rentabilidad_admin'))
+        facturacion_response = self.client.get(reverse('facturacion_admin'))
+        invoice_response = self.client.get(
+            reverse('detalle_factura_ot', args=[self.foreign_ot.pk]),
+        )
+
+        self.assertEqual(token_response.status_code, 404)
+        self.assertEqual(local_response.status_code, 404)
+        self.assertEqual(rentabilidad_response.status_code, 302)
+        self.assertEqual(facturacion_response.status_code, 302)
+        self.assertNotIn(
+            self.foreign_location.nombre.encode(),
+            rentabilidad_response.content,
+        )
+        self.assertNotIn(
+            self.foreign_location.nombre.encode(),
+            facturacion_response.content,
+        )
+        self.assertIn(invoice_response.status_code, {403, 404})
+
+    def test_internal_user_with_center_sees_only_that_centers_billing_and_profitability(self):
+        self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
+        self.client.force_login(self.user)
+        today = timezone.localdate().isoformat()
+
+        billing = self.client.get(reverse('facturacion_admin'))
+        profitability = self.client.get(
+            reverse('rentabilidad_admin'),
+            {'desde': today, 'hasta': today},
+        )
+
+        self.assertEqual(billing.status_code, 200)
+        self.assertEqual(profitability.status_code, 200)
+        self.assertEqual(
+            self._ids(billing.context['ots']),
+            {self.allowed_ot.pk},
+        )
+        self.assertEqual(
+            {row['ot'].pk for row in profitability.context['filas']},
+            {self.allowed_ot.pk},
+        )
+
+    def test_client_without_center_gets_empty_dashboard_ot_and_preventive_lists(self):
+        session = self.client.session
+        session.pop('centro_operaciones_id', None)
+        session['tipo_cuenta'] = 'jefe_de_area'
+        session.save()
+
+        dashboard = self.client.get(reverse('dashboard'))
+        board = self.client.get(reverse('gestion_ot'))
+        ot_list = self.client.get(reverse('listar_ot'))
+        plans = self.client.get(reverse('lista_planes'))
+        closure = self.client.get(reverse('cierre_ot', args=[self.allowed_ot.pk]))
+        request_detail = self.client.get(
+            reverse('detalles_solicitud', args=[self.allowed_request.consecutivo]),
+        )
+        report_status = self.client.get(
+            reverse(
+                'estado_proceso_informe',
+                args=[self.allowed_ot.pk, 'no-co-operation'],
+            ),
+        )
+        local_report = self.client.get(
+            reverse(
+                'descargar_informe_pdf',
+                args=[f'informe_ot_{self.allowed_request.consecutivo}_sin-co.pdf'],
+            ),
+        )
+        report = InformeDriveArchivo.objects.create(
+            cierre_ot=self.allowed_closure,
+            drive_file_id='allowed-drive-report',
+            nombre_archivo='informe-permitido.pdf',
+            download_token='allowed-download-token',
+        )
+        token_report = self.client.get(
+            reverse('descargar_informe_token', args=[report.download_token]),
+        )
+        billing = self.client.get(reverse('facturacion_admin'))
+        profitability = self.client.get(reverse('rentabilidad_admin'))
+
+        self.assertEqual(dashboard.context['solicitudes_totales'], 0)
+        self.assertEqual(list(board.context['ordenes_trabajo']), [])
+        self.assertEqual(list(ot_list.context['ots']), [])
+        self.assertEqual(list(plans.context['planes']), [])
+        self.assertEqual(closure.status_code, 404)
+        self.assertEqual(request_detail.status_code, 404)
+        self.assertEqual(report_status.status_code, 404)
+        self.assertEqual(local_report.status_code, 404)
+        self.assertEqual(token_report.status_code, 404)
+        self.assertEqual(billing.status_code, 302)
+        self.assertEqual(profitability.status_code, 302)
 
 
 @override_settings(
@@ -131,6 +381,7 @@ class GestionOtFilterRegressionTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.user = self._create_user('tester', 'contraseña123')
+        self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
         self.client.force_login(self.user)
         self.ubicacion_a = Ubicacion.objects.create(nombre='Ubicación A', codigo='UBI-A')
         self.ubicacion_b = Ubicacion.objects.create(nombre='Ubicación B', codigo='UBI-B')
@@ -314,6 +565,7 @@ class SolicitudEmailEventTests(TestCase):
             username='tecnico-email-eventos',
             password='test-password',
         )
+        self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
         self.client.force_login(self.user)
         self.ubicacion = Ubicacion.objects.create(
             nombre='Ubicación correo eventos',
@@ -464,6 +716,7 @@ class PreventiveRequestCoTests(TestCase):
             username='tecnico-preventivo-co',
             password='test-password',
         )
+        self.user.groups.add(Group.objects.get_or_create(name='Tecnico')[0])
         self.client.force_login(self.user)
         self.ubicacion = Ubicacion.objects.create(
             nombre='Ubicación preventivo CO',
@@ -1200,6 +1453,7 @@ class GoogleDriveMediaStorageTests(TestCase):
             username='drive-storage-user',
             password='test-password',
         )
+        self.user.groups.add(Group.objects.get_or_create(name='Tecnico')[0])
         self.ubicacion = Ubicacion.objects.create(
             nombre='Ubicación Drive',
             codigo='UBI-DRIVE',
@@ -1397,6 +1651,7 @@ class RentabilidadAdminTests(TestCase):
             password='test-password',
         )
         self.admin.groups.add(Group.objects.get_or_create(name='Supervisor')[0])
+        self.admin.groups.add(Group.objects.get_or_create(name='Admin')[0])
         self.ubicacion = Ubicacion.objects.create(
             nombre='Cliente rentabilidad',
             codigo='UBI-RENT',

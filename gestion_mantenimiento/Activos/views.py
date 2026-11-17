@@ -21,7 +21,11 @@ from reportlab.lib import colors
 from reportlab.platypus import Image as RLImage
 from PIL import Image as PILImage
 from gestion_mantenimiento.Gestion_ot.models import OrdenTrabajo
-from gestion_mantenimiento.users.access import obtener_scope_ubicacion_ids
+from gestion_mantenimiento.users.access import (
+    obtener_alcance,
+    obtener_scope_ots,
+    obtener_scope_ubicacion_ids,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,21 +61,26 @@ def _validar_equipo_en_scope(equipo, scope_ids):
 
 
 def _validar_scope_equipo_recursivo(request, equipo):
-    if request.session.get('tipo_cuenta') != 'administrador':
-        return
-
     scope_ids = obtener_scope_ubicacion_ids(request)
+    if scope_ids is None:
+        return
     if not scope_ids:
         raise Http404('No tenés ubicaciones autorizadas.')
 
     _validar_equipo_en_scope(equipo, scope_ids)
 
 
-def _validar_scope_ubicacion_recursivo(request, ubicacion):
-    if request.session.get('tipo_cuenta') != 'administrador':
-        return
-
+def _scope_ids_para_formulario(request):
     scope_ids = obtener_scope_ubicacion_ids(request)
+    if scope_ids is not None and not scope_ids:
+        raise Http404('No tenés ubicaciones autorizadas.')
+    return scope_ids
+
+
+def _validar_scope_ubicacion_recursivo(request, ubicacion):
+    scope_ids = obtener_scope_ubicacion_ids(request)
+    if scope_ids is None:
+        return
     if not scope_ids:
         raise Http404('No tenés ubicaciones autorizadas.')
 
@@ -94,14 +103,20 @@ def _validar_scope_ubicacion_recursivo(request, ubicacion):
 
 @login_required
 def crear_ubicacion(request):
+    scope_ids = _scope_ids_para_formulario(request)
     if request.method == 'POST':
-        form = UbicacionForm(request.POST, request.FILES, user=request.user)
+        form = UbicacionForm(
+            request.POST,
+            request.FILES,
+            user=request.user,
+            scope_ids=scope_ids,
+        )
         if form.is_valid():
             ubicacion = form.save(commit=False)
             ubicacion.save()
             return redirect('lista_activos')
     else:
-        form = UbicacionForm(user=request.user)
+        form = UbicacionForm(user=request.user, scope_ids=scope_ids)
     context = {
         'form': form,
         'page_title': 'Crear Ubicación',
@@ -115,15 +130,27 @@ def editar_ubicacion(request, ubicacion_id):
     ubicacion = Ubicacion.objects.filter(id=ubicacion_id).first()
     if not ubicacion:
         raise Http404('Ubicación no encontrada')
+    _validar_scope_ubicacion_recursivo(request, ubicacion)
+    scope_ids = _scope_ids_para_formulario(request)
 
     if request.method == 'POST':
-        form = UbicacionForm(request.POST, request.FILES, instance=ubicacion, user=request.user)
+        form = UbicacionForm(
+            request.POST,
+            request.FILES,
+            instance=ubicacion,
+            user=request.user,
+            scope_ids=scope_ids,
+        )
         if form.is_valid():
             ubicacion_guardada = form.save(commit=False)
             ubicacion_guardada.save()
             return redirect('lista_activos')
     else:
-        form = UbicacionForm(instance=ubicacion, user=request.user)
+        form = UbicacionForm(
+            instance=ubicacion,
+            user=request.user,
+            scope_ids=scope_ids,
+        )
 
     context = {
         'form': form,
@@ -135,14 +162,20 @@ def editar_ubicacion(request, ubicacion_id):
 
 @login_required
 def crear_equipo(request):
+    scope_ids = _scope_ids_para_formulario(request)
     if request.method == 'POST':
-        form = EquipoForm(request.POST, request.FILES, user=request.user)
+        form = EquipoForm(
+            request.POST,
+            request.FILES,
+            user=request.user,
+            scope_ids=scope_ids,
+        )
         if form.is_valid():
             equipo = form.save(commit=False)
             equipo.save()
             return redirect('lista_activos')
     else:
-        form = EquipoForm(user=request.user)
+        form = EquipoForm(user=request.user, scope_ids=scope_ids)
     context = {
         'form': form,
         'page_title': 'Crear Equipo',
@@ -156,15 +189,23 @@ def editar_equipo(request, equipo_id):
     equipo = Equipo.objects.filter(id=equipo_id).first()
     if not equipo:
         raise Http404('Equipo no encontrado')
+    _validar_scope_equipo_recursivo(request, equipo)
+    scope_ids = _scope_ids_para_formulario(request)
 
     if request.method == 'POST':
-        form = EquipoForm(request.POST, request.FILES, instance=equipo, user=request.user)
+        form = EquipoForm(
+            request.POST,
+            request.FILES,
+            instance=equipo,
+            user=request.user,
+            scope_ids=scope_ids,
+        )
         if form.is_valid():
             equipo_guardado = form.save(commit=False)
             equipo_guardado.save()
             return redirect('lista_activos')
     else:
-        form = EquipoForm(instance=equipo, user=request.user)
+        form = EquipoForm(instance=equipo, user=request.user, scope_ids=scope_ids)
 
     context = {
         'form': form,
@@ -177,24 +218,40 @@ def editar_equipo(request, equipo_id):
 @login_required
 def crear_equipo_dinamico(request):
     """Crea un equipo hijo dinámicamente desde el árbol"""
+    scope_ids = _scope_ids_para_formulario(request)
     if request.method == 'POST':
         parent_id = request.POST.get('parent_id')
         parent_type = request.POST.get('parent_type')
-        form = EquipoForm(request.POST, request.FILES, user=request.user)
+        form = EquipoForm(
+            request.POST,
+            request.FILES,
+            user=request.user,
+            scope_ids=scope_ids,
+        )
 
         if form.is_valid():
             equipo = form.save(commit=False)
 
             if parent_type == 'ubicacion' and parent_id:
                 try:
-                    ubicacion = Ubicacion.objects.get(id=parent_id)
+                    ubicacion = Ubicacion.objects.filter(
+                        id=parent_id,
+                        **({'id__in': scope_ids} if scope_ids is not None else {}),
+                    ).get()
                     equipo.ubicacion = ubicacion
                 except Ubicacion.DoesNotExist:
                     pass
 
             if parent_type == 'equipo' and parent_id:
                 try:
-                    parent_equipo = Equipo.objects.get(id=parent_id)
+                    parent_equipo = Equipo.objects.filter(
+                        id=parent_id,
+                        **(
+                            {'ubicacion_id__in': scope_ids}
+                            if scope_ids is not None
+                            else {}
+                        ),
+                    ).get()
                     equipo.parent = parent_equipo
                     if not equipo.ubicacion and parent_equipo.ubicacion:
                         equipo.ubicacion = parent_equipo.ubicacion
@@ -385,17 +442,13 @@ def api_arbol_json(request):
     from django.db.models import OuterRef, Subquery
     from .models import CentroCostos
 
-    tipo_cuenta = request.session.get('tipo_cuenta')
-    if tipo_cuenta not in ('administrador', 'jefe_de_area'):
+    alcance = obtener_alcance(request)
+    if alcance.rol not in ('administrador', 'jefe_de_area'):
         return JsonResponse({'data': []})
 
-    scope_ids = (
-        obtener_scope_ubicacion_ids(request)
-        if tipo_cuenta == 'administrador'
-        else set()
-    )
+    scope_ids = alcance.ubicacion_ids
 
-    if tipo_cuenta == 'administrador' and not scope_ids:
+    if scope_ids is not None and not scope_ids:
         return JsonResponse({'data': []})
 
     node_id = request.GET.get('node', '')
@@ -407,15 +460,21 @@ def api_arbol_json(request):
             ubicacion_id = int(node_id.replace('ubicacion-', '', 1))
         except ValueError:
             return JsonResponse({'data': []})
-        if tipo_cuenta == 'administrador' and ubicacion_id not in scope_ids:
+        if scope_ids is not None and ubicacion_id not in scope_ids:
             return JsonResponse({'data': []})
 
     centro_costo_nombre = CentroCostos.objects.filter(
         area__ubicacion_id=OuterRef('ubicacion_id')
     ).order_by('area_id', 'nombre').values('nombre')[:1]
-    ubicaciones = list(Ubicacion.objects.select_related('parent').order_by('nombre'))
+    ubicaciones_queryset = Ubicacion.objects.select_related('parent')
+    equipos_queryset = Equipo.objects.select_related('ubicacion__parent', 'parent')
+    if scope_ids is not None:
+        ubicaciones_queryset = ubicaciones_queryset.filter(id__in=scope_ids)
+        equipos_queryset = equipos_queryset.filter(ubicacion_id__in=scope_ids)
+
+    ubicaciones = list(ubicaciones_queryset.order_by('nombre'))
     equipos = list(
-        Equipo.objects.select_related('ubicacion__parent', 'parent')
+        equipos_queryset
         .annotate(centro_costo_nombre=Subquery(centro_costo_nombre))
         .order_by('nombre')
     )
@@ -535,7 +594,7 @@ def api_arbol_json(request):
 
         children = []
         for child in ubicaciones_por_padre.get(ubicacion.id, []):
-            if tipo_cuenta == 'administrador' and child.id not in scope_ids:
+            if scope_ids is not None and child.id not in scope_ids:
                 continue
             children.append(construir_nodo_ubicacion(child, filtrar_scope=True))
 
@@ -544,7 +603,7 @@ def api_arbol_json(request):
 
         return JsonResponse({'data': children})
 
-    if tipo_cuenta == 'administrador':
+    if scope_ids is not None:
         roots = [
             ubicacion for ubicacion in ubicaciones
             if ubicacion.id in scope_ids and ubicacion.parent_id not in scope_ids
@@ -563,16 +622,14 @@ def api_arbol_json(request):
 
 @login_required
 def lista_activos(request):
-    tipo_cuenta = request.session.get('tipo_cuenta')
-    scope_ids = set()
+    scope_ids = obtener_scope_ubicacion_ids(request)
 
-    if tipo_cuenta == 'administrador':
-        scope_ids = obtener_scope_ubicacion_ids(request)
-
-    if tipo_cuenta == 'administrador' and scope_ids:
-        ubicaciones = Ubicacion.objects.filter(id__in=scope_ids, parent__isnull=True).order_by('nombre')
+    if scope_ids is not None and scope_ids:
+        ubicaciones = Ubicacion.objects.filter(
+            id__in=scope_ids,
+        ).exclude(parent_id__in=scope_ids).order_by('nombre')
         ubicaciones_all = Ubicacion.objects.filter(id__in=scope_ids).order_by('nombre')
-    elif tipo_cuenta == 'administrador':
+    elif scope_ids is not None:
         ubicaciones = Ubicacion.objects.none()
         ubicaciones_all = Ubicacion.objects.none()
     else:
@@ -656,7 +713,12 @@ def _fit_image_dimensions(image_bytes, max_width, max_height):
 
 def _build_hoja_vida_pdf_bytes(equipo, request=None):
     """Genera el PDF de hoja de vida para un equipo y devuelve un BytesIO listo para responder."""
-    ots = OrdenTrabajo.objects.filter(solicitud__equipo=equipo).select_related('solicitud', 'estado').order_by('-solicitud__consecutivo')
+    ots = OrdenTrabajo.objects.filter(
+        solicitud__equipo=equipo,
+    )
+    if request is not None:
+        ots = ots.filter(pk__in=obtener_scope_ots(request).values('pk'))
+    ots = ots.select_related('solicitud', 'estado').order_by('-solicitud__consecutivo')
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
@@ -810,6 +872,7 @@ def hoja_vida_equipo(request, equipo_id):
     equipo = Equipo.objects.filter(id=equipo_id).first()
     if not equipo:
         raise Http404("Equipo no encontrado")
+    _validar_scope_equipo_recursivo(request, equipo)
 
     buffer = _build_hoja_vida_pdf_bytes(equipo, request=request)
     filename = f"hoja_vida_{equipo.codigo or equipo.id}.pdf"
@@ -832,8 +895,12 @@ def descargar_hojas_vida_ubicacion(request, ubicacion_id):
     ubicacion = Ubicacion.objects.filter(id=ubicacion_id).first()
     if not ubicacion:
         raise Http404("Ubicación no encontrada")
+    _validar_scope_ubicacion_recursivo(request, ubicacion)
 
     ubicacion_ids = _collect_ubicacion_descendants(ubicacion)
+    scope_ids = obtener_scope_ubicacion_ids(request)
+    if scope_ids is not None:
+        ubicacion_ids = [location_id for location_id in ubicacion_ids if location_id in scope_ids]
     equipos = Equipo.objects.filter(ubicacion_id__in=ubicacion_ids).select_related('ubicacion').order_by('ubicacion__nombre', 'nombre')
     if not equipos.exists():
         raise Http404("No hay equipos asociados a esta ubicación para exportar")

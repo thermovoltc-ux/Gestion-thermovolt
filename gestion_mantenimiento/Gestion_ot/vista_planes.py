@@ -11,6 +11,27 @@ from datetime import date, timedelta
 from .models import PlanMantenimiento, ActividadMantenimiento, TareaMantenimiento
 from gestion_mantenimiento.Activos.models import Equipo
 from .forms import PlanMantenimientoForm, ActividadMantenimientoForm, TareaMantenimientoForm
+from gestion_mantenimiento.users.access import obtener_scope_ubicacion_ids
+
+
+def _scope_ids(request):
+    return obtener_scope_ubicacion_ids(request)
+
+
+def _planes_visibles(request):
+    planes = PlanMantenimiento.objects.all()
+    scope_ids = _scope_ids(request)
+    if scope_ids is not None:
+        return planes.filter(equipo__ubicacion_id__in=scope_ids)
+    return planes
+
+
+def _tareas_visibles(request):
+    tareas = TareaMantenimiento.objects.all()
+    scope_ids = _scope_ids(request)
+    if scope_ids is not None:
+        return tareas.filter(plan__equipo__ubicacion_id__in=scope_ids)
+    return tareas
 
 
 @login_required
@@ -18,7 +39,7 @@ def lista_planes_mantenimiento(request):
     """Lista todos los planes de mantenimiento"""
     equipo_id = request.GET.get('equipo_id')
     
-    planes = PlanMantenimiento.objects.all().select_related('equipo').prefetch_related('tareas', 'actividades')
+    planes = _planes_visibles(request).select_related('equipo').prefetch_related('tareas', 'actividades')
     
     if equipo_id:
         planes = planes.filter(equipo_id=equipo_id)
@@ -29,6 +50,9 @@ def lista_planes_mantenimiento(request):
         plan.tareas_total = plan.tareas.count()
     
     equipos = Equipo.objects.all()
+    scope_ids = _scope_ids(request)
+    if scope_ids is not None:
+        equipos = equipos.filter(ubicacion_id__in=scope_ids)
     
     context = {
         'planes': planes,
@@ -45,17 +69,21 @@ def crear_plan_mantenimiento(request, equipo_id=None):
     if not equipo_id:
         equipo_id = request.GET.get('equipo_id')
 
+    scope_ids = _scope_ids(request)
+    if scope_ids is not None and not scope_ids:
+        return JsonResponse({'error': 'No tenés ubicaciones autorizadas.'}, status=403)
+
     equipo = None
     if equipo_id:
-        try:
-            equipo = Equipo.objects.get(id=equipo_id)
-        except Equipo.DoesNotExist:
-            equipo = None
+        equipos = Equipo.objects.all()
+        if scope_ids is not None:
+            equipos = equipos.filter(ubicacion_id__in=scope_ids)
+        equipo = equipos.filter(id=equipo_id).first()
 
     error_equipo = None
 
     if request.method == 'POST':
-        form = PlanMantenimientoForm(request.POST)
+        form = PlanMantenimientoForm(request.POST, scope_ids=scope_ids)
         if form.is_valid():
             plan = form.save(commit=False)
             # Validar que equipo esté presente
@@ -68,7 +96,10 @@ def crear_plan_mantenimiento(request, equipo_id=None):
                 # El signal post_save automáticamente genera las tareas
                 return redirect(f"{reverse('lista_planes')}?equipo_id={plan.equipo_id}")
     else:
-        form = PlanMantenimientoForm(initial={'equipo': equipo})
+        form = PlanMantenimientoForm(
+            initial={'equipo': equipo},
+            scope_ids=scope_ids,
+        )
 
     context = {
         'form': form,
@@ -82,15 +113,19 @@ def crear_plan_mantenimiento(request, equipo_id=None):
 @login_required
 def editar_plan_mantenimiento(request, plan_id):
     """Editar un plan de mantenimiento"""
-    plan = get_object_or_404(PlanMantenimiento, id=plan_id)
+    plan = get_object_or_404(_planes_visibles(request), id=plan_id)
     
     if request.method == 'POST':
-        form = PlanMantenimientoForm(request.POST, instance=plan)
+        form = PlanMantenimientoForm(
+            request.POST,
+            instance=plan,
+            scope_ids=_scope_ids(request),
+        )
         if form.is_valid():
             form.save()
             return redirect('detalle_plan', plan_id=plan.id)
     else:
-        form = PlanMantenimientoForm(instance=plan)
+        form = PlanMantenimientoForm(instance=plan, scope_ids=_scope_ids(request))
     
     context = {
         'form': form,
@@ -103,7 +138,7 @@ def editar_plan_mantenimiento(request, plan_id):
 @login_required
 def detalle_plan_mantenimiento(request, plan_id):
     """Ver detalles de un plan y sus tareas"""
-    plan = get_object_or_404(PlanMantenimiento, id=plan_id)
+    plan = get_object_or_404(_planes_visibles(request), id=plan_id)
     actividades = plan.actividades.all()
     tareas = plan.tareas.all()
     
@@ -140,7 +175,7 @@ def detalle_plan_mantenimiento(request, plan_id):
 @login_required
 def agregar_actividad_plan(request, plan_id):
     """Agregar una actividad a un plan"""
-    plan = get_object_or_404(PlanMantenimiento, id=plan_id)
+    plan = get_object_or_404(_planes_visibles(request), id=plan_id)
     
     if request.method == 'POST':
         form = ActividadMantenimientoForm(request.POST)
@@ -170,7 +205,7 @@ def listar_actividades_proximas(request):
     dias_adelante = int(request.GET.get('dias', 30))
     
     # Tareas de mantenimiento preventivo
-    tareas_preventivas = TareaMantenimiento.objects.filter(
+    tareas_preventivas = _tareas_visibles(request).filter(
         fecha_programada__gte=hoy,
         fecha_programada__lt=hoy + timedelta(days=dias_adelante),
         estado__in=['pendiente', 'en_progreso']
@@ -202,7 +237,7 @@ def actualizar_tarea_mantenimiento(request, tarea_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido'}, status=405)
     
-    tarea = get_object_or_404(TareaMantenimiento, id=tarea_id)
+    tarea = get_object_or_404(_tareas_visibles(request), id=tarea_id)
     
     nuevo_estado = request.POST.get('estado')
     tecnico_id = request.POST.get('tecnico_id')
@@ -236,7 +271,7 @@ def actualizar_tarea_mantenimiento(request, tarea_id):
 @login_required
 def eliminar_plan_mantenimiento(request, plan_id):
     """Eliminar un plan de mantenimiento"""
-    plan = get_object_or_404(PlanMantenimiento, id=plan_id)
+    plan = get_object_or_404(_planes_visibles(request), id=plan_id)
     equipo_id = plan.equipo_id
     
     if request.method == 'POST':
