@@ -37,7 +37,7 @@ class CustomAuthenticationForm(AuthenticationForm):
     tipo_cuenta = forms.ChoiceField(
         choices=TIPO_CUENTA_CHOICES,
         required=True,
-        initial='administrador',
+        initial='jefe_de_area',
         label='Tipo de cuenta',
         widget=forms.Select(attrs={'class': 'form-control'}),
     )
