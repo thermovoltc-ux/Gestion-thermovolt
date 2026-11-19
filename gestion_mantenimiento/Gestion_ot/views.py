@@ -1014,6 +1014,7 @@ def listar_ot(request):
 
     alcance = obtener_alcance(request)
     scope_ids = alcance.ubicacion_ids
+    puede_gestionar = alcance.rol in ('jefe_de_area', 'tecnico')
     if alcance.rol == 'tecnico':
         ots = OrdenTrabajo.objects.filter(tecnico_asignado=request.user.username)
     else:
@@ -1081,7 +1082,10 @@ def listar_ot(request):
             calendar_events.append({
                 'title': f"OT-{ot.solicitud.consecutivo} - {ot.tecnico_asignado}",
                 'start': ot.fecha_actividad.date().isoformat(),
-                'url': reverse('cierre_ot', args=[ot.id]),
+                'url': (
+                    reverse('cierre_ot', args=[ot.id])
+                    if puede_gestionar else ''
+                ),
                 'backgroundColor': event_color,
                 'borderColor': event_color,
                 'textColor': '#ffffff',
@@ -1094,6 +1098,7 @@ def listar_ot(request):
         'filter_label': filter_label,
         'calendar_events_json': json.dumps(calendar_events),
         'vista_calendario': vista_calendario,
+        'puede_gestionar': puede_gestionar,
         'puede_cargar_materiales': es_tecnico,
         'materiales_catalogo': (
             Material.objects.filter(categoria='repuestos').order_by('nombre')
@@ -1116,7 +1121,12 @@ def _tarifa_hora_rentabilidad(configuracion):
     return Decimal(configuracion.valor_hora_normal)
 
 
-def _es_admin_rentabilidad(user):
+def _es_admin_rentabilidad(request):
+    alcance = obtener_alcance(request)
+    if alcance.rol in ('administrador', 'tecnico'):
+        return False
+
+    user = request.user
     return (
         user.is_staff
         or user.is_superuser
@@ -1192,7 +1202,7 @@ def _calcular_costos_ot(ot, cierre):
 
 @login_required
 def facturacion_admin(request):
-    if not _es_admin_rentabilidad(request.user):
+    if not _es_admin_rentabilidad(request):
         messages.error(request, 'No tenés permiso para acceder a Facturación.')
         return redirect('dashboard')
 
@@ -1338,7 +1348,7 @@ def _precio_venta_desde_costo(costo, categoria):
 
 @login_required
 def gestionar_ot_admin(request, ot_id):
-    if not _es_admin_rentabilidad(request.user):
+    if not _es_admin_rentabilidad(request):
         messages.error(request, 'No tenés permiso para gestionar esta OT.')
         return redirect('dashboard')
 
@@ -1413,7 +1423,7 @@ def gestionar_ot_admin(request, ot_id):
 @login_required
 @require_POST
 def agregar_material_ot_admin(request, ot_id):
-    if not _es_admin_rentabilidad(request.user):
+    if not _es_admin_rentabilidad(request):
         messages.error(request, 'No tenés permiso para agregar materiales a esta OT.')
         return redirect('dashboard')
 
@@ -1492,7 +1502,7 @@ def agregar_material_ot_admin(request, ot_id):
 @login_required
 @require_POST
 def agregar_servicio_ot_admin(request, ot_id):
-    if not _es_admin_rentabilidad(request.user):
+    if not _es_admin_rentabilidad(request):
         messages.error(request, 'No tenés permiso para agregar servicios a esta OT.')
         return redirect('dashboard')
 
@@ -1550,7 +1560,7 @@ def agregar_servicio_ot_admin(request, ot_id):
 @login_required
 @require_POST
 def eliminar_servicio_ot_admin(request, ot_id, servicio_id):
-    if not _es_admin_rentabilidad(request.user):
+    if not _es_admin_rentabilidad(request):
         return JsonResponse(
             {'ok': False, 'error': 'No tenés permiso para eliminar servicios de esta OT.'},
             status=403,
@@ -1607,7 +1617,7 @@ def eliminar_servicio_ot_admin(request, ot_id, servicio_id):
 @login_required
 @require_POST
 def actualizar_mano_obra(request, ot_id):
-    if not _es_admin_rentabilidad(request.user):
+    if not _es_admin_rentabilidad(request):
         return JsonResponse({'ok': False, 'error': 'No tenés permiso para modificar la facturación.'}, status=403)
 
     ot = get_object_or_404(
@@ -1650,7 +1660,7 @@ def actualizar_mano_obra(request, ot_id):
 @login_required
 @require_POST
 def actualizar_material_ot_admin(request, ot_id, material_ot_id):
-    if not _es_admin_rentabilidad(request.user):
+    if not _es_admin_rentabilidad(request):
         return redirect('dashboard')
 
     material_ot = get_object_or_404(
@@ -1672,7 +1682,7 @@ def actualizar_material_ot_admin(request, ot_id, material_ot_id):
 @login_required
 @require_POST
 def eliminar_material_ot_admin(request, ot_id, material_ot_id):
-    if not _es_admin_rentabilidad(request.user):
+    if not _es_admin_rentabilidad(request):
         return redirect('dashboard')
 
     material_ot = get_object_or_404(
@@ -1689,7 +1699,7 @@ def eliminar_material_ot_admin(request, ot_id, material_ot_id):
 
 @login_required
 def rentabilidad_admin(request):
-    if not _es_admin_rentabilidad(request.user):
+    if not _es_admin_rentabilidad(request):
         messages.error(request, 'No tenés permiso para acceder a esta sección.')
         return redirect('dashboard')
 
@@ -1954,7 +1964,7 @@ def rentabilidad_admin(request):
 @login_required
 @require_GET
 def detalle_factura_ot(request, ot_id):
-    if not _es_admin_rentabilidad(request.user):
+    if not _es_admin_rentabilidad(request):
         return JsonResponse(
             {'ok': False, 'error': 'No tenés permiso para consultar esta factura.'},
             status=403,
@@ -2064,7 +2074,7 @@ def detalle_factura_ot(request, ot_id):
 @login_required
 @require_POST
 def subir_factura_dian(request, ot_id):
-    if not _es_admin_rentabilidad(request.user):
+    if not _es_admin_rentabilidad(request):
         return JsonResponse(
             {'success': False, 'error': 'No tenés permiso para cargar facturas DIAN.'},
             status=403,
@@ -2156,7 +2166,7 @@ def subir_factura_dian(request, ot_id):
 @login_required
 @require_GET
 def descargar_factura_dian(request, ot_id):
-    if not _es_admin_rentabilidad(request.user):
+    if not _es_admin_rentabilidad(request):
         raise Http404('No tenés permiso para descargar esta factura.')
 
     cierre = get_object_or_404(
@@ -2220,6 +2230,8 @@ def drive_media(request, file_id):
         foto_factura__startswith=stored_prefix,
         orden_trabajo__in=visible_ots,
     ).values_list('foto_factura', flat=True).first()
+    if material_name and obtener_alcance(request).rol == 'administrador':
+        raise Http404('Imagen no encontrada.')
     image_name = ImagenCierreOt.objects.filter(
         imagen__startswith=stored_prefix,
         cierre_ot__orden_trabajo__in=visible_ots,
@@ -2371,7 +2383,7 @@ def _respuesta_material_ot(material_ot, duplicado=False):
 @login_required
 @require_POST
 def crear_material_ajax(request, ot_id):
-    if _es_admin_rentabilidad(request.user):
+    if _es_admin_rentabilidad(request):
         get_object_or_404(_ordenes_filtradas_por_co(request), pk=ot_id)
     else:
         ot = get_object_or_404(_ordenes_visibles_para_usuario(request), pk=ot_id)
@@ -2448,6 +2460,10 @@ def agregar_material_rapido_ot(request, ot_id):
 @login_required
 def cierre_ot(request, ot_id):
     logger.info("cierre_ot called ot_id=%s method=%s", ot_id, request.method)
+    alcance = obtener_alcance(request)
+    if alcance.rol not in ('jefe_de_area', 'tecnico'):
+        raise Http404('OT no encontrada.')
+
     ot = get_object_or_404(_ordenes_visibles_para_usuario(request), id=ot_id)
     cierre_ot, created = CierreOt.objects.get_or_create(orden_trabajo=ot)
     read_only = _ot_es_solo_lectura(ot)

@@ -123,6 +123,7 @@ class CentroOperacionesGestionOtIsolationTests(TestCase):
             solicitud=self.allowed_request,
             tecnico_asignado='Tecnico scope',
             estado=self.finalized,
+            fecha_actividad=timezone.now(),
         )
         self.foreign_ot = OrdenTrabajo.objects.create(
             solicitud=self.foreign_request,
@@ -186,6 +187,68 @@ class CentroOperacionesGestionOtIsolationTests(TestCase):
         self.assertNotContains(board, self.foreign_request.descripcion_problema)
         self.assertNotContains(plans, self.foreign_plan.nombre)
 
+    def test_client_can_see_ot_status_but_not_manage_link_or_closure(self):
+        response = self.client.get(reverse('listar_ot'))
+        calendar_events = json.loads(response.context['calendar_events_json'])
+        closure_response = self.client.get(
+            reverse('cierre_ot', args=[self.allowed_ot.pk]),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self._ids(response.context['ots']),
+            {self.allowed_ot.pk},
+        )
+        self.assertNotContains(response, 'Gestionar')
+        self.assertEqual(calendar_events[0]['url'], '')
+        self.assertEqual(closure_response.status_code, 404)
+        self.assertNotContains(
+            closure_response,
+            'Costo unitario real',
+            status_code=404,
+        )
+
+    def test_client_cannot_download_material_invoice_from_private_media_route(self):
+        material = Material.objects.create(
+            codigo='CO-PRIVATE-INVOICE',
+            nombre='Material con factura privada',
+            costo_base='170000.00',
+            precio_venta_sugerido='242857.14',
+        )
+        material_ot = MaterialOT.objects.create(
+            orden_trabajo=self.allowed_ot,
+            material=material,
+            cantidad='1',
+            costo_real='170000.00',
+        )
+        material_ot.foto_factura.name = 'drive/private-invoice-file/file.pdf'
+        material_ot.save(update_fields=['foto_factura'])
+
+        with patch.object(GoogleDriveMediaStorage, 'open') as open_private_file:
+            response = self.client.get(
+                reverse('drive_media', args=['private-invoice-file']),
+            )
+
+        self.assertEqual(response.status_code, 404)
+        open_private_file.assert_not_called()
+
+    def test_client_group_takes_precedence_over_admin_for_financial_routes(self):
+        self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
+
+        rentabilidad = self.client.get(reverse('rentabilidad_admin'))
+        facturacion = self.client.get(reverse('facturacion_admin'))
+        invoice_detail = self.client.get(
+            reverse('detalle_factura_ot', args=[self.allowed_ot.pk]),
+        )
+        invoice_download = self.client.get(
+            reverse('descargar_factura_dian', args=[self.allowed_ot.pk]),
+        )
+
+        self.assertEqual(rentabilidad.status_code, 302)
+        self.assertEqual(facturacion.status_code, 302)
+        self.assertEqual(invoice_detail.status_code, 403)
+        self.assertEqual(invoice_download.status_code, 404)
+
     def test_direct_ot_request_plan_and_report_details_reject_foreign_co(self):
         responses = [
             self.client.get(reverse('cierre_ot', args=[self.foreign_ot.pk])),
@@ -204,7 +267,7 @@ class CentroOperacionesGestionOtIsolationTests(TestCase):
         self.assertTrue(all(response.status_code == 404 for response in responses))
         self.assertEqual(
             self.client.get(reverse('cierre_ot', args=[self.allowed_ot.pk])).status_code,
-            200,
+            404,
         )
 
     def test_foreign_report_downloads_and_client_financial_routes_do_not_expose_data(self):
@@ -244,6 +307,7 @@ class CentroOperacionesGestionOtIsolationTests(TestCase):
         self.assertIn(invoice_response.status_code, {403, 404})
 
     def test_internal_user_with_center_sees_only_that_centers_billing_and_profitability(self):
+        self.user.groups.clear()
         self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
         self.client.force_login(self.user)
         today = timezone.localdate().isoformat()
