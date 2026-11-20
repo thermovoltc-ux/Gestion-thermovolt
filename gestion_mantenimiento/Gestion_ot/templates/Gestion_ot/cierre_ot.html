@@ -118,7 +118,7 @@
                                 <tbody id="lista-materiales">
                                     {% for mat_ot in ot.materiales.all %}
                                     <tr>
-                                        <td>{{ mat_ot.material.nombre }}</td>
+                                        <td>{{ mat_ot.nombre_historico }}</td>
                                         <td>{{ mat_ot.cantidad|intcomma }}</td>
                                         <td>$ {{ mat_ot.costo_real|intcomma }}</td>
                                         <td>

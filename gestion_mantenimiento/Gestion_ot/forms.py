@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from django.forms import inlineformset_factory
 from decimal import Decimal
+from gestion_mantenimiento.almacen.models import Producto
 from .models import (
     OrdenTrabajo,
     Estado,
@@ -274,6 +275,12 @@ class MaterialForm(forms.ModelForm):
 
 
 class MaterialOTForm(forms.ModelForm):
+    producto_almacen = forms.ModelChoiceField(
+        queryset=Producto.objects.order_by('nombre', 'codigo'),
+        required=False,
+        empty_label='Sin descuento de inventario',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
     cantidad = forms.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -289,6 +296,7 @@ class MaterialOTForm(forms.ModelForm):
         max_digits=12,
         decimal_places=2,
         min_value=Decimal('0'),
+        required=False,
         widget=forms.NumberInput(attrs={
             'class': 'form-control',
             'step': '0.01',
@@ -298,7 +306,14 @@ class MaterialOTForm(forms.ModelForm):
 
     class Meta:
         model = MaterialOT
-        fields = ['material', 'cantidad', 'costo_real', 'foto_factura', 'observaciones']
+        fields = [
+            'material',
+            'producto_almacen',
+            'cantidad',
+            'costo_real',
+            'foto_factura',
+            'observaciones',
+        ]
         widgets = {
             'material': forms.Select(attrs={'class': 'form-control'}),
             'foto_factura': forms.FileInput(attrs={
@@ -311,6 +326,32 @@ class MaterialOTForm(forms.ModelForm):
                 'maxlength': '5000',
             }),
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        producto = cleaned_data.get('producto_almacen')
+        material = cleaned_data.get('material')
+        if (
+            producto
+            and producto.material_asociado_id
+            and material
+            and producto.material_asociado_id != material.pk
+        ):
+            self.add_error(
+                'material',
+                ValidationError(
+                    'El producto de almacén está asociado a otro material del catálogo.'
+                ),
+            )
+        if (
+            producto is None
+            and cleaned_data.get('costo_real') is None
+        ):
+            self.add_error(
+                'costo_real',
+                ValidationError('Ingresa el costo real si no seleccionas un producto de almacén.'),
+            )
+        return cleaned_data
 
     def clean_foto_factura(self):
         archivo = self.cleaned_data.get('foto_factura')

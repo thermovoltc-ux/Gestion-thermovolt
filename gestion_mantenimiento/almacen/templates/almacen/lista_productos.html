@@ -17,6 +17,26 @@
         </nav>
     </header>
 
+    {% if messages %}
+    <div class="warehouse-messages" aria-live="polite">
+        {% for message in messages %}
+        <p class="warehouse-message warehouse-message--{{ message.tags }}">{{ message }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="get" class="ds-card warehouse-search-form" role="search">
+        <label for="producto-search">Buscar producto o material asociado</label>
+        <div class="warehouse-actions">
+            <input id="producto-search" class="form-control" type="search" name="q"
+                   value="{{ busqueda }}" placeholder="Código o nombre">
+            <button type="submit" class="ds-button">Buscar</button>
+            {% if busqueda %}
+            <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_productos' %}">Limpiar</a>
+            {% endif %}
+        </div>
+    </form>
+
     <section class="ds-card warehouse-table-card" aria-label="Productos en inventario">
         <div class="warehouse-table-scroll">
             <table class="ds-table">
@@ -24,11 +44,13 @@
                     <tr>
                         <th scope="col">Código</th>
                         <th scope="col">Nombre</th>
+                        <th scope="col">Material asociado</th>
                         <th scope="col">Categoría</th>
                         <th scope="col">Unidad</th>
                         <th scope="col">Stock actual</th>
                         <th scope="col">Stock mínimo</th>
                         <th scope="col">Movimientos</th>
+                        {% if puede_editar_catalogo %}<th scope="col">Acciones</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -36,6 +58,13 @@
                     <tr>
                         <td>{{ producto.codigo }}</td>
                         <td>{{ producto.nombre }}</td>
+                        <td>
+                            {% if producto.material_asociado %}
+                                {{ producto.material_asociado.codigo }} — {{ producto.material_asociado.nombre }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
                         <td>{{ producto.categoria.nombre }}</td>
                         <td>{{ producto.unidad_medida }}</td>
                         <td>
@@ -50,10 +79,18 @@
                                 Ver movimientos
                             </a>
                         </td>
+                        {% if puede_editar_catalogo %}
+                        <td>
+                            <a class="ds-button ds-button--secondary ds-button--small"
+                               href="{% url 'almacen:editar_producto' producto.pk %}">
+                                Editar
+                            </a>
+                        </td>
+                        {% endif %}
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="warehouse-empty">No hay productos registrados.</td>
+                        <td colspan="{% if puede_editar_catalogo %}9{% else %}8{% endif %}" class="warehouse-empty">No hay productos registrados.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

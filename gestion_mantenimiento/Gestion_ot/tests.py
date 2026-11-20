@@ -20,6 +20,11 @@ from django.urls import reverse
 from django.utils import timezone
 from dateutil.relativedelta import relativedelta
 
+from gestion_mantenimiento.almacen.models import (
+    CategoriaProducto,
+    MovimientoInventario,
+    Producto,
+)
 from gestion_mantenimiento.Activos.models import CentroOperaciones, Equipo, Ubicacion
 from gestion_mantenimiento.Gestion_ot.models import (
     CierreOt,
@@ -1099,6 +1104,26 @@ class MaterialOTAjaxTests(TestCase):
             estado=estado,
         )
 
+    def _crear_producto_almacen(self, entradas):
+        categoria = CategoriaProducto.objects.create(
+            nombre=f'Repuestos OT {self.ot.pk}',
+        )
+        producto = Producto.objects.create(
+            codigo=f'ALM-{self.ot.pk}',
+            nombre='Rodamiento de almacén',
+            categoria=categoria,
+            unidad_medida='Unidad',
+        )
+        for cantidad, costo_unitario in entradas:
+            MovimientoInventario.objects.create(
+                producto=producto,
+                tipo=MovimientoInventario.ENTRADA,
+                cantidad=Decimal(cantidad),
+                costo_unitario=Decimal(costo_unitario),
+                usuario=self.user,
+            )
+        return producto
+
     def test_adds_material_and_calculates_historical_sale_price(self):
         response = self.client.post(
             reverse('agregar_material_ot', args=[self.ot.pk]),
@@ -1114,6 +1139,139 @@ class MaterialOTAjaxTests(TestCase):
         self.assertEqual(material_ot.precio_venta_aplicado, Decimal('14.29'))
         self.assertEqual(material_ot.cantidad, Decimal('2.00'))
         self.assertIsNotNone(material_ot.fecha_registro)
+
+    def test_material_name_and_code_snapshots_do_not_change_with_catalog(self):
+        material_ot = MaterialOT.objects.create(
+            orden_trabajo=self.ot,
+            material=self.material,
+            cantidad=Decimal('1.00'),
+            costo_real=Decimal('10.00'),
+            precio_venta_aplicado=Decimal('14.29'),
+        )
+
+        self.material.nombre = 'Rodamiento actualizado'
+        self.material.codigo = 'MAT-RENAMED'
+        self.material.save(update_fields=['nombre', 'codigo'])
+        material_ot.refresh_from_db()
+
+        self.assertEqual(material_ot.nombre_snapshot, 'Rodamiento')
+        self.assertEqual(material_ot.codigo_snapshot, 'MAT-001')
+        self.assertEqual(material_ot.nombre_historico, 'Rodamiento')
+        self.assertEqual(material_ot.codigo_historico, 'MAT-001')
+
+    def test_inventory_material_uses_weighted_average_and_creates_ot_exit(self):
+        producto = self._crear_producto_almacen([
+            ('10.000', '10.00'),
+            ('10.000', '20.00'),
+        ])
+
+        response = self.client.post(
+            reverse('agregar_material_ot', args=[self.ot.pk]),
+            {
+                'material': self.material.pk,
+                'producto_almacen': producto.pk,
+                'cantidad': '2.00',
+                'costo_real': '999.99',
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        material_ot = MaterialOT.objects.get(orden_trabajo=self.ot)
+        self.assertEqual(material_ot.producto_almacen, producto)
+        self.assertEqual(material_ot.costo_real, Decimal('15.00'))
+        self.assertEqual(material_ot.precio_venta_aplicado, Decimal('21.43'))
+        self.assertEqual(producto.stock, Decimal('18.000'))
+
+        salida = MovimientoInventario.objects.get(
+            producto=producto,
+            tipo=MovimientoInventario.SALIDA,
+        )
+        self.assertEqual(salida.cantidad, Decimal('2.00'))
+        self.assertEqual(salida.costo_unitario, Decimal('15.00'))
+        self.assertEqual(salida.documento_referencia, f'OT-{self.ot.pk}')
+        self.assertEqual(salida.usuario, self.user)
+
+    def test_insufficient_inventory_does_not_save_ot_material_or_exit(self):
+        producto = self._crear_producto_almacen([('2.000', '7.50')])
+
+        response = self.client.post(
+            reverse('agregar_material_ot', args=[self.ot.pk]),
+            {
+                'material': self.material.pk,
+                'producto_almacen': producto.pk,
+                'cantidad': '3.00',
+                'costo_real': '999.99',
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Stock insuficiente', response.json()['error'])
+        self.assertFalse(MaterialOT.objects.filter(orden_trabajo=self.ot).exists())
+        self.assertEqual(
+            MovimientoInventario.objects.filter(
+                producto=producto,
+                tipo=MovimientoInventario.SALIDA,
+            ).count(),
+            0,
+        )
+        self.assertEqual(producto.stock, Decimal('2.000'))
+
+    def test_inventory_product_rejects_a_different_linked_material(self):
+        producto = self._crear_producto_almacen([('2.000', '7.50')])
+        producto.material_asociado = self.material
+        producto.save(update_fields=['material_asociado'])
+        other_material = Material.objects.create(
+            codigo='MAT-002',
+            nombre='Otro repuesto',
+            costo_base='4.00',
+            precio_venta_sugerido='5.71',
+        )
+
+        response = self.client.post(
+            reverse('agregar_material_ot', args=[self.ot.pk]),
+            {
+                'material': other_material.pk,
+                'producto_almacen': producto.pk,
+                'cantidad': '1.00',
+                'costo_real': '7.50',
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('asociado a otro material', str(response.json()['errors']))
+        self.assertFalse(MaterialOT.objects.filter(orden_trabajo=self.ot).exists())
+        self.assertFalse(
+            MovimientoInventario.objects.filter(
+                producto=producto,
+                tipo=MovimientoInventario.SALIDA,
+            ).exists()
+        )
+
+    def test_repeated_inventory_add_request_does_not_debit_twice(self):
+        producto = self._crear_producto_almacen([('5.000', '8.00')])
+        url = reverse('agregar_material_ot', args=[self.ot.pk])
+        payload = {
+            'material': self.material.pk,
+            'producto_almacen': producto.pk,
+            'cantidad': '2.00',
+            'costo_real': '999.99',
+        }
+
+        first_response = self.client.post(url, payload)
+        retry_response = self.client.post(url, payload)
+
+        self.assertEqual(first_response.status_code, 201)
+        self.assertEqual(retry_response.status_code, 200)
+        self.assertTrue(retry_response.json()['duplicate'])
+        self.assertEqual(MaterialOT.objects.filter(orden_trabajo=self.ot).count(), 1)
+        self.assertEqual(
+            MovimientoInventario.objects.filter(
+                producto=producto,
+                tipo=MovimientoInventario.SALIDA,
+            ).count(),
+            1,
+        )
+        self.assertEqual(producto.stock, Decimal('3.000'))
 
     def test_standard_and_quick_add_accept_pdf_invoices(self):
         from tempfile import TemporaryDirectory

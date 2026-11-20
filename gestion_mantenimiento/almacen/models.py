@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -24,6 +24,13 @@ class CategoriaProducto(models.Model):
 class Producto(models.Model):
     codigo = models.CharField(max_length=50, unique=True)
     nombre = models.CharField(max_length=200)
+    material_asociado = models.OneToOneField(
+        'Gestion_ot.Material',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='producto_almacen',
+    )
     categoria = models.ForeignKey(
         CategoriaProducto,
         on_delete=models.PROTECT,
@@ -63,6 +70,57 @@ class Producto(models.Model):
             ),
         )['stock']
         return saldo if saldo is not None else Decimal('0')
+
+    @property
+    def costo_promedio_actual(self):
+        if self.pk is None:
+            return Decimal('0.00')
+
+        cantidad_actual = Decimal('0')
+        valor_actual = Decimal('0')
+        movimientos = self.movimientos.order_by('fecha', 'pk').values_list(
+            'tipo',
+            'cantidad',
+            'costo_unitario',
+        )
+
+        for tipo, cantidad, costo_unitario in movimientos:
+            if tipo == MovimientoInventario.ENTRADA:
+                valor_actual += cantidad * costo_unitario
+                cantidad_actual += cantidad
+            elif tipo == MovimientoInventario.SALIDA:
+                costo_salida = (
+                    valor_actual / cantidad_actual
+                    if cantidad_actual > 0
+                    else Decimal('0')
+                )
+                valor_actual -= cantidad * costo_salida
+                cantidad_actual -= cantidad
+            elif tipo == MovimientoInventario.AJUSTE:
+                if cantidad > 0:
+                    costo_ajuste = costo_unitario
+                    if cantidad_actual > 0 and costo_ajuste == 0:
+                        costo_ajuste = valor_actual / cantidad_actual
+                    valor_actual += cantidad * costo_ajuste
+                else:
+                    costo_ajuste = (
+                        valor_actual / cantidad_actual
+                        if cantidad_actual > 0
+                        else Decimal('0')
+                    )
+                    valor_actual += cantidad * costo_ajuste
+                cantidad_actual += cantidad
+
+            if cantidad_actual <= 0:
+                cantidad_actual = Decimal('0')
+                valor_actual = Decimal('0')
+
+        if cantidad_actual == 0:
+            return Decimal('0.00')
+        return (valor_actual / cantidad_actual).quantize(
+            Decimal('0.01'),
+            rounding=ROUND_HALF_UP,
+        )
 
 
 class MovimientoInventarioQuerySet(models.QuerySet):

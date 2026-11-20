@@ -97,7 +97,7 @@
                 <tbody>
                     {% for fila in filas_materiales %}
                         <tr>
-                            <td>{{ fila.material_ot.material.nombre }}<br><small>{{ fila.material_ot.material.codigo }}</small></td>
+                            <td>{{ fila.material_ot.nombre_historico }}<br><small>{{ fila.material_ot.codigo_historico }}</small></td>
                             <td colspan="3">
                                 <form method="post" action="{% url 'actualizar_material_ot_admin' ot.pk fila.material_ot.pk %}" class="admin-ot-material-form">
                                     {% csrf_token %}
@@ -147,6 +147,12 @@
                     {% endfor %}
                 </datalist>
                 {% if material_admin_form.material.errors %}<div class="field-errors">{{ material_admin_form.material.errors }}</div>{% endif %}
+            </div>
+            <div>
+                <label for="{{ material_admin_form.producto_almacen.id_for_label }}">Producto de almacén (opcional)</label>
+                {{ material_admin_form.producto_almacen }}
+                {% if material_admin_form.producto_almacen.errors %}<div class="field-errors">{{ material_admin_form.producto_almacen.errors }}</div>{% endif %}
+                <small>Al seleccionarlo, el costo real se calcula desde el promedio ponderado del Kardex.</small>
             </div>
             <div>
                 <label for="{{ material_admin_form.cantidad.id_for_label }}">Cantidad</label>

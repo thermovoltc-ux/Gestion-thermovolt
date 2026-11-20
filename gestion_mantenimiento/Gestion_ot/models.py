@@ -464,6 +464,15 @@ class MaterialOT(models.Model):
         on_delete=models.PROTECT,
         related_name='usos_en_ordenes',
     )
+    producto_almacen = models.ForeignKey(
+        'almacen.Producto',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='usos_en_ordenes',
+    )
+    nombre_snapshot = models.CharField(max_length=150, blank=True)
+    codigo_snapshot = models.CharField(max_length=50, blank=True)
     cantidad = models.DecimalField(max_digits=10, decimal_places=2)
     costo_real = models.DecimalField(max_digits=12, decimal_places=2)
     foto_factura = models.FileField(
@@ -490,7 +499,25 @@ class MaterialOT(models.Model):
     )
 
     def __str__(self):
-        return f"{self.material} x {self.cantidad} - OT-{self.orden_trabajo_id}"
+        material = self.nombre_snapshot or self.material.nombre
+        codigo = self.codigo_snapshot or self.material.codigo
+        return f"{codigo} - {material} x {self.cantidad} - OT-{self.orden_trabajo_id}"
+
+    @property
+    def nombre_historico(self):
+        return self.nombre_snapshot or self.material.nombre
+
+    @property
+    def codigo_historico(self):
+        return self.codigo_snapshot or self.material.codigo
+
+    def save(self, *args, **kwargs):
+        if self._state.adding:
+            if not self.nombre_snapshot:
+                self.nombre_snapshot = self.material.nombre
+            if not self.codigo_snapshot:
+                self.codigo_snapshot = self.material.codigo
+        return super().save(*args, **kwargs)
 
 
 class ServicioOT(models.Model):

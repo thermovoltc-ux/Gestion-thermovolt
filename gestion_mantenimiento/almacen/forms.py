@@ -1,6 +1,99 @@
+from decimal import Decimal
+
 from django import forms
 
-from .models import MovimientoInventario
+from gestion_mantenimiento.Gestion_ot.models import Material
+
+from .models import MovimientoInventario, Producto
+
+
+class ProductoForm(forms.ModelForm):
+    nombre_material = forms.CharField(
+        max_length=150,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        label='Nombre del material asociado',
+    )
+    costo_base = forms.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=Decimal('0'),
+        required=False,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'min': '0',
+            'step': '0.01',
+        }),
+    )
+    precio_venta_sugerido = forms.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        min_value=Decimal('0'),
+        required=False,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'min': '0',
+            'step': '0.01',
+        }),
+    )
+
+    class Meta:
+        model = Producto
+        fields = [
+            'codigo',
+            'nombre',
+            'categoria',
+            'unidad_medida',
+            'stock_minimo',
+            'material_asociado',
+        ]
+        widgets = {
+            'codigo': forms.TextInput(attrs={'class': 'form-control'}),
+            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            'categoria': forms.Select(attrs={'class': 'form-control'}),
+            'unidad_medida': forms.TextInput(attrs={'class': 'form-control'}),
+            'stock_minimo': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'step': '0.001',
+            }),
+            'material_asociado': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['material_asociado'].queryset = Material.objects.order_by(
+            'nombre',
+            'codigo',
+        )
+        self.fields['material_asociado'].required = False
+        material = self.instance.material_asociado if self.instance.pk else None
+        if material:
+            self.initial.setdefault('nombre_material', material.nombre)
+            self.initial.setdefault('costo_base', material.costo_base)
+            self.initial.setdefault(
+                'precio_venta_sugerido',
+                material.precio_venta_sugerido,
+            )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('material_asociado'):
+            for field_name in (
+                'nombre_material',
+                'costo_base',
+                'precio_venta_sugerido',
+            ):
+                field_value = cleaned_data.get(field_name)
+                if (
+                    field_value is None
+                    or (field_name == 'nombre_material' and not field_value.strip())
+                ):
+                    self.add_error(
+                        field_name,
+                        'Este campo es obligatorio para el material asociado.',
+                    )
+        return cleaned_data
 
 
 class MovimientoInventarioForm(forms.ModelForm):
@@ -45,4 +138,3 @@ class MovimientoInventarioForm(forms.ModelForm):
         )
         self.fields['producto'].empty_label = 'Selecciona un producto'
         self.fields['costo_unitario'].required = tipo == MovimientoInventario.ENTRADA
-

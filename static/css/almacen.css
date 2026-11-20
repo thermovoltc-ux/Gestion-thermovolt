@@ -42,7 +42,7 @@
 }
 
 .warehouse-table-card .ds-table {
-  min-width: 760px;
+  min-width: 900px;
 }
 
 .warehouse-table-card .ds-table th {
@@ -142,6 +142,72 @@
   padding-top: var(--ds-space-2);
 }
 
+.warehouse-search-form {
+  display: grid;
+  gap: var(--ds-space-3);
+}
+
+.warehouse-search-form label,
+.warehouse-form-field label {
+  color: var(--ds-color-text);
+  font-weight: 600;
+}
+
+.warehouse-search-form .form-control,
+.warehouse-form-field .form-control {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  color: var(--ds-color-text);
+  background: var(--ds-color-surface);
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-md);
+}
+
+.warehouse-search-form .form-control:focus,
+.warehouse-form-field .form-control:focus {
+  border-color: var(--ds-color-primary);
+  outline: 3px solid rgb(29 78 216 / 0.15);
+}
+
+.warehouse-product-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ds-space-4);
+}
+
+.warehouse-form-field {
+  display: grid;
+  align-content: start;
+  gap: var(--ds-space-2);
+}
+
+.warehouse-form-field small,
+.warehouse-form-note {
+  color: var(--ds-color-text-muted);
+}
+
+.warehouse-form-note {
+  margin: 0;
+}
+
+.warehouse-message {
+  margin: 0;
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-radius: var(--ds-radius-md);
+}
+
+.warehouse-message--success {
+  color: var(--ds-color-success);
+  background: var(--ds-color-success-surface);
+}
+
+.warehouse-message--error,
+.warehouse-message--warning {
+  color: var(--ds-color-danger);
+  background: var(--ds-color-danger-surface);
+}
+
 @media (max-width: 640px) {
   .warehouse-page {
     padding: var(--ds-space-4);
@@ -155,5 +221,9 @@
   .warehouse-actions .ds-button,
   .warehouse-form-actions .ds-button {
     flex: 1 1 auto;
+  }
+
+  .warehouse-product-form-grid {
+    grid-template-columns: 1fr;
   }
 }

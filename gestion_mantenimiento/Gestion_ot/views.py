@@ -73,6 +73,7 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from .drive_utils import subir_pdf_a_drive, subir_pdf_privado_a_drive, descargar_archivo_privado_drive, iterar_archivo_privado_drive
 from .storage import GoogleDriveMediaStorage
+from gestion_mantenimiento.almacen.models import MovimientoInventario, Producto
 from googleapiclient.errors import HttpError
 
 
@@ -1524,6 +1525,13 @@ def agregar_material_ot_admin(request, ot_id):
         return redirect('gestionar_ot_admin', ot_id=ot.pk)
 
     material_name = post_data.get('material_name', '').strip()
+    if post_data.get('producto_almacen') and not post_data.get('material'):
+        messages.error(
+            request,
+            'Para descontar un producto de almacén, selecciona un material existente del catálogo.',
+        )
+        return redirect('gestionar_ot_admin', ot_id=ot.pk)
+
     category_by_prefix = {
         prefix: category
         for category, prefix in Material.CATEGORIA_PREFIJOS.items()
@@ -1577,7 +1585,19 @@ def agregar_material_ot_admin(request, ot_id):
         if aplicar_margen == '1'
         else material_ot.costo_real
     )
-    _, creado = _guardar_material_ot_sin_reintento(ot, material_ot)
+    try:
+        _, creado = _guardar_material_ot_sin_reintento(
+            ot,
+            material_ot,
+            request.user,
+            aplicar_margen=aplicar_margen == '1',
+        )
+    except ValidationError as exc:
+        messages.error(
+            request,
+            f'No se pudo agregar el material: {" ".join(exc.messages)}',
+        )
+        return redirect('gestionar_ot_admin', ot_id=ot.pk)
     if creado:
         messages.success(
             request,
@@ -2081,8 +2101,8 @@ def detalle_factura_ot(request, ot_id):
             rounding=ROUND_HALF_UP,
         )
         materiales.append({
-            'codigo': material_ot.material.codigo,
-            'descripcion': material_ot.material.nombre,
+            'codigo': material_ot.codigo_historico,
+            'descripcion': material_ot.nombre_historico,
             'cantidad': str(material_ot.cantidad),
             'precio_unitario': str(material_ot.precio_venta_aplicado),
             'total': str(total),
@@ -2424,7 +2444,12 @@ def _crear_material_catalogo(request):
     }, status=201)
 
 
-def _guardar_material_ot_sin_reintento(ot, material_ot):
+def _guardar_material_ot_sin_reintento(
+    ot,
+    material_ot,
+    usuario,
+    aplicar_margen=True,
+):
     observaciones_vacias = not (material_ot.observaciones or '').strip()
     sin_foto = not material_ot.foto_factura
 
@@ -2432,7 +2457,40 @@ def _guardar_material_ot_sin_reintento(ot, material_ot):
         ot_bloqueada = OrdenTrabajo.objects.select_for_update().get(pk=ot.pk)
         material_ot.orden_trabajo = ot_bloqueada
 
-        if observaciones_vacias and sin_foto:
+        producto = None
+        if material_ot.producto_almacen_id:
+            producto = Producto.objects.select_for_update().get(
+                pk=material_ot.producto_almacen_id,
+            )
+            if observaciones_vacias and sin_foto:
+                existente = MaterialOT.objects.filter(
+                    orden_trabajo=ot_bloqueada,
+                    material=material_ot.material,
+                    producto_almacen=producto,
+                    cantidad=material_ot.cantidad,
+                ).filter(
+                    (Q(foto_factura='') | Q(foto_factura__isnull=True))
+                    & (Q(observaciones='') | Q(observaciones__isnull=True))
+                ).order_by('pk').first()
+                if existente:
+                    return existente, False
+
+            stock_actual = producto.stock
+            if stock_actual < material_ot.cantidad:
+                raise ValidationError(
+                    f'Stock insuficiente para {producto}. Disponible: '
+                    f'{stock_actual} {producto.unidad_medida}.',
+                )
+            material_ot.costo_real = producto.costo_promedio_actual
+        if aplicar_margen:
+            material_ot.precio_venta_aplicado = _precio_venta_desde_costo(
+                material_ot.costo_real,
+                material_ot.material.categoria,
+            )
+        else:
+            material_ot.precio_venta_aplicado = material_ot.costo_real
+
+        if producto is None and observaciones_vacias and sin_foto:
             existente = MaterialOT.objects.filter(
                 orden_trabajo=ot_bloqueada,
                 material=material_ot.material,
@@ -2447,6 +2505,16 @@ def _guardar_material_ot_sin_reintento(ot, material_ot):
                 return existente, False
 
         material_ot.save()
+        if producto:
+            MovimientoInventario.objects.create(
+                producto=producto,
+                tipo=MovimientoInventario.SALIDA,
+                cantidad=material_ot.cantidad,
+                costo_unitario=material_ot.costo_real,
+                usuario=usuario,
+                documento_referencia=f'OT-{ot_bloqueada.pk}',
+                observaciones=f'Consumo de MaterialOT #{material_ot.pk}.',
+            )
         return material_ot, True
 
 
@@ -2454,7 +2522,13 @@ def _respuesta_material_ot(material_ot, duplicado=False):
     return {
         'ok': True,
         'id': material_ot.pk,
-        'material': material_ot.material.nombre,
+        'material': material_ot.nombre_historico,
+        'codigo': material_ot.codigo_historico,
+        'producto_almacen': (
+            str(material_ot.producto_almacen)
+            if material_ot.producto_almacen_id
+            else ''
+        ),
         'cantidad': str(material_ot.cantidad),
         'costo_real': str(material_ot.costo_real),
         'foto_url': material_ot.foto_factura.url if material_ot.foto_factura else '',
@@ -2510,11 +2584,17 @@ def agregar_material_ot(request, ot_id):
         )
 
     material_ot = form.save(commit=False)
-    material_ot.precio_venta_aplicado = _precio_venta_desde_costo(
-        material_ot.costo_real,
-        material_ot.material.categoria,
-    )
-    material_ot, creado = _guardar_material_ot_sin_reintento(ot, material_ot)
+    try:
+        material_ot, creado = _guardar_material_ot_sin_reintento(
+            ot,
+            material_ot,
+            request.user,
+        )
+    except ValidationError as exc:
+        return JsonResponse(
+            {'ok': False, 'error': ' '.join(exc.messages)},
+            status=400,
+        )
 
     return JsonResponse(
         _respuesta_material_ot(material_ot, duplicado=not creado),
@@ -2534,11 +2614,17 @@ def agregar_material_rapido_ot(request, ot_id):
         )
 
     material_ot = form.save(commit=False)
-    material_ot.precio_venta_aplicado = _precio_venta_desde_costo(
-        material_ot.costo_real,
-        material_ot.material.categoria,
-    )
-    material_ot, creado = _guardar_material_ot_sin_reintento(ot, material_ot)
+    try:
+        material_ot, creado = _guardar_material_ot_sin_reintento(
+            ot,
+            material_ot,
+            request.user,
+        )
+    except ValidationError as exc:
+        return JsonResponse(
+            {'ok': False, 'error': ' '.join(exc.messages)},
+            status=400,
+        )
 
     return JsonResponse(
         _respuesta_material_ot(material_ot, duplicado=not creado),
@@ -2557,8 +2643,11 @@ def cierre_ot(request, ot_id):
     cierre_ot, created = CierreOt.objects.get_or_create(orden_trabajo=ot)
     read_only = _ot_es_solo_lectura(ot)
     materiales_catalogo = Material.objects.filter(
-        categoria='repuestos',
+        Q(categoria='repuestos') | Q(producto_almacen__isnull=False),
     ).order_by('nombre')
+    productos_almacen = Producto.objects.select_related(
+        'material_asociado',
+    ).order_by('nombre', 'codigo')
     material_catalogo_form = MaterialForm()
     existing_proceso = _get_active_proceso_para_cierre(cierre_ot)
     operation_id = existing_proceso.operation_id if existing_proceso else ''
@@ -2592,6 +2681,7 @@ def cierre_ot(request, ot_id):
                 'form_despues': form_despues,
                 'ot': ot,
                 'materiales_catalogo': materiales_catalogo,
+                'productos_almacen': productos_almacen,
                 'material_catalogo_form': material_catalogo_form,
                 'read_only': read_only,
                 'operation_id': operation_id
@@ -2620,6 +2710,7 @@ def cierre_ot(request, ot_id):
                 'form_despues': form_despues,
                 'ot': ot,
                 'materiales_catalogo': materiales_catalogo,
+                'productos_almacen': productos_almacen,
                 'material_catalogo_form': material_catalogo_form,
                 'operation_id': operation_id
             })
@@ -2729,6 +2820,7 @@ def cierre_ot(request, ot_id):
         'form_despues': form_despues,
         'ot': ot,
         'materiales_catalogo': materiales_catalogo,
+        'productos_almacen': productos_almacen,
         'material_catalogo_form': material_catalogo_form,
         'read_only': read_only,
         'operation_id': operation_id

@@ -6,6 +6,8 @@ from django.db.models.deletion import ProtectedError
 from django.test import TestCase
 from django.urls import reverse
 
+from gestion_mantenimiento.Gestion_ot.models import Material
+
 from .models import CategoriaProducto, MovimientoInventario, Producto
 
 
@@ -38,6 +40,23 @@ class ProductoStockTests(TestCase):
         self.crear_movimiento(MovimientoInventario.AJUSTE, '-1.000')
 
         self.assertEqual(self.producto.stock, Decimal('5'))
+
+    def test_weighted_average_reflects_remaining_inventory_after_exits(self):
+        for tipo, cantidad, costo in (
+            (MovimientoInventario.ENTRADA, '10.000', '10.00'),
+            (MovimientoInventario.SALIDA, '4.000', '0.00'),
+            (MovimientoInventario.ENTRADA, '10.000', '20.00'),
+        ):
+            MovimientoInventario.objects.create(
+                producto=self.producto,
+                tipo=tipo,
+                cantidad=Decimal(cantidad),
+                costo_unitario=Decimal(costo),
+                usuario=self.usuario,
+            )
+
+        self.assertEqual(self.producto.stock, Decimal('16'))
+        self.assertEqual(self.producto.costo_promedio_actual, Decimal('16.25'))
 
     def test_new_product_has_zero_stock(self):
         self.assertEqual(self.producto.stock, Decimal('0'))
@@ -97,16 +116,77 @@ class AlmacenViewsTests(TestCase):
         )
 
     def test_product_list_shows_calculated_stock(self):
+        material = Material.objects.create(
+            codigo='REP-LIST-01',
+            categoria='repuestos',
+            nombre='Contactor de búsqueda',
+            costo_base=Decimal('100.00'),
+            precio_venta_sugerido=Decimal('142.86'),
+        )
+        self.producto.material_asociado = material
+        self.producto.save(update_fields=['material_asociado'])
         self.crear_movimiento(MovimientoInventario.ENTRADA, '5')
         self.crear_movimiento(MovimientoInventario.SALIDA, '1')
 
-        response = self.client.get(reverse('almacen:lista_productos'))
+        response = self.client.get(
+            reverse('almacen:lista_productos'),
+            {'q': 'Contactor de búsqueda'},
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['productos'][0].stock_actual, Decimal('4'))
         self.assertContains(response, '4,000')
         self.assertContains(response, 'warehouse-stock-low')
         self.assertContains(response, 'ds-table')
+        self.assertContains(
+            response,
+            f'href="{reverse("almacen:lista_productos")}"',
+        )
+        self.assertContains(response, 'Almacén')
+        self.assertContains(response, 'REP-LIST-01')
+        self.assertContains(response, 'Contactor de búsqueda')
+
+    def test_staff_can_update_associated_material_prices_from_product_editor(self):
+        material = Material.objects.create(
+            codigo='REP-EDIT-01',
+            categoria='repuestos',
+            nombre='Contactor',
+            costo_base=Decimal('100.00'),
+            precio_venta_sugerido=Decimal('142.86'),
+        )
+        self.usuario.is_staff = True
+        self.usuario.save(update_fields=['is_staff'])
+
+        response = self.client.post(
+            reverse('almacen:editar_producto', args=[self.producto.pk]),
+            {
+                'codigo': self.producto.codigo,
+                'nombre': 'Automático actualizado',
+                'categoria': self.categoria.pk,
+                'unidad_medida': self.producto.unidad_medida,
+                'stock_minimo': '5.000',
+                'material_asociado': material.pk,
+                'nombre_material': 'Contactor ajustado',
+                'costo_base': '125.50',
+                'precio_venta_sugerido': '179.29',
+            },
+        )
+
+        self.assertRedirects(response, reverse('almacen:lista_productos'))
+        self.producto.refresh_from_db()
+        material.refresh_from_db()
+        self.assertEqual(self.producto.nombre, 'Automático actualizado')
+        self.assertEqual(self.producto.material_asociado, material)
+        self.assertEqual(material.nombre, 'Contactor ajustado')
+        self.assertEqual(material.costo_base, Decimal('125.50'))
+        self.assertEqual(material.precio_venta_sugerido, Decimal('179.29'))
+
+    def test_non_admin_cannot_edit_product_catalog(self):
+        response = self.client.get(
+            reverse('almacen:editar_producto', args=[self.producto.pk]),
+        )
+
+        self.assertEqual(response.status_code, 403)
 
     def test_insufficient_stock_exit_is_not_saved(self):
         self.crear_movimiento(MovimientoInventario.ENTRADA, '2')

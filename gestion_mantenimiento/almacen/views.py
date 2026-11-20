@@ -2,8 +2,9 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
-from django.db.models import Case, DecimalField, F, Sum, When
+from django.core.exceptions import PermissionDenied
+from django.db import IntegrityError, transaction
+from django.db.models import Case, DecimalField, F, Q, Sum, When
 from django.db.models.functions import Coalesce
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
@@ -11,8 +12,16 @@ from django.urls import reverse
 from django.utils.http import urlencode
 from django.views.decorators.http import require_http_methods
 
-from .forms import MovimientoInventarioForm
+from .forms import MovimientoInventarioForm, ProductoForm
 from .models import MovimientoInventario, Producto
+
+
+def _puede_gestionar_catalogo(user):
+    return (
+        user.is_staff
+        or user.is_superuser
+        or user.groups.filter(name__in=['Admin', 'Supervisor']).exists()
+    )
 
 
 def _stock_expression():
@@ -38,7 +47,20 @@ def _stock_expression():
 
 @login_required
 def lista_productos(request):
-    productos = Producto.objects.select_related('categoria').annotate(
+    busqueda = request.GET.get('q', '').strip()
+    productos = Producto.objects.select_related(
+        'categoria',
+        'material_asociado',
+    )
+    if busqueda:
+        productos = productos.filter(
+            Q(codigo__icontains=busqueda)
+            | Q(nombre__icontains=busqueda)
+            | Q(categoria__nombre__icontains=busqueda)
+            | Q(material_asociado__codigo__icontains=busqueda)
+            | Q(material_asociado__nombre__icontains=busqueda)
+        )
+    productos = productos.annotate(
         stock_actual=Coalesce(
             _stock_expression(),
             Decimal('0'),
@@ -47,6 +69,56 @@ def lista_productos(request):
     )
     return render(request, 'almacen/lista_productos.html', {
         'productos': productos,
+        'busqueda': busqueda,
+        'puede_editar_catalogo': _puede_gestionar_catalogo(request.user),
+    })
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def editar_producto(request, producto_id):
+    if not _puede_gestionar_catalogo(request.user):
+        raise PermissionDenied
+
+    producto = get_object_or_404(Producto, pk=producto_id)
+    if request.method == 'POST':
+        try:
+            with transaction.atomic():
+                producto = get_object_or_404(
+                    Producto.objects.select_for_update(),
+                    pk=producto_id,
+                )
+                form = ProductoForm(request.POST, instance=producto)
+                if form.is_valid():
+                    producto = form.save(commit=False)
+                    material = form.cleaned_data['material_asociado']
+                    producto.material_asociado = material
+                    producto.save()
+                    if material:
+                        material.nombre = form.cleaned_data['nombre_material']
+                        material.costo_base = form.cleaned_data['costo_base']
+                        material.precio_venta_sugerido = form.cleaned_data[
+                            'precio_venta_sugerido'
+                        ]
+                        material.save(update_fields=[
+                            'nombre',
+                            'costo_base',
+                            'precio_venta_sugerido',
+                        ])
+                    messages.success(request, 'Producto y material asociado actualizados.')
+                    return redirect('almacen:lista_productos')
+        except IntegrityError:
+            messages.error(
+                request,
+                'No se pudo guardar: el código del producto o la asociación del material ya está en uso.',
+            )
+            return redirect('almacen:editar_producto', producto_id=producto_id)
+    else:
+        form = ProductoForm(instance=producto)
+
+    return render(request, 'almacen/editar_producto.html', {
+        'form': form,
+        'producto': producto,
     })
 
 

@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const pageContainer = document.querySelector('.cierre-ot-form-container[data-material-add-url]');
     const tableBody = document.getElementById('lista-materiales');
     const costInput = document.getElementById('input-costo-real');
+    const warehouseProductInput = document.getElementById('producto-almacen-material');
     const quantityInput = document.getElementById('input-cantidad');
     const photoInput = document.getElementById('input-foto-factura');
     const observationInput = document.getElementById('input-observaciones-material');
@@ -86,6 +87,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const invoiceCell = document.createElement('td');
         const observationCell = document.createElement('td');
         nameCell.textContent = material.material;
+        if (material.producto_almacen) {
+            const warehouseProduct = document.createElement('small');
+            warehouseProduct.textContent = `\nAlmacén: ${material.producto_almacen}`;
+            nameCell.appendChild(warehouseProduct);
+        }
         quantityCell.textContent = numberFormat.format(Number(material.cantidad));
         costCell.textContent = `$ ${numberFormat.format(Number(material.costo_real))}`;
 
@@ -138,9 +144,50 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     searchInput.addEventListener('input', function () {
+        const selectedWarehouseOption = warehouseProductInput.selectedOptions[0];
+        const linkedMaterialId = selectedWarehouseOption
+            ? selectedWarehouseOption.dataset.materialId
+            : '';
+        const linkedMaterial = catalogOptions.find(
+            option => option.dataset.id === linkedMaterialId
+        );
+        if (
+            linkedMaterial
+            && normalizeSearchText(searchInput.value.trim())
+                !== normalizeSearchText(linkedMaterial.value.trim())
+        ) {
+            warehouseProductInput.value = '';
+            costInput.disabled = false;
+        }
         updateMaterialSuggestions();
         const option = findMaterialOption(searchInput.value);
-        costInput.value = option ? option.dataset.costo : '';
+        costInput.value = warehouseProductInput.value
+            ? ''
+            : (option ? option.dataset.costo : '');
+    });
+
+    warehouseProductInput.addEventListener('change', function () {
+        const selectedOption = warehouseProductInput.selectedOptions[0];
+        const linkedMaterialId = selectedOption
+            ? selectedOption.dataset.materialId
+            : '';
+        costInput.disabled = Boolean(warehouseProductInput.value);
+        costInput.value = '';
+        if (!linkedMaterialId) {
+            return;
+        }
+
+        const linkedMaterial = catalogOptions.find(
+            option => option.dataset.id === linkedMaterialId
+        );
+        if (!linkedMaterial) {
+            addError.textContent = 'El material asociado no está disponible en el catálogo de esta OT.';
+            warehouseProductInput.value = '';
+            return;
+        }
+
+        searchInput.value = linkedMaterial.value;
+        updateMaterialSuggestions();
     });
 
     addButton.addEventListener('click', async function () {
@@ -164,7 +211,7 @@ document.addEventListener('DOMContentLoaded', function () {
             quantityInput.focus();
             return;
         }
-        if (!validateNumber(costInput, 0)) {
+        if (!warehouseProductInput.value && !validateNumber(costInput, 0)) {
             addError.textContent = 'Ingresa un costo real válido (cero o mayor).';
             costInput.focus();
             return;
@@ -174,10 +221,34 @@ document.addEventListener('DOMContentLoaded', function () {
         requestInProgress = true;
         try {
             let materialId;
-            const option = findMaterialOption(materialName);
+            const selectedWarehouseOption = warehouseProductInput.selectedOptions[0];
+            const linkedMaterialId = selectedWarehouseOption
+                ? selectedWarehouseOption.dataset.materialId
+                : '';
+            const linkedMaterialOption = linkedMaterialId
+                ? catalogOptions.find(option => option.dataset.id === linkedMaterialId)
+                : null;
+            if (
+                linkedMaterialId
+                && (
+                    !linkedMaterialOption
+                    || normalizeSearchText(materialName)
+                        !== normalizeSearchText(linkedMaterialOption.value.trim())
+                )
+            ) {
+                throw new Error(
+                    'El producto de almacén requiere su material asociado del catálogo.'
+                );
+            }
+            const option = linkedMaterialOption || findMaterialOption(materialName);
             if (option) {
                 materialId = option.dataset.id;
             } else {
+                if (warehouseProductInput.value) {
+                    throw new Error(
+                        'Para descontar un producto de almacén, selecciona un material existente del catálogo.'
+                    );
+                }
                 if (!addModal.dataset.materialCreateUrl) {
                     throw new Error('No está disponible la creación automática de materiales.');
                 }
@@ -207,6 +278,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const formData = new FormData();
             formData.append('material', materialId);
+            formData.append('producto_almacen', warehouseProductInput.value);
             formData.append('cantidad', quantityInput.value);
             formData.append('costo_real', costInput.value);
             formData.append('observaciones', observationInput.value);
@@ -229,6 +301,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             quantityInput.value = '1';
             costInput.value = '';
+            costInput.disabled = false;
+            warehouseProductInput.value = '';
             photoInput.value = '';
             observationInput.value = '';
             searchInput.value = '';

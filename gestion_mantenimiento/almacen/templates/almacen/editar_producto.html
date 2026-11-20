@@ -1,0 +1,53 @@
+{% extends "solicitudes/indexpadre.html" %}
+{% load static %}
+
+{% block title %}Editar producto{% endblock %}
+
+{% block content %}
+<main class="warehouse-page ds-fade-in">
+    <header class="warehouse-header">
+        <div>
+            <h1>Editar producto</h1>
+            <p>Actualiza el catálogo físico y, si está vinculado, los precios del material.</p>
+        </div>
+        <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_productos' %}">Volver al inventario</a>
+    </header>
+
+    <section class="ds-card">
+        <form method="post" class="warehouse-form">
+            {% csrf_token %}
+            {% if messages %}
+                {% for message in messages %}
+                    <p class="warehouse-message warehouse-message--{{ message.tags }}">{{ message }}</p>
+                {% endfor %}
+            {% endif %}
+            {% if form.non_field_errors %}
+                <div class="cierre-ot-alert cierre-ot-alert-error">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <div class="warehouse-product-form-grid">
+                {% for field in form %}
+                    <div class="warehouse-form-field">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                        {% if field.errors %}<div class="field-errors">{{ field.errors }}</div>{% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+
+            <p class="warehouse-form-note">
+                Los cambios de nombre del material no alteran las descripciones guardadas en OTs anteriores.
+            </p>
+            <div class="warehouse-actions">
+                <button type="submit" class="ds-button">Guardar cambios</button>
+                <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_productos' %}">Cancelar</a>
+            </div>
+        </form>
+    </section>
+</main>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/almacen.css' %}">
+{% endblock %}
