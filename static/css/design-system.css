@@ -111,6 +111,45 @@
   background: var(--ds-color-border);
 }
 
+.ds-button--success,
+.ds-button--info,
+.ds-button--warning,
+.ds-button--danger {
+  color: #ffffff;
+}
+
+.ds-button--success {
+  background: var(--ds-color-success);
+}
+
+.ds-button--success:hover {
+  background: #166534;
+}
+
+.ds-button--info {
+  background: var(--ds-color-info);
+}
+
+.ds-button--info:hover {
+  background: #075985;
+}
+
+.ds-button--warning {
+  background: var(--ds-color-warning);
+}
+
+.ds-button--warning:hover {
+  background: #854d0e;
+}
+
+.ds-button--danger {
+  background: var(--ds-color-danger);
+}
+
+.ds-button--danger:hover {
+  background: #991b1b;
+}
+
 .ds-button--small {
   padding: var(--ds-space-1) var(--ds-space-3);
   font-size: var(--ds-font-size-sm);
@@ -177,6 +216,34 @@
   color: var(--ds-color-text-muted);
 }
 
+.arbol-panel-izquierdo.ds-card,
+.arbol-panel-derecho.ds-card {
+  background: var(--ds-color-surface);
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.modal-arbol-buttons .ds-button--danger {
+  border-color: transparent;
+}
+
+.floating-button.ds-button--floating {
+  color: #ffffff;
+  background: var(--ds-color-primary);
+  box-shadow: var(--ds-shadow-md);
+  transition:
+    background-color var(--ds-transition-fast),
+    box-shadow var(--ds-transition-fast),
+    transform var(--ds-transition-fast);
+}
+
+.floating-button.ds-button--floating:hover {
+  background: var(--ds-color-primary-hover);
+  box-shadow: var(--ds-shadow-md);
+  transform: translateY(-2px);
+}
+
 .ds-fade-in {
   animation: ds-fade-in 220ms ease-out both;
 }
@@ -214,7 +281,8 @@
 
   .ds-card--interactive:hover,
   .ds-button:hover,
-  .cardBox .card.ds-card:hover {
+  .cardBox .card.ds-card:hover,
+  .floating-button.ds-button--floating:hover {
     transform: none;
   }
 

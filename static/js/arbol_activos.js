@@ -315,41 +315,33 @@
 
             var $actions = jQuery('<div></div>').css({ display: 'flex', flexWrap: 'wrap', gap: '8px' });
 
-            function addButton(label, color, handler) {
+            function addButton(label, variant, handler) {
                 jQuery('<button></button>')
                     .attr('type', 'button')
                     .text(label)
-                    .css({
-                        padding: '8px 14px',
-                        borderRadius: '6px',
-                        border: '1px solid ' + color,
-                        background: 'white',
-                        color: color,
-                        cursor: 'pointer',
-                        fontSize: '13px'
-                    })
+                    .addClass('ds-button ds-button--small ds-button--' + variant)
                     .on('click', handler)
                     .appendTo($actions);
             }
 
-            addButton('✏️ Editar', '#0d6efd', function() {
+            addButton('✏️ Editar', 'primary', function() {
                 if (typeof abrirEditarNodo === 'function') {
                     abrirEditarNodo(tipo, id);
                 }
             });
 
             if (tipo === 'equipo') {
-                addButton('📝 Crear Solicitud', '#0e7490', function() {
+                addButton('📝 Crear Solicitud', 'info', function() {
                     window.location.href = '/solicitudes/crear/?equipo=' + id;
                 });
             }
 
             if (tipo === 'equipo') {
-                addButton('📄 Hoja de Vida', '#198754', function() {
+                addButton('📄 Hoja de Vida', 'success', function() {
                     window.open('/Activos/hoja_vida/' + id + '/', '_blank');
                 });
 
-                addButton('📋 Plan', '#fd7e14', function() {
+                addButton('📋 Plan', 'warning', function() {
                     if (typeof abrirModalCrearPlan === 'function') {
                         abrirModalCrearPlan(id, nombre || '');
                     }
@@ -357,18 +349,18 @@
             }
 
             if (tipo === 'ubicacion') {
-                addButton('📦 Descargar HVs', '#198754', function() {
+                addButton('📦 Descargar HVs', 'success', function() {
                     window.open('/Activos/zip_hojas_vida/' + id + '/', '_blank');
                 });
             }
 
-            addButton('📊 Historial OT', '#6c757d', function() {
+            addButton('📊 Historial OT', 'secondary', function() {
                 if (typeof verHistorial === 'function') {
                     verHistorial(id, tipo);
                 }
             });
 
-            addButton('🗑 Eliminar', '#dc3545', function() {
+            addButton('🗑 Eliminar', 'danger', function() {
                 abrirModalEliminar(tipo, id, nombre);
             });
 

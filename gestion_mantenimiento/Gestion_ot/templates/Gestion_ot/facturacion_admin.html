@@ -4,33 +4,30 @@
 
 {% block content %}
 <style>
-    .billing-queue { max-width: 1400px; margin: 0 auto; padding: 24px; color: #1e293b; }
+    .billing-queue { max-width: 1400px; margin: 0 auto; padding: 24px; color: var(--ds-color-text); }
     .billing-queue h1 { margin: 0 0 8px; }
-    .billing-queue .muted { color: #64748b; }
-    .billing-queue-card { background: #fff; border-radius: 12px; overflow-x: auto; margin-top: 20px; box-shadow: 0 2px 8px rgba(15,23,42,.08); }
-    .billing-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; align-items: end; margin-top: 20px; padding: 18px; background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(15,23,42,.08); }
+    .billing-queue .muted { color: var(--ds-color-text-muted); }
+    .billing-queue-card { overflow-x: auto; margin-top: 20px; }
+    .billing-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; align-items: end; margin-top: 20px; padding: 18px; }
     .billing-filters label { display: block; margin-bottom: 6px; font-weight: 600; }
-    .billing-filters input, .billing-filters select { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; }
-    .billing-filters button, .billing-filters .clear-filters, .billing-view-toggle button { min-height: 40px; padding: 9px 14px; border: 0; border-radius: 6px; font-weight: 600; cursor: pointer; text-decoration: none; }
-    .billing-filters button { background: #2563eb; color: #fff; }
-    .billing-filters .clear-filters { display: inline-flex; align-items: center; justify-content: center; background: #e2e8f0; color: #1e293b; }
+    .billing-filters input, .billing-filters select { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid var(--ds-color-border); border-radius: var(--ds-radius-sm); }
+    .billing-filters button, .billing-filters .clear-filters, .billing-view-toggle button { min-height: 40px; text-decoration: none; }
+    .billing-view-toggle button.active { color: #fff; background: var(--ds-color-primary); }
+    .billing-filters .clear-filters { display: inline-flex; align-items: center; justify-content: center; }
     .billing-view-toggle { display: flex; gap: 8px; margin-top: 20px; }
-    .billing-view-toggle button { background: #e2e8f0; color: #334155; }
-    .billing-view-toggle button.active { background: #2563eb; color: #fff; }
-    .billing-queue table { width: 100%; min-width: 820px; border-collapse: collapse; }
-    .billing-queue th, .billing-queue td { padding: 13px; border-bottom: 1px solid #e2e8f0; text-align: left; }
-    .billing-queue th { background: #f1f5f9; }
+    .billing-queue table.ds-table { width: 100%; min-width: 820px; }
+    .billing-queue table.ds-table tbody tr:hover { background: var(--ds-color-surface-muted); }
     .billing-queue th a { color: inherit; text-decoration: none; white-space: nowrap; }
-    .billing-queue th a:hover, .billing-queue th a:focus { color: #1d4ed8; text-decoration: underline; }
-    .billing-queue .sort-indicator { margin-left: 4px; color: #64748b; }
-    .billing-queue th a[aria-current="true"] .sort-indicator { color: #1d4ed8; }
+    .billing-queue th a:hover, .billing-queue th a:focus { color: var(--ds-color-primary); text-decoration: underline; }
+    .billing-queue .sort-indicator { margin-left: 4px; color: var(--ds-color-text-muted); }
+    .billing-queue th a[aria-current="true"] .sort-indicator { color: var(--ds-color-primary); }
     .billing-queue .status { display: inline-block; border-radius: 999px; background: #fff7ed; color: #9a3412; padding: 4px 10px; font-size: 13px; }
-    .billing-queue .action { display: inline-block; border-radius: 6px; background: #2563eb; color: #fff; padding: 8px 12px; text-decoration: none; font-weight: 600; }
-    .billing-calendar-panel { display: none; margin-top: 20px; padding: 18px; background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(15,23,42,.08); }
+    .billing-queue .action { text-decoration: none; }
+    .billing-calendar-panel { display: none; margin-top: 20px; padding: 18px; }
     @media (max-width: 640px) { .billing-queue { padding: 14px; } }
 </style>
 
-<main class="billing-queue" data-billing-queue>
+<main class="billing-queue ds-fade-in" data-billing-queue>
     <h1>Facturación pendiente</h1>
     <p class="muted">Órdenes en revisión o finalizadas que todavía no tienen estado de facturación “Facturada”.</p>
 
@@ -40,7 +37,7 @@
         {% endfor %}
     {% endif %}
 
-    <form method="get" class="billing-filters">
+    <form method="get" class="billing-filters ds-card">
         <div>
             <label for="billing-technician">Técnico</label>
             <select id="billing-technician" name="tecnico">
@@ -62,17 +59,17 @@
             <label for="billing-date-to">Fecha de cierre hasta</label>
             <input id="billing-date-to" type="date" name="fecha_fin" value="{{ filtro_fecha_fin }}">
         </div>
-        <div><button type="submit">Aplicar filtros</button></div>
-        <div><a class="clear-filters" href="{% url 'facturacion_admin' %}">Limpiar filtros</a></div>
+        <div><button class="ds-button" type="submit">Aplicar filtros</button></div>
+        <div><a class="clear-filters ds-button ds-button--secondary" href="{% url 'facturacion_admin' %}">Limpiar filtros</a></div>
     </form>
 
     <div class="billing-view-toggle" role="group" aria-label="Cambiar vista de facturación">
-        <button id="billing-table-button" type="button" class="active" aria-pressed="true">Vista de Tabla</button>
-        <button id="billing-calendar-button" type="button" aria-pressed="false">Vista de Calendario</button>
+        <button id="billing-table-button" type="button" class="ds-button ds-button--secondary active" aria-pressed="true">Vista de Tabla</button>
+        <button id="billing-calendar-button" type="button" class="ds-button ds-button--secondary" aria-pressed="false">Vista de Calendario</button>
     </div>
 
-    <div id="billing-table-view" class="billing-queue-card">
-        <table>
+    <div id="billing-table-view" class="billing-queue-card ds-card">
+        <table class="ds-table">
             <thead>
                 <tr>
                     <th aria-sort="{% if orden_actual == 'ot' %}{% if direccion_actual == 'asc' %}ascending{% else %}descending{% endif %}{% else %}none{% endif %}">
@@ -99,7 +96,7 @@
                         <td>{{ ot.solicitud.ubicacion_nombre|default:"—" }}</td>
                         <td>{{ ot.cierreot.fecha_inicio_actividad|date:"d/m/Y"|default:"—" }}</td>
                         <td><span class="status">{{ ot.cierreot.get_estado_facturacion_display }}</span></td>
-                        <td><a class="action" href="{% url 'gestionar_ot_admin' ot.pk %}">Facturar / Gestionar</a></td>
+                        <td><a class="action ds-button ds-button--small" href="{% url 'gestionar_ot_admin' ot.pk %}">Facturar / Gestionar</a></td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="6" class="muted" style="text-align:center;padding:24px;">No hay órdenes pendientes de facturar.</td></tr>
@@ -108,7 +105,7 @@
         </table>
     </div>
 
-    <div id="billing-calendar-view" class="billing-calendar-panel">
+    <div id="billing-calendar-view" class="billing-calendar-panel ds-card">
         <div id="billing-calendar"></div>
     </div>
     {{ eventos_calendario|json_script:"billing-calendar-events" }}

@@ -6,12 +6,12 @@ Lista de Activos - Gestión de Activos y Equipos
 {% endblock %}
 
 {% block content %}
-<div class="container-arbol-mejorado">
+<div class="container-arbol-mejorado ds-fade-in">
     <h1>Árbol de Activos y Equipos</h1>
 
     <div class="arbol-layout">
         <!-- Panel izquierdo: árbol -->
-        <div class="arbol-panel-izquierdo">
+        <div class="arbol-panel-izquierdo ds-card">
             <div class="arbol-header">
                 <h3>Estructura de Activos</h3>
             </div>
@@ -58,7 +58,7 @@ Lista de Activos - Gestión de Activos y Equipos
         </div>
 
         <!-- Panel derecho: detalles del nodo -->
-        <div class="arbol-panel-derecho">
+        <div class="arbol-panel-derecho ds-card">
             <div id="node-details-container" class="node-details-empty">
                 <p>Selecciona un nodo para ver detalles</p>
             </div>
@@ -279,7 +279,7 @@ Lista de Activos - Gestión de Activos y Equipos
                 {% csrf_token %}
                 <div class="modal-arbol-buttons">
                     <button type="button" class="btn-modal-cancel" onclick="cerrarModalEliminar()">Cancelar</button>
-                    <button type="submit" class="btn-modal-success" style="background-color: #dc3545;">Sí, eliminar definitivamente</button>
+                    <button type="submit" class="ds-button ds-button--danger">Sí, eliminar definitivamente</button>
                 </div>
             </form>
         </div>
@@ -287,7 +287,7 @@ Lista de Activos - Gestión de Activos y Equipos
 </div>
 
 <div class="floating-button-container">
-    <a href="#" class="floating-button" onclick="toggleOptions()">
+    <a href="#" class="floating-button ds-button ds-button--icon ds-button--floating" onclick="toggleOptions()">
         <span><ion-icon name="add-outline" class="icon-large"></ion-icon></span>
     </a>
     <div id="floating-options" class="floating-options">
