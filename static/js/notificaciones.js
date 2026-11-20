@@ -1,4 +1,11 @@
 (() => {
+    window.addEventListener('load', () => {
+        const pushButton = document.getElementById('webpush-subscribe-button');
+        if (pushButton) {
+            pushButton.textContent = 'Activar notificaciones push';
+        }
+    });
+
     const badge = document.querySelector('[data-notification-count]');
     if (!badge) {
         return;

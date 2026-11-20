@@ -8,6 +8,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('pwa.urls')),
+    path('webpush/', include('webpush.urls')),
     path(
         'notificaciones/',
         include('gestion_mantenimiento.notificaciones.urls'),

@@ -1,21 +1,62 @@
+import logging
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
+from pywebpush import WebPushException
+from requests import RequestException
+from webpush import send_user_notification
 
 from gestion_mantenimiento.Activos.models import CentroOperaciones
 from gestion_mantenimiento.users.models import PerfilUsuario
 
 from .models import Notificacion
 
+logger = logging.getLogger(__name__)
+
 
 def crear_notificacion(usuario, tipo, titulo, mensaje, url_destino=''):
-    return Notificacion.objects.create(
+    notificacion = Notificacion.objects.create(
         usuario=usuario,
         tipo=tipo,
         titulo=titulo,
         mensaje=mensaje,
         url_destino=url_destino,
     )
+    webpush_settings = settings.WEBPUSH_SETTINGS
+    if all(
+        webpush_settings.get(key)
+        for key in (
+            'VAPID_PUBLIC_KEY',
+            'VAPID_PRIVATE_KEY',
+            'VAPID_ADMIN_EMAIL',
+        )
+    ):
+        transaction.on_commit(
+            lambda: _enviar_push(notificacion),
+        )
+    return notificacion
+
+
+def _enviar_push(notificacion):
+    try:
+        send_user_notification(
+            user=notificacion.usuario,
+            payload={
+                'head': notificacion.titulo,
+                'body': notificacion.mensaje,
+                'url': notificacion.url_destino or '/',
+            },
+            ttl=86400,
+        )
+    except (WebPushException, RequestException):
+        logger.exception(
+            'No se pudo enviar push para la notificación %s del usuario %s.',
+            notificacion.pk,
+            notificacion.usuario_id,
+        )
 
 
 def notificar_usuarios(usuarios, tipo, titulo, mensaje, url_destino=''):

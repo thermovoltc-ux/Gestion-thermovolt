@@ -1,5 +1,7 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import Notificacion
@@ -63,6 +65,18 @@ class NotificacionViewsTests(TestCase):
             [self.own_read],
         )
 
+    @override_settings(WEBPUSH_SETTINGS={
+        'VAPID_PUBLIC_KEY': 'public-key',
+        'VAPID_PRIVATE_KEY': 'private-key',
+        'VAPID_ADMIN_EMAIL': 'admin@example.com',
+    })
+    def test_list_renders_push_subscription_controls_when_configured(self):
+        response = self.client.get(reverse('notificaciones:lista'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'webpush-subscribe-button')
+        self.assertContains(response, 'service-worker-js')
+
     def test_unread_counter_only_counts_current_users_notifications(self):
         response = self.client.get(reverse('notificaciones:contador_no_leidas'))
 
@@ -78,3 +92,35 @@ class NotificacionViewsTests(TestCase):
         self.foreign_unread.refresh_from_db()
         self.assertTrue(self.own_unread.leida)
         self.assertFalse(self.foreign_unread.leida)
+
+
+class NotificacionPushTests(TestCase):
+    @override_settings(WEBPUSH_SETTINGS={
+        'VAPID_PUBLIC_KEY': 'public-key',
+        'VAPID_PRIVATE_KEY': 'private-key',
+        'VAPID_ADMIN_EMAIL': 'admin@example.com',
+    })
+    @patch('gestion_mantenimiento.notificaciones.utils.send_user_notification')
+    def test_creating_notification_sends_push_after_commit(self, send_push):
+        user = get_user_model().objects.create_user(
+            username='push-notification-user',
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            notification = crear_notificacion(
+                user,
+                Notificacion.SOLICITUD,
+                'Nueva solicitud',
+                'Se creó una solicitud.',
+                '/solicitudes/',
+            )
+
+        send_push.assert_called_once_with(
+            user=user,
+            payload={
+                'head': 'Nueva solicitud',
+                'body': 'Se creó una solicitud.',
+                'url': '/solicitudes/',
+            },
+            ttl=86400,
+        )
+        self.assertEqual(notification.usuario, user)

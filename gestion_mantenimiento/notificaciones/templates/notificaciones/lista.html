@@ -1,5 +1,6 @@
 {% extends "solicitudes/indexpadre.html" %}
 {% load static %}
+{% load webpush_notifications %}
 
 {% block title %}Notificaciones{% endblock %}
 
@@ -15,6 +16,9 @@
             {% csrf_token %}
             <button type="submit" class="ds-button ds-button--secondary">Marcar todas como leídas</button>
         </form>
+        {% endif %}
+        {% if webpush_enabled %}
+        {% webpush_button with_class="ds-button ds-button--secondary" %}
         {% endif %}
     </header>
 
@@ -72,4 +76,5 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/notificaciones.css' %}">
+{% if webpush_enabled %}{% webpush_header %}{% endif %}
 {% endblock %}

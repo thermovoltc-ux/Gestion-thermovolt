@@ -171,6 +171,10 @@ class CustomLoginCentroOperacionesTests(TestCase):
         session = self.client.session
         self.assertEqual(session.get_expiry_age(), 30 * 24 * 60 * 60)
         self.assertFalse(session.get_expire_at_browser_close())
+        self.assertEqual(
+            response.cookies['sessionid']['max-age'],
+            30 * 24 * 60 * 60,
+        )
 
     def test_admin_with_registered_center_sees_assets_navigation(self):
         self._login(self.centro.codigo)

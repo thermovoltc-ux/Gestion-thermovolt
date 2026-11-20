@@ -89,10 +89,16 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
-# Configuración de sesiones - Timeout después de 1 hora de inactividad
-SESSION_COOKIE_AGE = 3600  # 1 hora en segundos
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Cerrar sesión al cerrar el navegador
+# Configuración de sesiones - El login puede acortar esta duración si no se recuerda.
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 30
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_SAVE_EVERY_REQUEST = True  # Actualizar la fecha de expiración en cada solicitud
+
+WEBPUSH_SETTINGS = {
+    'VAPID_PUBLIC_KEY': os.environ.get('VAPID_PUBLIC_KEY', ''),
+    'VAPID_PRIVATE_KEY': os.environ.get('VAPID_PRIVATE_KEY', ''),
+    'VAPID_ADMIN_EMAIL': os.environ.get('VAPID_ADMIN_EMAIL', ''),
+}
 
 
 # Application definition
@@ -109,6 +115,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.humanize',
     'pwa',
+    'webpush',
 
 
     'gestion_mantenimiento.solicitudes',
@@ -438,7 +445,6 @@ LOGGING = {
         },
     },
 }
-
 
 
 

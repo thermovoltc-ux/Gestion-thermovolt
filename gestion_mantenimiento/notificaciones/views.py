@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
@@ -26,6 +27,14 @@ def lista_notificaciones(request):
             usuario=request.user,
             leida=False,
         ).count(),
+        'webpush_enabled': all(
+            settings.WEBPUSH_SETTINGS.get(key)
+            for key in (
+                'VAPID_PUBLIC_KEY',
+                'VAPID_PRIVATE_KEY',
+                'VAPID_ADMIN_EMAIL',
+            )
+        ),
     })
 
 
