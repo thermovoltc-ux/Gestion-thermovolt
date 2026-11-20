@@ -807,7 +807,10 @@ body {
 @media (max-width: 991px) {
   .navigation {
     position: fixed;
+    top: 70px;
     width: 230px;
+    height: calc(100vh - 70px);
+    height: calc(100dvh - 70px);
     border-left: none;
     transform: translateX(-230px);
     transition: transform 0.5s;
@@ -828,6 +831,13 @@ body {
   .main.active .topbar {
     left: 0;
     width: 100%;
+  }
+  .overlay,
+  .overlay.active {
+    top: 70px;
+    height: calc(100vh - 70px);
+    height: calc(100dvh - 70px);
+    z-index: 1000;
   }
   .cardBox {
     grid-template-columns: repeat(2, 1fr);
@@ -1041,15 +1051,6 @@ body {
   }
   .navigation.active {
     transform: translateX(0);
-  }
-  .toggle {
-    z-index: 10001;
-  }
-  .main.active .toggle {
-    color: #fff;
-    position: fixed;
-    right: 0;
-    left: initial;
   }
 }
 
