@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.Gestion_ot.models import Estado
+from webpush.models import PushInformation, SubscriptionInfo
 from gestion_mantenimiento.Activos.models import (
     Activo,
     Area,
@@ -297,6 +298,59 @@ class CrearSolicitudCoTests(TestCase):
         )
         self.assertIn('Equipo con CO', notification.mensaje)
         self.assertIn('Ubicación con CO', notification.mensaje)
+
+    @override_settings(WEBPUSH_SETTINGS={
+        'VAPID_PUBLIC_KEY': 'public-key',
+        'VAPID_PRIVATE_KEY': 'private-key',
+        'VAPID_ADMIN_EMAIL': 'admin@example.com',
+    })
+    @patch('gestion_mantenimiento.notificaciones.utils.send_user_notification')
+    def test_client_request_sends_push_to_subscribed_admin_after_commit(
+        self,
+        send_push,
+    ):
+        center = CentroOperaciones.objects.create(
+            nombre='Centro de notificaciones push',
+            codigo='CO-TEST',
+        )
+        self.ubicacion.centro_operaciones = center
+        self.ubicacion.save(update_fields=['centro_operaciones'])
+        self.user.groups.clear()
+        self.user.groups.add(Group.objects.get_or_create(name='Cliente')[0])
+        session = self.client.session
+        session['co'] = 'CO-TEST'
+        session.save()
+
+        admin = get_user_model().objects.create_user(
+            username='admin-solicitud-push',
+            password='test-password',
+        )
+        admin.groups.add(Group.objects.get_or_create(name='Admin')[0])
+        subscription = SubscriptionInfo.objects.create(
+            browser='Chrome',
+            endpoint='https://push.example.test/admin-subscription',
+            auth='auth-secret',
+            p256dh='public-key',
+        )
+        PushInformation.objects.create(user=admin, subscription=subscription)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self._post_solicitud(self.equipo)
+
+        self.assertEqual(response.status_code, 302)
+        notification = Notificacion.objects.get(
+            usuario=admin,
+            tipo=Notificacion.SOLICITUD,
+        )
+        send_push.assert_called_once_with(
+            user=admin,
+            payload={
+                'head': 'Nueva solicitud de mantenimiento',
+                'body': notification.mensaje,
+                'url': reverse('lista_solicitudes'),
+            },
+            ttl=86400,
+        )
 
     def test_creation_uses_session_co_when_equipment_has_no_location(self):
         equipo_sin_ubicacion = Equipo.objects.create(

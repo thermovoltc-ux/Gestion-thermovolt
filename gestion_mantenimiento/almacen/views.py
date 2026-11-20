@@ -30,6 +30,8 @@ from .models import (
     MovimientoInventario,
     Producto,
 )
+from gestion_mantenimiento.notificaciones.models import Notificacion
+from gestion_mantenimiento.notificaciones.utils import notificar_administradores
 
 
 def _puede_gestionar_catalogo(user):
@@ -414,6 +416,7 @@ def registrar_movimiento(request, tipo):
                         f'{producto.unidad_medida}.',
                     )
                 else:
+                    stock_anterior = producto.stock
                     movimiento = form.save(commit=False)
                     movimiento.producto = producto
                     movimiento.tipo = tipo_movimiento
@@ -421,6 +424,23 @@ def registrar_movimiento(request, tipo):
                     if movimiento.costo_unitario is None:
                         movimiento.costo_unitario = Decimal('0')
                     movimiento.save()
+                    stock_actual = producto.stock
+                    if (
+                        tipo_movimiento == MovimientoInventario.SALIDA
+                        and producto.stock_minimo > 0
+                        and stock_anterior >= producto.stock_minimo
+                        and stock_actual < producto.stock_minimo
+                    ):
+                        notificar_administradores(
+                            Notificacion.STOCK_BAJO,
+                            'Stock bajo',
+                            (
+                                f'El producto {producto.nombre} tiene stock bajo. '
+                                f'Actual: {stock_actual}, '
+                                f'mínimo: {producto.stock_minimo}.'
+                            ),
+                            reverse('almacen:lista_productos'),
+                        )
 
             if not form.errors:
                 messages.success(request, 'Movimiento de inventario registrado.')

@@ -109,6 +109,19 @@ railway connect
 railway run python manage.py shell
 ```
 
+### Recordatorios de órdenes de trabajo
+
+El comando `send_maintenance_reminders` envía recordatorios para OTs programadas
+para el día siguiente y mantenimientos preventivos programados para dentro de
+tres días. Debe ejecutarse una vez al día mediante un scheduler externo:
+
+```bash
+python manage.py send_maintenance_reminders
+```
+
+El comando evita volver a crear el mismo recordatorio para el mismo usuario en
+el mismo día.
+
 ## Configuración OAuth
 
 Para Google OAuth:

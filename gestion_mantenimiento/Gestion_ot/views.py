@@ -34,8 +34,12 @@ from .forms import (
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.solicitudes.utils import enviar_correo_solicitud
 from gestion_mantenimiento.notificaciones.utils import (
+    notificar_administradores,
     notificar_mantenimiento_preventivo,
+    notificar_usuarios,
+    usuarios_cliente_de_ubicacion,
 )
+from gestion_mantenimiento.notificaciones.models import Notificacion
 from gestion_mantenimiento.users.access import (
     obtener_alcance,
     obtener_codigo_co_actual,
@@ -470,6 +474,30 @@ MAX_INTENTOS_PROCESO_INFORME = 4
 
 
 def _procesar_proceso_informe(operation_id):
+    def marcar_error(proceso, mensaje, last_error):
+        proceso.set_state(ProcesoInforme.ERROR, mensaje, last_error=last_error)
+        if proceso.intentos >= MAX_INTENTOS_PROCESO_INFORME:
+            cierre = proceso.cierre_ot
+            ot = cierre.orden_trabajo
+            solicitud = ot.solicitud
+            titulo = 'Informe de OT bloqueado'
+            mensaje_notificacion = (
+                f'El informe de la OT #{solicitud.consecutivo} falló tras '
+                f'{MAX_INTENTOS_PROCESO_INFORME} intentos. Revisa los logs. '
+                f'Referencia: {proceso.operation_id}.'
+            )
+            if not Notificacion.objects.filter(
+                tipo=Notificacion.ERROR_INFORME,
+                titulo=titulo,
+                mensaje=mensaje_notificacion,
+            ).exists():
+                notificar_administradores(
+                    Notificacion.ERROR_INFORME,
+                    titulo,
+                    mensaje_notificacion,
+                    reverse('gestionar_ot_admin', args=[ot.pk]),
+                )
+
     try:
         with transaction.atomic():
             proceso = ProcesoInforme.objects.select_related(
@@ -479,12 +507,11 @@ def _procesar_proceso_informe(operation_id):
                 logger.info('[INFORME] operation=%s ya enviado, no se procesará de nuevo', operation_id)
                 return
             if proceso.intentos >= MAX_INTENTOS_PROCESO_INFORME:
-                if proceso.estado != ProcesoInforme.ERROR:
-                    proceso.set_state(
-                        ProcesoInforme.ERROR,
-                        'Se alcanzó el máximo de intentos de procesamiento',
-                        last_error='Se alcanzó el máximo de intentos de procesamiento',
-                    )
+                marcar_error(
+                    proceso,
+                    'Se alcanzó el máximo de intentos de procesamiento',
+                    'Se alcanzó el máximo de intentos de procesamiento',
+                )
                 logger.warning('[INFORME] operation=%s alcanzó el límite de intentos', operation_id)
                 return
             proceso.intentos += 1
@@ -511,7 +538,7 @@ def _procesar_proceso_informe(operation_id):
                 proceso.set_state(ProcesoInforme.VALIDANDO_ARCHIVOS, 'Validando archivos')
                 validar_firmas_ok, mensaje_firmas = _validar_firmas(cierre_ot)
                 if not validar_firmas_ok:
-                    proceso.set_state(ProcesoInforme.ERROR, mensaje_firmas, last_error=mensaje_firmas)
+                    marcar_error(proceso, mensaje_firmas, mensaje_firmas)
                     return
 
                 valid_imgs, expected_images, confirmed_images, mensaje_imgs = _validar_imagenes(cierre_ot)
@@ -519,7 +546,7 @@ def _procesar_proceso_informe(operation_id):
                 proceso.confirmed_images = confirmed_images
                 proceso.save(update_fields=['expected_images', 'confirmed_images'])
                 if not valid_imgs:
-                    proceso.set_state(ProcesoInforme.ERROR, mensaje_imgs, last_error=mensaje_imgs)
+                    marcar_error(proceso, mensaje_imgs, mensaje_imgs)
                     return
 
                 proceso.set_state(ProcesoInforme.GENERANDO_PDF, 'Generando PDF')
@@ -530,7 +557,11 @@ def _procesar_proceso_informe(operation_id):
             result = generar_pdf_informe(cierre_ot)
             pdf_buffer = _normalize_pdf_result(result)
             if not _validar_pdf(pdf_buffer):
-                proceso.set_state(ProcesoInforme.ERROR, 'PDF inválido después de generar', last_error='La salida no parece un PDF válido.')
+                marcar_error(
+                    proceso,
+                    'PDF inválido después de generar',
+                    'La salida no parece un PDF válido.',
+                )
                 return
             drive_link, stored_path = guardar_pdf_en_media(pdf_buffer, cierre_ot)
             proceso.pdf_path = drive_link or stored_path or ''
@@ -585,9 +616,17 @@ def _procesar_proceso_informe(operation_id):
         try:
             proceso = ProcesoInforme.objects.filter(operation_id=operation_id).first()
             if proceso:
-                proceso.set_state(ProcesoInforme.ERROR, 'Fallo inesperado durante el procesamiento', last_error=str(exc))
+                marcar_error(
+                    proceso,
+                    'Fallo inesperado durante el procesamiento',
+                    str(exc),
+                )
         except Exception:
-            pass
+            logger.exception(
+                '[INFORME] operation=%s no se pudo guardar el error final ni '
+                'programar su notificación.',
+                operation_id,
+            )
 
 
 @login_required
@@ -976,11 +1015,138 @@ def actualizar_estado_solicitud(request):
         logger.debug(f"Orden de Trabajo {'creada' if created else 'actualizada'}: {orden_trabajo}")
 
         email_warning = None
-        asignacion_nueva = bool(tecnico and tecnico != tecnico_anterior)
+        tecnico_nuevo = orden_trabajo.tecnico_asignado or ''
+        asignacion_cambio = tecnico_nuevo.casefold() != (tecnico_anterior or '').casefold()
+        asignacion_nueva = bool(tecnico_nuevo and asignacion_cambio)
         finalizacion_nueva = (
             nuevo_estado_nombre == 'finalizada'
             and estado_solicitud_anterior != 'finalizada'
         )
+        equipo_nombre = solicitud.equipo.nombre
+        ubicacion_nombre = solicitud.ubicacion_nombre or 'ubicación no especificada'
+        ot_admin_url = reverse('gestionar_ot_admin', args=[orden_trabajo.pk])
+        ot_tecnico_url = reverse('cierre_ot', args=[orden_trabajo.pk])
+        solicitud_url = reverse('lista_solicitudes')
+
+        if asignacion_cambio:
+            mensaje_reasignacion = (
+                f'La OT #{solicitud.consecutivo} del equipo {equipo_nombre} '
+                f'en {ubicacion_nombre} fue reasignada.'
+            )
+            if tecnico_anterior:
+                anterior = User.objects.filter(
+                    username__iexact=tecnico_anterior,
+                    is_active=True,
+                ).first()
+                if anterior:
+                    notificar_usuarios(
+                        User.objects.filter(pk=anterior.pk),
+                        Notificacion.OT_REASIGNADA,
+                        'OT reasignada',
+                        mensaje_reasignacion,
+                        ot_tecnico_url,
+                    )
+                else:
+                    logger.warning(
+                        '[PUSH] No se encontró una cuenta activa para el técnico '
+                        'anterior %s de la OT #%s.',
+                        tecnico_anterior,
+                        solicitud.consecutivo,
+                    )
+            if tecnico_nuevo:
+                nuevo = User.objects.filter(
+                    username__iexact=tecnico_nuevo,
+                    is_active=True,
+                ).first()
+                if nuevo:
+                    tipo_asignacion = (
+                        Notificacion.OT_REASIGNADA
+                        if tecnico_anterior
+                        else Notificacion.OT_ASIGNADA
+                    )
+                    notificar_usuarios(
+                        User.objects.filter(pk=nuevo.pk),
+                        tipo_asignacion,
+                        'Nueva OT asignada' if not tecnico_anterior else 'OT reasignada',
+                        (
+                            f'Se te ha asignado la OT #{solicitud.consecutivo} '
+                            f'para el equipo {equipo_nombre} en {ubicacion_nombre}.'
+                        ),
+                        ot_tecnico_url,
+                    )
+                else:
+                    logger.warning(
+                        '[PUSH] No se encontró una cuenta activa para el técnico '
+                        '%s de la OT #%s.',
+                        tecnico_nuevo,
+                        solicitud.consecutivo,
+                    )
+
+        if created and not tecnico_nuevo:
+            notificar_administradores(
+                Notificacion.OT_SIN_ASIGNAR,
+                'Nueva OT sin asignar',
+                (
+                    f'La OT #{solicitud.consecutivo} del equipo {equipo_nombre} '
+                    f'en {ubicacion_nombre} no tiene técnico asignado.'
+                ),
+                ot_admin_url,
+            )
+
+        clientes = usuarios_cliente_de_ubicacion(solicitud.ubicacion)
+        if (
+            nuevo_estado_nombre == 'en proceso'
+            and estado_solicitud_anterior != 'en proceso'
+        ):
+            notificar_usuarios(
+                clientes,
+                Notificacion.SOLICITUD_ACEPTADA,
+                'Solicitud aceptada',
+                (
+                    f'Tu solicitud #{solicitud.consecutivo} para el equipo '
+                    f'{equipo_nombre} fue aceptada y su OT está en proceso.'
+                ),
+                solicitud_url,
+            )
+            notificar_usuarios(
+                clientes,
+                Notificacion.TECNICO_EN_CAMINO,
+                'OT en proceso',
+                (
+                    f'La OT #{solicitud.consecutivo} para el equipo '
+                    f'{equipo_nombre} está en proceso.'
+                ),
+                solicitud_url,
+            )
+
+        if finalizacion_nueva:
+            tecnico = User.objects.filter(
+                username__iexact=tecnico_nuevo,
+                is_active=True,
+            ).first() if tecnico_nuevo else None
+            nombre_completo = tecnico.get_full_name().strip() if tecnico else ''
+            tecnico_nombre = nombre_completo or tecnico_nuevo or 'no especificado'
+            notificar_administradores(
+                Notificacion.OT_FINALIZADA,
+                'OT finalizada',
+                (
+                    f'La OT #{solicitud.consecutivo} del equipo {equipo_nombre} '
+                    f'ha sido finalizada por el técnico {tecnico_nombre}. '
+                    'Lista para revisión.'
+                ),
+                ot_admin_url,
+            )
+            notificar_usuarios(
+                clientes,
+                Notificacion.OT_FINALIZADA,
+                'OT finalizada',
+                (
+                    f'El trabajo de la OT #{solicitud.consecutivo} para el '
+                    f'equipo {equipo_nombre} ha finalizado.'
+                ),
+                solicitud_url,
+            )
+
         if solicitud.enviar_email and solicitud.email_solicitante and (asignacion_nueva or finalizacion_nueva):
             if asignacion_nueva:
                 try:
@@ -1079,7 +1245,7 @@ def asignar_tarea_preventiva(request, tarea_id):
                 co=co_solicitud,
             )
 
-            OrdenTrabajo.objects.create(
+            orden_trabajo = OrdenTrabajo.objects.create(
                 solicitud=solicitud,
                 tecnico_asignado=tecnico,
                 fecha_actividad=fecha_dt,
@@ -1090,6 +1256,26 @@ def asignar_tarea_preventiva(request, tarea_id):
             tarea.estado = 'convertido'
             tarea.observaciones = f"Convertido en solicitud {solicitud.consecutivo}"
             tarea.save()
+
+            if tarea.tecnico:
+                notificar_usuarios(
+                    User.objects.filter(pk=tarea.tecnico.pk),
+                    Notificacion.OT_ASIGNADA,
+                    'Nueva OT asignada',
+                    (
+                        f'Se te ha asignado la OT #{solicitud.consecutivo} '
+                        f'para el equipo {equipo.nombre} en '
+                        f'{solicitud.ubicacion_nombre or "ubicación no especificada"}.'
+                    ),
+                    reverse('cierre_ot', args=[orden_trabajo.pk]),
+                )
+            else:
+                logger.warning(
+                    '[PUSH] No se encontró una cuenta activa para el técnico %s '
+                    'de la OT #%s.',
+                    tecnico,
+                    solicitud.consecutivo,
+                )
 
             notificar_mantenimiento_preventivo(
                 solicitud,

@@ -104,9 +104,20 @@ def enviar_push_usuario(usuario, titulo, mensaje, url_destino='', referencia='ma
 
 
 def notificar_usuarios(usuarios, tipo, titulo, mensaje, url_destino=''):
+    destinatarios = list(usuarios.distinct())
+    logger.info(
+        '[PUSH] Notificación tipo=%s: %s destinatario(s) de usuario.',
+        tipo,
+        len(destinatarios),
+    )
+    if not destinatarios:
+        logger.warning(
+            '[PUSH] No se creó notificación tipo=%s: no se encontraron destinatarios.',
+            tipo,
+        )
     return [
         crear_notificacion(usuario, tipo, titulo, mensaje, url_destino)
-        for usuario in usuarios.distinct()
+        for usuario in destinatarios
     ]
 
 

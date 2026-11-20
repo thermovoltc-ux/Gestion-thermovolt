@@ -720,6 +720,125 @@ class SolicitudEmailEventTests(TestCase):
         self.assertEqual(response.status_code, 200)
         send_email.assert_not_called()
 
+    @patch('gestion_mantenimiento.Gestion_ot.views.enviar_correo_solicitud')
+    def test_assignment_creates_notifications_for_new_technician(self, send_email):
+        tecnico = get_user_model().objects.create_user(
+            username='tecnico-notificacion',
+            password='test-password',
+        )
+
+        response = self._actualizar_solicitud(
+            'en proceso',
+            tecnico.username,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        notificacion = Notificacion.objects.get(
+            usuario=tecnico,
+            tipo=Notificacion.OT_ASIGNADA,
+        )
+        self.assertIn(f'OT #{self.solicitud.consecutivo}', notificacion.mensaje)
+        self.assertEqual(
+            notificacion.url_destino,
+            reverse('cierre_ot', args=[self.solicitud.orden_trabajo.pk]),
+        )
+        send_email.assert_called_once()
+
+    @patch('gestion_mantenimiento.Gestion_ot.views.enviar_correo_solicitud')
+    def test_unassigned_new_ot_notifies_administrators(self, send_email):
+        response = self._actualizar_solicitud('solicitado')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            Notificacion.objects.filter(
+                usuario=self.user,
+                tipo=Notificacion.OT_SIN_ASIGNAR,
+                mensaje__contains=f'OT #{self.solicitud.consecutivo}',
+            ).exists(),
+        )
+        send_email.assert_not_called()
+
+    @patch('gestion_mantenimiento.Gestion_ot.views.enviar_correo_solicitud')
+    def test_reassignment_notifies_previous_and_new_technicians(self, send_email):
+        anterior = get_user_model().objects.create_user(
+            username='tecnico-anterior',
+            password='test-password',
+        )
+        nuevo = get_user_model().objects.create_user(
+            username='tecnico-nuevo',
+            password='test-password',
+        )
+        OrdenTrabajo.objects.create(
+            solicitud=self.solicitud,
+            tecnico_asignado=anterior.username,
+            estado=self.estado_solicitado,
+        )
+
+        response = self._actualizar_solicitud('en proceso', nuevo.username)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            Notificacion.objects.filter(
+                usuario=anterior,
+                tipo=Notificacion.OT_REASIGNADA,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            Notificacion.objects.filter(
+                usuario=nuevo,
+                tipo=Notificacion.OT_REASIGNADA,
+            ).count(),
+            1,
+        )
+        send_email.assert_called_once()
+
+    @patch('gestion_mantenimiento.Gestion_ot.views.enviar_correo_solicitud')
+    def test_customer_is_notified_when_request_is_accepted_and_finished(self, send_email):
+        centro = CentroOperaciones.objects.create(
+            nombre='Centro de notificaciones cliente',
+            codigo='CO-CORREO',
+        )
+        self.ubicacion.centro_operaciones = centro
+        self.ubicacion.save(update_fields=['centro_operaciones'])
+        cliente_usuario = get_user_model().objects.create_user(
+            username='cliente-ot-notificacion',
+            password='test-password',
+        )
+        cliente = Cliente.objects.create(
+            nombre='Cliente OT notificación',
+            codigo='CLI-OT-NOTIF',
+        )
+        cliente.centros_operaciones.add(centro)
+        PerfilUsuario.objects.create(user=cliente_usuario, cliente=cliente)
+
+        response = self._actualizar_solicitud('en proceso', 'tecnico-asignado')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            Notificacion.objects.filter(
+                usuario=cliente_usuario,
+                tipo=Notificacion.SOLICITUD_ACEPTADA,
+                url_destino=reverse('lista_solicitudes'),
+            ).exists(),
+        )
+        self.assertTrue(
+            Notificacion.objects.filter(
+                usuario=cliente_usuario,
+                tipo=Notificacion.TECNICO_EN_CAMINO,
+            ).exists(),
+        )
+
+        response = self._actualizar_solicitud('finalizada')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            Notificacion.objects.filter(
+                usuario=cliente_usuario,
+                tipo=Notificacion.OT_FINALIZADA,
+            ).exists(),
+        )
+        send_email.assert_called()
+
     @patch(
         'gestion_mantenimiento.Gestion_ot.views.enviar_correo_solicitud',
         side_effect=RuntimeError('provider unavailable'),
@@ -750,6 +869,13 @@ class SolicitudEmailEventTests(TestCase):
         response = self._actualizar_solicitud('finalizada')
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            Notificacion.objects.filter(
+                usuario=self.user,
+                tipo=Notificacion.OT_FINALIZADA,
+            ).count(),
+            1,
+        )
         send_email.assert_called_once_with(
             self.solicitud,
             'finalizacion',
@@ -863,6 +989,10 @@ class PreventiveRequestCoTests(TestCase):
             password='test-password',
         )
         admin.groups.add(Group.objects.get_or_create(name='Admin')[0])
+        tecnico = get_user_model().objects.create_user(
+            username='tecnico-asignado',
+            password='test-password',
+        )
 
         response = self._asignar_tarea()
 
@@ -882,6 +1012,105 @@ class PreventiveRequestCoTests(TestCase):
         )
         self.assertIn('Plan preventivo CO', admin_notification.mensaje)
         self.assertIn('CO', admin_notification.mensaje)
+        self.assertTrue(
+            Notificacion.objects.filter(
+                usuario=tecnico,
+                tipo=Notificacion.OT_ASIGNADA,
+            ).exists(),
+        )
+
+
+class MaintenanceReminderCommandTests(TestCase):
+    def test_upcoming_ot_reminder_is_sent_once(self):
+        tecnico = get_user_model().objects.create_user(
+            username='tecnico-recordatorio-ot',
+            password='test-password',
+        )
+        ubicacion = Ubicacion.objects.create(
+            nombre='Ubicación recordatorio',
+            codigo='UBI-RECORDATORIO',
+        )
+        equipo = Equipo.objects.create(
+            nombre='Equipo recordatorio',
+            codigo='EQ-RECORDATORIO',
+            ubicacion=ubicacion,
+        )
+        estado = Estado.objects.get_or_create(nombre='en proceso')[0]
+        solicitud = Solicitud.objects.create(
+            creado_por='admin',
+            descripcion_problema='OT para recordatorio',
+            equipo=equipo,
+            ubicacion=ubicacion,
+            estado=estado,
+        )
+        fecha_manana = timezone.localdate() + timedelta(days=1)
+        fecha_actividad = timezone.make_aware(
+            datetime.combine(fecha_manana, datetime.min.time()),
+        )
+        ot = OrdenTrabajo.objects.create(
+            solicitud=solicitud,
+            tecnico_asignado=tecnico.username,
+            fecha_actividad=fecha_actividad,
+            estado=estado,
+        )
+
+        call_command('send_maintenance_reminders', stdout=StringIO())
+        call_command('send_maintenance_reminders', stdout=StringIO())
+
+        self.assertEqual(
+            Notificacion.objects.filter(
+                usuario=tecnico,
+                tipo=Notificacion.RECORDATORIO_OT,
+                url_destino=reverse('cierre_ot', args=[ot.pk]),
+            ).count(),
+            1,
+        )
+
+    def test_preventive_reminder_is_sent_to_linked_client_once(self):
+        centro = CentroOperaciones.objects.create(
+            nombre='Centro recordatorio',
+            codigo='CO-RECORDATORIO',
+        )
+        ubicacion = Ubicacion.objects.create(
+            nombre='Ubicación recordatorio preventivo',
+            codigo='UBI-PREV-RECORDATORIO',
+            centro_operaciones=centro,
+        )
+        equipo = Equipo.objects.create(
+            nombre='Equipo preventivo recordatorio',
+            codigo='EQ-PREV-RECORDATORIO',
+            ubicacion=ubicacion,
+        )
+        plan = PlanMantenimiento.objects.create(
+            equipo=equipo,
+            nombre='Plan recordatorio',
+            fecha_inicio=timezone.localdate(),
+        )
+        TareaMantenimiento.objects.create(
+            plan=plan,
+            fecha_programada=timezone.localdate() + timedelta(days=3),
+        )
+        cliente_usuario = get_user_model().objects.create_user(
+            username='cliente-recordatorio',
+            password='test-password',
+        )
+        cliente = Cliente.objects.create(
+            nombre='Cliente recordatorio',
+            codigo='CLI-RECORDATORIO',
+        )
+        cliente.centros_operaciones.add(centro)
+        PerfilUsuario.objects.create(user=cliente_usuario, cliente=cliente)
+
+        call_command('send_maintenance_reminders', stdout=StringIO())
+        call_command('send_maintenance_reminders', stdout=StringIO())
+
+        self.assertEqual(
+            Notificacion.objects.filter(
+                usuario=cliente_usuario,
+                tipo=Notificacion.RECORDATORIO_MANTENIMIENTO,
+            ).count(),
+            1,
+        )
 
 
 class ProcesoInformeRetryTests(TestCase):
@@ -930,6 +1159,33 @@ class ProcesoInformeRetryTests(TestCase):
         proceso.refresh_from_db()
         self.assertEqual(proceso.intentos, 4)
         validar_firmas.assert_not_called()
+
+    def test_fourth_failed_attempt_notifies_administrators_once(self):
+        admin = get_user_model().objects.create_user(
+            username='retry-notification-admin',
+            password='test-password',
+        )
+        admin.groups.add(Group.objects.get_or_create(name='Admin')[0])
+        proceso = self.crear_proceso('retry-notification', 3)
+
+        with patch.object(
+            views,
+            '_validar_firmas',
+            return_value=(False, 'Falta una firma'),
+        ):
+            views._procesar_proceso_informe(proceso.operation_id)
+            views._procesar_proceso_informe(proceso.operation_id)
+
+        proceso.refresh_from_db()
+        self.assertEqual(proceso.intentos, 4)
+        self.assertEqual(
+            Notificacion.objects.filter(
+                usuario=admin,
+                tipo=Notificacion.ERROR_INFORME,
+                mensaje__contains=proceso.operation_id,
+            ).count(),
+            1,
+        )
 
     def test_worker_selects_only_errors_below_attempt_limit(self):
         reintentable = self.crear_proceso('retry-eligible', 0)

@@ -1,12 +1,14 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db.models.deletion import ProtectedError
 from django.test import TestCase
 from django.urls import reverse
 
 from gestion_mantenimiento.Gestion_ot.models import Material
+from gestion_mantenimiento.notificaciones.models import Notificacion
 
 from .models import (
     CategoriaProducto,
@@ -476,6 +478,54 @@ class AlmacenViewsTests(TestCase):
         self.assertEqual(
             response.context['movimientos'][0].producto_id,
             self.producto.pk,
+        )
+
+    def test_stock_below_minimum_notifies_admin_once_when_crossing_threshold(self):
+        admin = get_user_model().objects.create_user(
+            username='almacen-stock-admin',
+            password='test-password',
+        )
+        admin.groups.add(Group.objects.get_or_create(name='Admin')[0])
+        self.crear_movimiento(MovimientoInventario.ENTRADA, '5')
+
+        response = self.client.post(
+            reverse('almacen:registrar_salida'),
+            {
+                'producto': self.producto.pk,
+                'cantidad': '2',
+                'costo_unitario': '0',
+                'documento_referencia': '',
+                'observaciones': '',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            Notificacion.objects.filter(
+                usuario=admin,
+                tipo=Notificacion.STOCK_BAJO,
+            ).count(),
+            1,
+        )
+
+        response = self.client.post(
+            reverse('almacen:registrar_salida'),
+            {
+                'producto': self.producto.pk,
+                'cantidad': '1',
+                'costo_unitario': '0',
+                'documento_referencia': '',
+                'observaciones': '',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            Notificacion.objects.filter(
+                usuario=admin,
+                tipo=Notificacion.STOCK_BAJO,
+            ).count(),
+            1,
         )
 
     def test_inventory_pages_require_login(self):

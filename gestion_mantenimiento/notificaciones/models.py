@@ -11,9 +11,11 @@ class Notificacion(models.Model):
     SOLICITUD_ACEPTADA = 'SOLICITUD_ACEPTADA'
     TECNICO_EN_CAMINO = 'TECNICO_EN_CAMINO'
     MANTENIMIENTO_PREVENTIVO = 'MANTENIMIENTO_PREVENTIVO'
+    RECORDATORIO_OT = 'RECORDATORIO_OT'
     RECORDATORIO_MANTENIMIENTO = 'RECORDATORIO_MANTENIMIENTO'
     STOCK_BAJO = 'STOCK_BAJO'
     OT_FINALIZADA = 'OT_FINALIZADA'
+    OT_SIN_ASIGNAR = 'OT_SIN_ASIGNAR'
     ERROR_INFORME = 'ERROR_INFORME'
 
     TIPO_CHOICES = [
@@ -25,9 +27,11 @@ class Notificacion(models.Model):
         (SOLICITUD_ACEPTADA, 'Solicitud aceptada'),
         (TECNICO_EN_CAMINO, 'Técnico en camino'),
         (MANTENIMIENTO_PREVENTIVO, 'Mantenimiento preventivo'),
+        (RECORDATORIO_OT, 'Recordatorio de OT'),
         (RECORDATORIO_MANTENIMIENTO, 'Recordatorio de mantenimiento'),
         (STOCK_BAJO, 'Stock bajo'),
         (OT_FINALIZADA, 'OT finalizada'),
+        (OT_SIN_ASIGNAR, 'OT sin asignar'),
         (ERROR_INFORME, 'Error de informe'),
     ]
 
