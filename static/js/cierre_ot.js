@@ -266,7 +266,53 @@ document.addEventListener('DOMContentLoaded', function() {
                 const statusDiv = document.getElementById('cierre-ot-status');
                 if (!statusDiv) return;
 
-                statusDiv.textContent = `Estado: ${data.estado.replace(/_/g, ' ')} - ${data.mensaje}`;
+                const isError = data.estado === 'ERROR';
+                statusDiv.replaceChildren();
+                statusDiv.style.color = isError ? '#b91c1c' : '#1f2937';
+
+                const statusMessage = document.createElement('div');
+                statusMessage.textContent = `Estado: ${data.estado.replace(/_/g, ' ')} - ${data.mensaje}`;
+                statusDiv.appendChild(statusMessage);
+
+                if (isError && data.last_error) {
+                    const errorDetail = document.createElement('div');
+                    errorDetail.textContent = `Detalle: ${data.last_error}`;
+                    statusDiv.appendChild(errorDetail);
+                }
+
+                if (data.puede_reintentar && data.url_reintentar) {
+                    const retryButton = document.createElement('button');
+                    retryButton.type = 'button';
+                    retryButton.textContent = 'Reintentar procesamiento';
+                    retryButton.style.marginTop = '8px';
+                    retryButton.addEventListener('click', function() {
+                        retryButton.disabled = true;
+                        retryButton.textContent = 'Encolando reintento...';
+                        fetch(data.url_reintentar, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+                            }
+                        })
+                            .then(response => response.json().then(result => {
+                                if (!response.ok) {
+                                    throw new Error(result.error || `HTTP ${response.status}`);
+                                }
+                                return result;
+                            }))
+                            .then(() => {
+                                statusDiv.textContent = 'Reintento manual en cola.';
+                                statusDiv.style.color = '#1f2937';
+                                actualizarEstadoInforme();
+                            })
+                            .catch(error => {
+                                console.error('Error reintentando el informe:', error);
+                                statusDiv.textContent = `No se pudo reintentar el informe: ${error.message}`;
+                                statusDiv.style.color = '#b91c1c';
+                            });
+                    });
+                    statusDiv.appendChild(retryButton);
+                }
 
                 if (['ENVIADO', 'ERROR'].includes(data.estado)) {
                     const submitButton = document.getElementById('submit-cierre-ot');

@@ -886,6 +886,116 @@ class ProcesoInformeRetryTests(TestCase):
 
         procesar.assert_called_once_with(reintentable.operation_id)
 
+    def test_admin_can_manually_retry_failed_process(self):
+        admin = get_user_model().objects.create_user(
+            username='retry-admin',
+            password='test-password',
+        )
+        admin.groups.add(Group.objects.get_or_create(name='Admin')[0])
+        self.client.force_login(admin)
+        proceso = self.crear_proceso('manual-retry', 4)
+        proceso.last_error = 'Falta una firma'
+        proceso.save(update_fields=['last_error'])
+
+        with patch.object(views.threading, 'Thread') as thread_class:
+            response = self.client.post(
+                reverse(
+                    'reintentar_proceso_informe',
+                    args=[self.cierre_ot.orden_trabajo_id, proceso.operation_id],
+                ),
+            )
+
+        proceso.refresh_from_db()
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(proceso.estado, ProcesoInforme.PENDIENTE)
+        self.assertEqual(proceso.intentos, 0)
+        self.assertEqual(proceso.last_error, '')
+        thread_class.assert_called_once()
+        thread_class.return_value.start.assert_called_once()
+
+    def test_manual_retry_requires_admin_and_client_group_takes_precedence(self):
+        user = get_user_model().objects.create_user(
+            username='retry-client',
+            password='test-password',
+            is_superuser=True,
+        )
+        user.groups.add(Group.objects.get_or_create(name='Cliente')[0])
+        self.client.force_login(user)
+        proceso = self.crear_proceso('client-retry', 4)
+        proceso.last_error = 'Error interno'
+        proceso.save(update_fields=['last_error'])
+
+        state_response = self.client.get(
+            reverse(
+                'estado_proceso_informe',
+                args=[self.cierre_ot.orden_trabajo_id, proceso.operation_id],
+            ),
+        )
+
+        response = self.client.post(
+            reverse(
+                'reintentar_proceso_informe',
+                args=[self.cierre_ot.orden_trabajo_id, proceso.operation_id],
+            ),
+        )
+
+        proceso.refresh_from_db()
+        self.assertIsNone(state_response.json()['last_error'])
+        self.assertFalse(state_response.json()['puede_reintentar'])
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(proceso.estado, ProcesoInforme.ERROR)
+        self.assertEqual(proceso.intentos, 4)
+
+    def test_technician_cannot_manually_retry_failed_process(self):
+        technician = get_user_model().objects.create_user(
+            username='retry-technician',
+            password='test-password',
+        )
+        technician.groups.add(Group.objects.get_or_create(name='Tecnico')[0])
+        self.client.force_login(technician)
+        proceso = self.crear_proceso('technician-retry', 4)
+
+        response = self.client.post(
+            reverse(
+                'reintentar_proceso_informe',
+                args=[self.cierre_ot.orden_trabajo_id, proceso.operation_id],
+            ),
+        )
+
+        proceso.refresh_from_db()
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(proceso.estado, ProcesoInforme.ERROR)
+        self.assertEqual(proceso.intentos, 4)
+
+    def test_state_api_exposes_error_only_to_admin_and_offers_retry_url(self):
+        proceso = self.crear_proceso('state-error', 4)
+        proceso.last_error = 'Falta una firma'
+        proceso.save(update_fields=['last_error'])
+        admin = get_user_model().objects.create_user(
+            username='retry-state-admin',
+            password='test-password',
+        )
+        admin.groups.add(Group.objects.get_or_create(name='Admin')[0])
+        self.client.force_login(admin)
+
+        response = self.client.get(
+            reverse(
+                'estado_proceso_informe',
+                args=[self.cierre_ot.orden_trabajo_id, proceso.operation_id],
+            ),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['last_error'], 'Falta una firma')
+        self.assertTrue(response.json()['puede_reintentar'])
+        self.assertEqual(
+            response.json()['url_reintentar'],
+            reverse(
+                'reintentar_proceso_informe',
+                args=[self.cierre_ot.orden_trabajo_id, proceso.operation_id],
+            ),
+        )
+
 
 class ProcesoInformePersistenciaTests(TestCase):
     def setUp(self):

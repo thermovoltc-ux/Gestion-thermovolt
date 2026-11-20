@@ -62,6 +62,11 @@ urlpatterns = [
     path('descargar_informe/<str:filename>/', views.descargar_informe_pdf, name='descargar_informe_pdf'),
     path('informes/descargar/<str:token>/', views.descargar_informe_token, name='descargar_informe_token'),
     path('informes/estado/<int:ot_id>/<str:operation_id>/', views.estado_proceso_informe, name='estado_proceso_informe'),
+    path(
+        'informes/reintentar/<int:ot_id>/<str:operation_id>/',
+        views.reintentar_proceso_informe,
+        name='reintentar_proceso_informe',
+    ),
     
     # Rutas para planes de mantenimiento
     path('planes/', vista_planes.lista_planes_mantenimiento, name='lista_planes'),

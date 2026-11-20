@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, FileResponse, Http404, StreamingHttpResponse, HttpResponseBadRequest
 from django.views.decorators.http import require_GET, require_POST
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 import json
 import mimetypes
 from decimal import Decimal, ROUND_HALF_UP
@@ -591,10 +591,23 @@ def estado_proceso_informe(request, ot_id, operation_id):
     ot = get_object_or_404(_ordenes_filtradas_por_co(request), id=ot_id)
     cierre_ot = get_object_or_404(CierreOt, orden_trabajo=ot)
     proceso = get_object_or_404(ProcesoInforme, operation_id=operation_id, cierre_ot=cierre_ot)
+    puede_reintentar = _usuario_puede_reintentar_informe(request.user)
+    puede_ver_error = puede_reintentar
+    permite_reintentar = (
+        puede_reintentar
+        and proceso.estado == ProcesoInforme.ERROR
+        and not proceso.email_enviado
+    )
     return JsonResponse({
         'operation_id': proceso.operation_id,
         'estado': proceso.estado,
         'mensaje': proceso.mensaje,
+        'last_error': proceso.last_error if puede_ver_error else None,
+        'puede_reintentar': permite_reintentar,
+        'url_reintentar': (
+            reverse('reintentar_proceso_informe', args=[ot_id, operation_id])
+            if permite_reintentar else None
+        ),
         'expected_images': proceso.expected_images,
         'confirmed_images': proceso.confirmed_images,
         'required_signatures': proceso.required_signatures,
@@ -602,6 +615,82 @@ def estado_proceso_informe(request, ot_id, operation_id):
         'created_at': proceso.created_at.isoformat(),
         'updated_at': proceso.updated_at.isoformat(),
     })
+
+
+def _usuario_puede_reintentar_informe(user):
+    grupos = set(user.groups.values_list('name', flat=True))
+    return 'Cliente' not in grupos and (user.is_superuser or 'Admin' in grupos)
+
+
+@login_required
+@require_POST
+def reintentar_proceso_informe(request, ot_id, operation_id):
+    if not _usuario_puede_reintentar_informe(request.user):
+        raise PermissionDenied
+
+    ot = get_object_or_404(_ordenes_filtradas_por_co(request), id=ot_id)
+    cierre_ot = get_object_or_404(CierreOt, orden_trabajo=ot)
+
+    with transaction.atomic():
+        proceso = get_object_or_404(
+            ProcesoInforme.objects.select_for_update(),
+            operation_id=operation_id,
+            cierre_ot=cierre_ot,
+        )
+        if proceso.email_enviado or proceso.estado == ProcesoInforme.ENVIADO:
+            return JsonResponse(
+                {'error': 'El informe ya fue enviado y no puede reintentarse.'},
+                status=409,
+            )
+        if proceso.estado != ProcesoInforme.ERROR:
+            return JsonResponse(
+                {'error': 'Solo se pueden reintentar procesos que terminaron con error.'},
+                status=409,
+            )
+
+        proceso.intentos = 0
+        proceso.estado = ProcesoInforme.PENDIENTE
+        proceso.mensaje = 'Reintento manual en cola'
+        proceso.last_error = ''
+        proceso.started_at = timezone.now()
+        proceso.finished_at = None
+        proceso.save(update_fields=[
+            'intentos',
+            'estado',
+            'mensaje',
+            'last_error',
+            'started_at',
+            'finished_at',
+            'updated_at',
+        ])
+
+    try:
+        thread = threading.Thread(
+            target=_procesar_proceso_informe,
+            args=(proceso.operation_id,),
+            daemon=True,
+        )
+        thread.start()
+    except Exception as exc:
+        logger.exception(
+            '[INFORME] operation=%s no se pudo iniciar el reintento manual',
+            proceso.operation_id,
+        )
+        proceso.set_state(
+            ProcesoInforme.ERROR,
+            'No se pudo iniciar el reintento',
+            last_error=str(exc),
+        )
+        return JsonResponse(
+            {'error': 'No se pudo iniciar el reintento del informe.'},
+            status=500,
+        )
+
+    return JsonResponse({
+        'operation_id': proceso.operation_id,
+        'estado': ProcesoInforme.PENDIENTE,
+        'mensaje': 'Reintento manual en cola',
+    }, status=202)
 
 
 class CustomDjangoJSONEncoder(DjangoJSONEncoder):
