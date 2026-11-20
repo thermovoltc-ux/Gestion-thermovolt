@@ -4,7 +4,7 @@ cffi==2.0.0
 charset-normalizer==3.4.6
 cloudinary==1.40.0
 colorama==0.4.6
-cryptography==50.0.2
+cryptography==41.0.7
 dj-database-url==3.0.1
 psycopg2-binary==2.9.9
 Django==4.2.7
