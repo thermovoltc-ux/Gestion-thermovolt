@@ -8,7 +8,13 @@ from django.urls import reverse
 
 from gestion_mantenimiento.Gestion_ot.models import Material
 
-from .models import CategoriaProducto, MovimientoInventario, Producto
+from .models import (
+    CategoriaProducto,
+    HerramientaUnidad,
+    HistorialHerramienta,
+    MovimientoInventario,
+    Producto,
+)
 
 
 class ProductoStockTests(TestCase):
@@ -113,6 +119,12 @@ class AlmacenViewsTests(TestCase):
             cantidad=Decimal(cantidad),
             costo_unitario=Decimal('2500.00'),
             usuario=self.usuario,
+        )
+
+    def crear_herramienta(self, identificador='SERIE-001'):
+        return HerramientaUnidad.objects.create(
+            producto=self.producto,
+            identificador_unico=identificador,
         )
 
     def test_product_list_shows_calculated_stock(self):
@@ -276,3 +288,87 @@ class AlmacenViewsTests(TestCase):
             with self.subTest(route=route):
                 response = self.client.get(reverse(route))
                 self.assertEqual(response.status_code, 302)
+
+    def test_available_tool_can_be_assigned_and_creates_history(self):
+        herramienta = self.crear_herramienta()
+        tecnico = get_user_model().objects.create_user(
+            username='tecnico-herramienta',
+            first_name='Técnico',
+            last_name='Prueba',
+        )
+
+        response = self.client.post(
+            reverse('almacen:asignar_herramienta', args=[herramienta.pk]),
+            {'tecnico': tecnico.pk, 'observaciones': 'Entrega inicial'},
+        )
+
+        self.assertRedirects(response, reverse('almacen:lista_herramientas'))
+        herramienta.refresh_from_db()
+        historial = HistorialHerramienta.objects.get(herramienta=herramienta)
+        self.assertEqual(herramienta.estado, HerramientaUnidad.ASIGNADA)
+        self.assertEqual(herramienta.tecnico_asignado, tecnico)
+        self.assertIsNotNone(herramienta.fecha_asignacion)
+        self.assertEqual(historial.tecnico, tecnico)
+        self.assertIsNone(historial.fecha_devolucion)
+        self.assertEqual(historial.observaciones, 'Entrega inicial')
+
+    def test_return_makes_tool_available_and_closes_history(self):
+        herramienta = self.crear_herramienta()
+        tecnico = get_user_model().objects.create_user(username='tecnico-devolucion')
+        self.client.post(
+            reverse('almacen:asignar_herramienta', args=[herramienta.pk]),
+            {'tecnico': tecnico.pk, 'observaciones': 'Asignada'},
+        )
+
+        response = self.client.post(
+            reverse('almacen:devolver_herramienta', args=[herramienta.pk]),
+            {'observaciones': 'Devuelta sin daños'},
+        )
+
+        self.assertRedirects(response, reverse('almacen:lista_herramientas'))
+        herramienta.refresh_from_db()
+        historial = HistorialHerramienta.objects.get(herramienta=herramienta)
+        self.assertEqual(herramienta.estado, HerramientaUnidad.DISPONIBLE)
+        self.assertIsNone(herramienta.tecnico_asignado)
+        self.assertIsNone(herramienta.fecha_asignacion)
+        self.assertIsNotNone(historial.fecha_devolucion)
+        self.assertIn('Devuelta sin daños', historial.observaciones)
+
+    def test_assigned_tool_cannot_be_assigned_to_another_technician(self):
+        herramienta = self.crear_herramienta()
+        primer_tecnico = get_user_model().objects.create_user(username='primer-tecnico')
+        segundo_tecnico = get_user_model().objects.create_user(username='segundo-tecnico')
+        self.client.post(
+            reverse('almacen:asignar_herramienta', args=[herramienta.pk]),
+            {'tecnico': primer_tecnico.pk, 'observaciones': ''},
+        )
+
+        response = self.client.post(
+            reverse('almacen:asignar_herramienta', args=[herramienta.pk]),
+            {'tecnico': segundo_tecnico.pk, 'observaciones': ''},
+        )
+
+        self.assertRedirects(response, reverse('almacen:lista_herramientas'))
+        herramienta.refresh_from_db()
+        self.assertEqual(herramienta.estado, HerramientaUnidad.ASIGNADA)
+        self.assertEqual(herramienta.tecnico_asignado, primer_tecnico)
+        self.assertEqual(HistorialHerramienta.objects.filter(
+            herramienta=herramienta,
+        ).count(), 1)
+
+    def test_tool_list_filters_by_state_and_assigned_technician(self):
+        herramienta = self.crear_herramienta()
+        tecnico = get_user_model().objects.create_user(username='tecnico-filtro')
+        self.client.post(
+            reverse('almacen:asignar_herramienta', args=[herramienta.pk]),
+            {'tecnico': tecnico.pk, 'observaciones': ''},
+        )
+
+        response = self.client.get(
+            reverse('almacen:lista_herramientas'),
+            {'estado': HerramientaUnidad.ASIGNADA, 'tecnico': tecnico.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context['herramientas']), [herramienta])
+        self.assertContains(response, 'Historial')

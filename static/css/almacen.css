@@ -208,6 +208,51 @@
   background: var(--ds-color-danger-surface);
 }
 
+.warehouse-tool-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: var(--ds-space-4);
+}
+
+.warehouse-tool-filter-actions {
+  padding-bottom: var(--ds-space-1);
+}
+
+.warehouse-tool-history summary,
+.warehouse-tool-actions summary {
+  cursor: pointer;
+}
+
+.warehouse-tool-history ul {
+  min-width: 220px;
+  padding-left: var(--ds-space-5);
+}
+
+.warehouse-tool-history li + li {
+  margin-top: var(--ds-space-3);
+}
+
+.warehouse-tool-action-form {
+  display: grid;
+  min-width: 220px;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3);
+  background: var(--ds-color-surface);
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-md);
+}
+
+.warehouse-tool-action-form .form-control {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  color: var(--ds-color-text);
+  background: var(--ds-color-surface);
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-md);
+}
+
 @media (max-width: 640px) {
   .warehouse-page {
     padding: var(--ds-space-4);
@@ -224,6 +269,10 @@
   }
 
   .warehouse-product-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .warehouse-tool-filters {
     grid-template-columns: 1fr;
   }
 }

@@ -1,10 +1,39 @@
 from decimal import Decimal
 
 from django import forms
+from django.contrib.auth import get_user_model
 
 from gestion_mantenimiento.Gestion_ot.models import Material
 
-from .models import MovimientoInventario, Producto
+from .models import HerramientaUnidad, MovimientoInventario, Producto
+
+
+class HerramientaAsignacionForm(forms.Form):
+    tecnico = forms.ModelChoiceField(
+        queryset=get_user_model().objects.none(),
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label='Técnico',
+    )
+    observaciones = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        label='Observaciones',
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['tecnico'].queryset = get_user_model().objects.filter(
+            is_active=True,
+        ).order_by('first_name', 'last_name', 'username')
+        self.fields['tecnico'].empty_label = 'Selecciona un técnico'
+
+
+class HerramientaDevolucionForm(forms.Form):
+    observaciones = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        label='Observaciones de devolución',
+    )
 
 
 class ProductoForm(forms.ModelForm):

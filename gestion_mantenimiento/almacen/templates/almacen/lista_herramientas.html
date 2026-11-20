@@ -1,0 +1,161 @@
+{% extends "solicitudes/indexpadre.html" %}
+{% load static %}
+
+{% block title %}Herramientas individuales{% endblock %}
+
+{% block content %}
+<main class="warehouse-page ds-fade-in">
+    <header class="warehouse-header">
+        <div>
+            <h1>Herramientas individuales</h1>
+            <p>Controla cada unidad física, sus asignaciones y devoluciones.</p>
+        </div>
+        <nav class="warehouse-actions" aria-label="Navegación de almacén">
+            <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_productos' %}">Inventario</a>
+            <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_movimientos' %}">Ver kardex</a>
+        </nav>
+    </header>
+
+    {% if messages %}
+    <div class="warehouse-messages" aria-live="polite">
+        {% for message in messages %}
+        <p class="warehouse-message warehouse-message--{{ message.tags }}">{{ message }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="get" class="ds-card warehouse-search-form">
+        <div class="warehouse-tool-filters">
+            <div class="warehouse-form-field">
+                <label for="herramienta-estado">Estado</label>
+                <select id="herramienta-estado" class="form-control" name="estado">
+                    <option value="">Todos los estados</option>
+                    {% for valor, etiqueta in estados %}
+                    <option value="{{ valor }}" {% if estado_seleccionado == valor %}selected{% endif %}>{{ etiqueta }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="warehouse-form-field">
+                <label for="herramienta-tecnico">Técnico asignado</label>
+                <select id="herramienta-tecnico" class="form-control" name="tecnico">
+                    <option value="">Todos los técnicos</option>
+                    {% for tecnico in tecnicos %}
+                    <option value="{{ tecnico.pk }}" {% if tecnico_seleccionado == tecnico.pk %}selected{% endif %}>
+                        {{ tecnico.get_full_name|default:tecnico.username }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="warehouse-actions warehouse-tool-filter-actions">
+                <button type="submit" class="ds-button">Filtrar</button>
+                {% if estado_seleccionado or tecnico_seleccionado %}
+                <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_herramientas' %}">Limpiar</a>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+
+    <section class="ds-card warehouse-table-card" aria-label="Herramientas registradas">
+        <div class="warehouse-table-scroll">
+            <table class="ds-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Producto</th>
+                        <th scope="col">Identificador</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col">Técnico</th>
+                        <th scope="col">Asignada desde</th>
+                        <th scope="col">Historial</th>
+                        <th scope="col">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for herramienta in herramientas %}
+                    <tr>
+                        <td>{{ herramienta.producto.codigo }} — {{ herramienta.producto.nombre }}</td>
+                        <td>{{ herramienta.identificador_unico }}</td>
+                        <td>{{ herramienta.get_estado_display }}</td>
+                        <td>
+                            {% if herramienta.tecnico_asignado %}
+                                {{ herramienta.tecnico_asignado.get_full_name|default:herramienta.tecnico_asignado.username }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if herramienta.fecha_asignacion %}
+                                {{ herramienta.fecha_asignacion|date:"d/m/Y H:i" }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            <details class="warehouse-tool-history">
+                                <summary>{{ herramienta.historial.all|length }} registro(s)</summary>
+                                <ul>
+                                    {% for registro in herramienta.historial.all %}
+                                    <li>
+                                        <strong>{{ registro.tecnico.get_full_name|default:registro.tecnico.username }}</strong>:
+                                        {{ registro.fecha_asignacion|date:"d/m/Y H:i" }}
+                                        {% if registro.fecha_devolucion %}
+                                            a {{ registro.fecha_devolucion|date:"d/m/Y H:i" }}
+                                        {% else %}
+                                            (activa)
+                                        {% endif %}
+                                        {% if registro.observaciones %}<br>{{ registro.observaciones|linebreaksbr }}{% endif %}
+                                    </li>
+                                    {% empty %}
+                                    <li>Sin asignaciones registradas.</li>
+                                    {% endfor %}
+                                </ul>
+                            </details>
+                        </td>
+                        <td class="warehouse-tool-actions">
+                            {% if herramienta.asignacion_form %}
+                            <details>
+                                <summary class="ds-button ds-button--small">Asignar</summary>
+                                <form method="post" action="{% url 'almacen:asignar_herramienta' herramienta.pk %}" class="warehouse-tool-action-form">
+                                    {% csrf_token %}
+                                    <div class="warehouse-form-field">
+                                        {{ herramienta.asignacion_form.tecnico.label_tag }}
+                                        {{ herramienta.asignacion_form.tecnico }}
+                                    </div>
+                                    <div class="warehouse-form-field">
+                                        {{ herramienta.asignacion_form.observaciones.label_tag }}
+                                        {{ herramienta.asignacion_form.observaciones }}
+                                    </div>
+                                    <button type="submit" class="ds-button ds-button--small">Confirmar asignación</button>
+                                </form>
+                            </details>
+                            {% elif herramienta.devolucion_form %}
+                            <details>
+                                <summary class="ds-button ds-button--secondary ds-button--small">Devolver</summary>
+                                <form method="post" action="{% url 'almacen:devolver_herramienta' herramienta.pk %}" class="warehouse-tool-action-form">
+                                    {% csrf_token %}
+                                    <div class="warehouse-form-field">
+                                        {{ herramienta.devolucion_form.observaciones.label_tag }}
+                                        {{ herramienta.devolucion_form.observaciones }}
+                                    </div>
+                                    <button type="submit" class="ds-button ds-button--small">Confirmar devolución</button>
+                                </form>
+                            </details>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="warehouse-empty">No hay herramientas que coincidan con los filtros.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/almacen.css' %}">
+{% endblock %}

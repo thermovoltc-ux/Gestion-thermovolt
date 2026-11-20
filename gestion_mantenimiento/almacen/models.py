@@ -123,6 +123,98 @@ class Producto(models.Model):
         )
 
 
+class HerramientaUnidad(models.Model):
+    DISPONIBLE = 'DISPONIBLE'
+    ASIGNADA = 'ASIGNADA'
+    EN_REPARACION = 'EN_REPARACION'
+    BAJA = 'BAJA'
+
+    ESTADO_CHOICES = [
+        (DISPONIBLE, 'Disponible'),
+        (ASIGNADA, 'Asignada'),
+        (EN_REPARACION, 'En reparación'),
+        (BAJA, 'Baja'),
+    ]
+
+    producto = models.ForeignKey(
+        Producto,
+        on_delete=models.PROTECT,
+        related_name='herramientas_unidad',
+    )
+    identificador_unico = models.CharField(max_length=100, unique=True)
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        default=DISPONIBLE,
+        db_index=True,
+    )
+    tecnico_asignado = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='herramientas_asignadas',
+    )
+    fecha_asignacion = models.DateTimeField(null=True, blank=True)
+    observaciones = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['producto__nombre', 'identificador_unico']
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(
+                        estado='ASIGNADA',
+                        tecnico_asignado__isnull=False,
+                        fecha_asignacion__isnull=False,
+                    )
+                    | models.Q(
+                        estado__in=['DISPONIBLE', 'EN_REPARACION', 'BAJA'],
+                        tecnico_asignado__isnull=True,
+                        fecha_asignacion__isnull=True,
+                    )
+                ),
+                name='almacen_herramienta_estado_asignacion_valido',
+            ),
+        ]
+        verbose_name = 'herramienta individual'
+        verbose_name_plural = 'herramientas individuales'
+
+    def __str__(self):
+        return f'{self.producto} — {self.identificador_unico}'
+
+
+class HistorialHerramienta(models.Model):
+    herramienta = models.ForeignKey(
+        HerramientaUnidad,
+        on_delete=models.PROTECT,
+        related_name='historial',
+    )
+    tecnico = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='historial_herramientas',
+    )
+    fecha_asignacion = models.DateTimeField(auto_now_add=True)
+    fecha_devolucion = models.DateTimeField(null=True, blank=True)
+    observaciones = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-fecha_asignacion', '-pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['herramienta'],
+                condition=models.Q(fecha_devolucion__isnull=True),
+                name='almacen_herramienta_una_asignacion_abierta',
+            ),
+        ]
+        verbose_name = 'historial de herramienta'
+        verbose_name_plural = 'historial de herramientas'
+
+    def __str__(self):
+        return f'{self.herramienta} — {self.tecnico}'
+
+
 class MovimientoInventarioQuerySet(models.QuerySet):
     def update(self, **kwargs):
         raise ValidationError('Los movimientos de inventario son inmutables.')
