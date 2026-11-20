@@ -128,6 +128,9 @@ class AlmacenViewsTests(TestCase):
         )
 
     def test_product_list_shows_calculated_stock(self):
+        session = self.client.session
+        session['tipo_cuenta'] = 'administrador'
+        session.save()
         material = Material.objects.create(
             codigo='REP-LIST-01',
             categoria='repuestos',
@@ -247,6 +250,115 @@ class AlmacenViewsTests(TestCase):
         self.assertEqual(salida.usuario, self.usuario)
         self.assertEqual(salida.costo_unitario, Decimal('0'))
         self.assertEqual(self.producto.stock, Decimal('3'))
+
+    def test_quick_product_creation_returns_json_and_can_be_used_for_entry(self):
+        response = self.client.post(
+            reverse('almacen:crear_producto_rapido'),
+            {
+                'codigo': 'QUICK-001',
+                'nombre': 'Producto rápido',
+                'categoria': self.categoria.pk,
+                'unidad_medida': 'Unidad',
+                'stock_minimo': '0',
+                'material_asociado': '',
+                'nombre_material': '',
+                'costo_base': '',
+                'precio_venta_sugerido': '',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        producto = Producto.objects.get(pk=payload['id'])
+        self.assertEqual(payload['label'], 'QUICK-001 — Producto rápido')
+        self.assertEqual(producto.stock, Decimal('0'))
+
+        entrada_response = self.client.post(
+            reverse('almacen:registrar_entrada'),
+            {
+                'producto': producto.pk,
+                'cantidad': '4',
+                'costo_unitario': '8500.00',
+                'documento_referencia': 'COMPRA-QUICK',
+                'observaciones': '',
+            },
+        )
+
+        self.assertRedirects(
+            entrada_response,
+            f"{reverse('almacen:lista_movimientos')}?producto={producto.pk}",
+        )
+        self.assertEqual(producto.stock, Decimal('4'))
+        self.assertEqual(
+            MovimientoInventario.objects.get(producto=producto).tipo,
+            MovimientoInventario.ENTRADA,
+        )
+
+    def test_movement_form_renders_product_search_and_quick_create_dialog(self):
+        response = self.client.get(reverse('almacen:registrar_entrada'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'movement-product-search')
+        self.assertContains(response, 'warehouse-products')
+        self.assertContains(response, 'quick-product-dialog')
+        self.assertContains(response, 'almacen_rapido.js')
+
+    def test_invalid_product_id_renders_movement_form_without_crashing(self):
+        response = self.client.post(
+            reverse('almacen:registrar_entrada'),
+            {
+                'producto': 'not-an-id',
+                'cantidad': '1',
+                'costo_unitario': '100',
+                'documento_referencia': '',
+                'observaciones': '',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['form'].errors['producto'])
+
+    def test_quick_tool_creation_returns_json_and_tool_appears_in_list(self):
+        response = self.client.post(
+            reverse('almacen:crear_herramienta'),
+            {
+                'producto': self.producto.pk,
+                'identificador_unico': 'PATRIMONIAL-123',
+                'observaciones': 'Taladro asignable',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        herramienta = HerramientaUnidad.objects.get(pk=payload['id'])
+        self.assertEqual(herramienta.producto, self.producto)
+        self.assertEqual(herramienta.estado, HerramientaUnidad.DISPONIBLE)
+        self.assertEqual(payload['identificador_unico'], 'PATRIMONIAL-123')
+
+        list_response = self.client.get(reverse('almacen:lista_herramientas'))
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertContains(list_response, 'PATRIMONIAL-123')
+        self.assertContains(list_response, 'Agregar herramienta')
+        self.assertContains(list_response, 'new-tool-dialog')
+
+    def test_quick_tool_creation_rejects_duplicate_identifier(self):
+        self.crear_herramienta('SERIE-DUPLICADA')
+
+        response = self.client.post(
+            reverse('almacen:crear_herramienta'),
+            {
+                'producto': self.producto.pk,
+                'identificador_unico': 'SERIE-DUPLICADA',
+                'observaciones': '',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('identificador_unico', response.json()['errors'])
 
     def test_movements_can_be_filtered_by_product(self):
         another_product = Producto.objects.create(

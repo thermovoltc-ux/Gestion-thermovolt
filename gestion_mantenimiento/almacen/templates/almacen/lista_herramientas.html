@@ -11,18 +11,17 @@
             <p>Controla cada unidad física, sus asignaciones y devoluciones.</p>
         </div>
         <nav class="warehouse-actions" aria-label="Navegación de almacén">
+            <button type="button" class="ds-button" data-open-dialog="new-tool-dialog">Agregar herramienta</button>
             <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_productos' %}">Inventario</a>
             <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_movimientos' %}">Ver kardex</a>
         </nav>
     </header>
 
-    {% if messages %}
-    <div class="warehouse-messages" aria-live="polite">
+    <div class="warehouse-messages" aria-live="polite" data-page-feedback>
         {% for message in messages %}
         <p class="warehouse-message warehouse-message--{{ message.tags }}">{{ message }}</p>
         {% endfor %}
     </div>
-    {% endif %}
 
     <form method="get" class="ds-card warehouse-search-form">
         <div class="warehouse-tool-filters">
@@ -69,7 +68,7 @@
                         <th scope="col">Acción</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody data-tools-table-body>
                     {% for herramienta in herramientas %}
                     <tr>
                         <td>{{ herramienta.producto.codigo }} — {{ herramienta.producto.nombre }}</td>
@@ -153,9 +152,68 @@
             </table>
         </div>
     </section>
+
+    <select id="tool-technician-options" hidden aria-hidden="true">
+        <option value="">Selecciona un técnico</option>
+        {% for tecnico in tecnicos %}
+        <option value="{{ tecnico.pk }}">{{ tecnico.get_full_name|default:tecnico.username }}</option>
+        {% endfor %}
+    </select>
+
+    <dialog id="new-tool-dialog" class="warehouse-dialog" aria-labelledby="new-tool-title">
+        <form method="post" action="{% url 'almacen:crear_herramienta' %}"
+              class="warehouse-dialog-content" data-ajax-form="tool"
+              data-product-datalist="tool-products"
+              data-product-search-id="tool-product-search"
+              data-product-hidden-id="id_producto"
+              data-assign-url-template="{% url 'almacen:asignar_herramienta' 0 %}">
+            {% csrf_token %}
+            <header class="warehouse-dialog-header">
+                <div>
+                    <h2 id="new-tool-title">Agregar herramienta individual</h2>
+                    <p>Registra una unidad física con su serie o código patrimonial.</p>
+                </div>
+                <button type="button" class="warehouse-dialog-close" data-close-dialog aria-label="Cerrar">×</button>
+            </header>
+            <div class="warehouse-ajax-feedback" role="status" aria-live="polite" data-form-feedback></div>
+            <div class="warehouse-form-field">
+                <label for="tool-product-search">Producto</label>
+                <input id="tool-product-search" class="form-control" type="search"
+                       list="tool-products" autocomplete="off"
+                       placeholder="Busca por código o nombre"
+                       data-product-search
+                       data-product-id-field="id_producto"
+                       required>
+                {{ herramienta_form.producto }}
+                <datalist id="tool-products">
+                    {% for producto in productos %}
+                    <option value="{{ producto.codigo }} — {{ producto.nombre }}" data-id="{{ producto.pk }}"></option>
+                    {% endfor %}
+                </datalist>
+                {% for error in herramienta_form.producto.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+            </div>
+            {% for field in herramienta_form %}
+                {% if field.name != 'producto' %}
+                <div class="warehouse-form-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                </div>
+                {% endif %}
+            {% endfor %}
+            <footer class="warehouse-form-actions">
+                <button type="submit" class="ds-button">Guardar herramienta</button>
+                <button type="button" class="ds-button ds-button--secondary" data-close-dialog>Cancelar</button>
+            </footer>
+        </form>
+    </dialog>
 </main>
 {% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/almacen.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/almacen_rapido.js' %}" defer></script>
 {% endblock %}

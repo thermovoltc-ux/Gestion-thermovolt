@@ -36,6 +36,36 @@ class HerramientaDevolucionForm(forms.Form):
     )
 
 
+class HerramientaCreacionForm(forms.ModelForm):
+    class Meta:
+        model = HerramientaUnidad
+        fields = ['producto', 'identificador_unico', 'observaciones']
+        widgets = {
+            'producto': forms.HiddenInput(),
+            'identificador_unico': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '100',
+                'autocomplete': 'off',
+            }),
+            'observaciones': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+            }),
+        }
+        labels = {
+            'producto': 'Producto',
+            'identificador_unico': 'Identificador único',
+            'observaciones': 'Observaciones',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['producto'].queryset = Producto.objects.select_related(
+            'categoria',
+        ).order_by('nombre', 'codigo')
+        self.fields['producto'].empty_label = 'Selecciona un producto'
+
+
 class ProductoForm(forms.ModelForm):
     nombre_material = forms.CharField(
         max_length=150,
@@ -136,7 +166,7 @@ class MovimientoInventarioForm(forms.ModelForm):
             'observaciones',
         ]
         widgets = {
-            'producto': forms.Select(attrs={'class': 'form-control'}),
+            'producto': forms.HiddenInput(),
             'cantidad': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'min': '0.001',

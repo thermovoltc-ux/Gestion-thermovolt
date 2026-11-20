@@ -18,7 +18,9 @@ urlpatterns = [
         views.devolver_herramienta,
         name='devolver_herramienta',
     ),
+    path('herramientas/crear/', views.crear_herramienta, name='crear_herramienta'),
     path('movimientos/', views.lista_movimientos, name='lista_movimientos'),
     path('entrada/', views.registrar_movimiento, {'tipo': 'entrada'}, name='registrar_entrada'),
     path('salida/', views.registrar_movimiento, {'tipo': 'salida'}, name='registrar_salida'),
+    path('producto/crear-rapido/', views.crear_producto_rapido, name='crear_producto_rapido'),
 ]

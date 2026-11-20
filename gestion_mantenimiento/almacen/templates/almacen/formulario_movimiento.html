@@ -13,19 +13,47 @@
         <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_productos' %}">Volver al inventario</a>
     </header>
 
-    <form method="post" class="ds-card warehouse-form">
+    <form method="post" class="ds-card warehouse-form"
+          data-product-datalist="warehouse-products"
+          data-product-search-id="movement-product-search"
+          data-product-hidden-id="id_producto">
         {% csrf_token %}
         {% if form.non_field_errors %}
             <div class="warehouse-form-errors" role="alert">{{ form.non_field_errors }}</div>
         {% endif %}
 
         {% for field in form %}
+            {% if field.name == 'producto' %}
+            <div class="warehouse-form-field">
+                <label for="movement-product-search">{{ field.label }}</label>
+                <div class="warehouse-quick-search">
+                    <input id="movement-product-search" class="form-control" type="search"
+                           list="warehouse-products" autocomplete="off"
+                           placeholder="Busca por código o nombre"
+                           value="{% if selected_product %}{{ selected_product.codigo }} — {{ selected_product.nombre }}{% endif %}"
+                           data-product-search
+                           data-product-id-field="id_producto"
+                           required>
+                    <button class="ds-button ds-button--secondary" type="button"
+                            data-open-dialog="quick-product-dialog">Crear producto</button>
+                </div>
+                {{ field }}
+                <datalist id="warehouse-products">
+                    {% for producto in productos %}
+                    <option value="{{ producto.codigo }} — {{ producto.nombre }}" data-id="{{ producto.pk }}"></option>
+                    {% endfor %}
+                </datalist>
+                {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                {% for error in field.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+            </div>
+            {% elif field.name != 'producto' %}
             <div class="warehouse-form-field{% if field.name == 'costo_unitario' and not es_entrada %} warehouse-cost-optional{% endif %}">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
                 {% for error in field.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
             </div>
+            {% endif %}
         {% endfor %}
 
         <div class="warehouse-form-actions">
@@ -35,9 +63,45 @@
             <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_productos' %}">Cancelar</a>
         </div>
     </form>
+
+    <dialog id="quick-product-dialog" class="warehouse-dialog" aria-labelledby="quick-product-title">
+        <form method="post" action="{% url 'almacen:crear_producto_rapido' %}"
+              class="warehouse-dialog-content" data-ajax-form="product"
+              data-product-datalist="warehouse-products"
+              data-product-search-id="movement-product-search"
+              data-product-hidden-id="id_producto">
+            {% csrf_token %}
+            <header class="warehouse-dialog-header">
+                <div>
+                    <h2 id="quick-product-title">Crear producto</h2>
+                    <p>Guarda el producto y quedará seleccionado para este movimiento.</p>
+                </div>
+                <button type="button" class="warehouse-dialog-close" data-close-dialog aria-label="Cerrar">×</button>
+            </header>
+            <div class="warehouse-ajax-feedback" role="status" aria-live="polite" data-form-feedback></div>
+            <div class="warehouse-product-form-grid">
+                {% for field in producto_form %}
+                <div class="warehouse-form-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                    {% for error in field.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            <footer class="warehouse-form-actions">
+                <button type="submit" class="ds-button">Guardar producto</button>
+                <button type="button" class="ds-button ds-button--secondary" data-close-dialog>Cancelar</button>
+            </footer>
+        </form>
+    </dialog>
 </main>
 {% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/almacen.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/almacen_rapido.js' %}" defer></script>
 {% endblock %}

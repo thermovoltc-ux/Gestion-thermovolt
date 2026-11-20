@@ -7,15 +7,17 @@ from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 from django.db.models import Case, DecimalField, F, Prefetch, Q, Sum, When
 from django.db.models.functions import Coalesce
-from django.http import HttpResponseBadRequest
+from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import urlencode
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .forms import (
     HerramientaAsignacionForm,
+    HerramientaCreacionForm,
     HerramientaDevolucionForm,
     MovimientoInventarioForm,
     ProductoForm,
@@ -34,6 +36,16 @@ def _puede_gestionar_catalogo(user):
         or user.is_superuser
         or user.groups.filter(name__in=['Admin', 'Supervisor']).exists()
     )
+
+
+def _es_peticion_ajax(request):
+    return request.headers.get('x-requested-with') == 'XMLHttpRequest'
+
+
+def _errores_formulario(form):
+    return {
+        'errors': form.errors.get_json_data(),
+    }
 
 
 def _stock_expression():
@@ -170,15 +182,59 @@ def lista_herramientas(request):
 
     return render(request, 'almacen/lista_herramientas.html', {
         'herramientas': herramientas,
+        'productos': Producto.objects.select_related('categoria').order_by(
+            'nombre',
+            'codigo',
+        ),
+        'herramienta_form': HerramientaCreacionForm(),
         'estados': HerramientaUnidad.ESTADO_CHOICES,
         'estado_seleccionado': estado,
         'tecnicos': get_user_model().objects.order_by(
             'first_name',
             'last_name',
             'username',
-        ),
+        ).filter(is_active=True),
         'tecnico_seleccionado': tecnico_id,
     })
+
+
+@login_required
+@require_POST
+def crear_herramienta(request):
+    form = HerramientaCreacionForm(request.POST)
+    if not form.is_valid():
+        if _es_peticion_ajax(request):
+            return JsonResponse(_errores_formulario(form), status=400)
+        messages.error(request, 'Revisa los datos de la herramienta.')
+        return redirect('almacen:lista_herramientas')
+
+    try:
+        with transaction.atomic():
+            herramienta = form.save()
+    except IntegrityError:
+        form.add_error(
+            'identificador_unico',
+            'Ya existe una herramienta con este identificador.',
+        )
+        if _es_peticion_ajax(request):
+            return JsonResponse(_errores_formulario(form), status=400)
+        messages.error(request, 'El identificador único ya está registrado.')
+        return redirect('almacen:lista_herramientas')
+
+    if _es_peticion_ajax(request):
+        return JsonResponse({
+            'id': herramienta.pk,
+            'producto_id': herramienta.producto_id,
+            'producto_label': (
+                f'{herramienta.producto.codigo} — {herramienta.producto.nombre}'
+            ),
+            'identificador_unico': herramienta.identificador_unico,
+            'estado': herramienta.get_estado_display(),
+            'message': 'Herramienta creada correctamente.',
+        }, status=201)
+
+    messages.success(request, 'Herramienta creada correctamente.')
+    return redirect('almacen:lista_herramientas')
 
 
 @login_required
@@ -365,8 +421,55 @@ def registrar_movimiento(request, tipo):
     else:
         form = MovimientoInventarioForm(tipo=tipo_movimiento)
 
+    selected_product = form.cleaned_data.get('producto') if form.is_bound else None
     return render(request, 'almacen/formulario_movimiento.html', {
         'form': form,
+        'productos': Producto.objects.select_related('categoria').order_by(
+            'nombre',
+            'codigo',
+        ),
+        'selected_product': selected_product,
+        'producto_form': ProductoForm(),
         'tipo_movimiento': tipo_movimiento,
         'es_entrada': tipo_movimiento == MovimientoInventario.ENTRADA,
     })
+
+
+@login_required
+@require_POST
+def crear_producto_rapido(request):
+    form = ProductoForm(request.POST)
+    if not form.is_valid():
+        if _es_peticion_ajax(request):
+            return JsonResponse(_errores_formulario(form), status=400)
+        messages.error(request, 'Revisa los datos del producto.')
+        return redirect('almacen:registrar_entrada')
+
+    try:
+        with transaction.atomic():
+            producto = form.save()
+    except IntegrityError:
+        form.add_error('codigo', 'Ya existe un producto con este código.')
+        if _es_peticion_ajax(request):
+            return JsonResponse(_errores_formulario(form), status=400)
+        messages.error(request, 'Ya existe un producto con ese código.')
+        return redirect('almacen:registrar_entrada')
+
+    if _es_peticion_ajax(request):
+        return JsonResponse({
+            'id': producto.pk,
+            'codigo': producto.codigo,
+            'nombre': producto.nombre,
+            'label': f'{producto.codigo} — {producto.nombre}',
+            'message': 'Producto creado correctamente.',
+        }, status=201)
+
+    messages.success(request, 'Producto creado correctamente.')
+    destino = request.POST.get('next', '')
+    if not url_has_allowed_host_and_scheme(
+        destino,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        destino = reverse('almacen:registrar_entrada')
+    return redirect(destino)
