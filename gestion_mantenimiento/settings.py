@@ -115,6 +115,7 @@ INSTALLED_APPS = [
     'gestion_mantenimiento.Activos',
     'gestion_mantenimiento.Gestion_ot',
     'gestion_mantenimiento.almacen.apps.AlmacenConfig',
+    'gestion_mantenimiento.notificaciones.apps.NotificacionesConfig',
     'crispy_forms',
     'mptt',
     'gestion_mantenimiento.users',
@@ -437,7 +438,6 @@ LOGGING = {
         },
     },
 }
-
 
 
 

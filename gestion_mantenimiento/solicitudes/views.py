@@ -22,7 +22,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from gestion_mantenimiento.users.forms import CustomAuthenticationForm
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 from gestion_mantenimiento.users.access import (
     obtener_alcance,
@@ -31,6 +31,7 @@ from gestion_mantenimiento.users.access import (
     obtener_scope_ubicacion_ids,
 )
 from gestion_mantenimiento.solicitudes.utils import enviar_correo_solicitud
+from gestion_mantenimiento.notificaciones.utils import notificar_nueva_solicitud
 
 # Configurar el logger
 logger = logging.getLogger(__name__)
@@ -133,10 +134,13 @@ def crear_solicitud(request):
                 )
 
             try:
-                nueva_solicitud.save()
+                with transaction.atomic():
+                    nueva_solicitud.save()
+                    if obtener_alcance(request).rol == 'administrador':
+                        notificar_nueva_solicitud(nueva_solicitud)
                 logger.info("Solicitud guardada: %s", nueva_solicitud.pk)
             except Exception as e:
-                logger.error("Error al guardar solicitud: %s", e)
+                logger.exception("Error al guardar solicitud: %s", e)
                 form.add_error(None, 'Error interno al guardar la solicitud. Intenta nuevamente.')
                 return render(request, 'solicitudes/crear_solicitud.html', {'form': form})
 

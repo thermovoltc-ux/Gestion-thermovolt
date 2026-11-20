@@ -34,6 +34,10 @@ class CustomAuthenticationForm(AuthenticationForm):
         ('tecnico', 'Técnico'),
     ]
 
+    remember_me = forms.BooleanField(
+        required=False,
+        label='Recordarme en este dispositivo',
+    )
     tipo_cuenta = forms.ChoiceField(
         choices=TIPO_CUENTA_CHOICES,
         required=True,

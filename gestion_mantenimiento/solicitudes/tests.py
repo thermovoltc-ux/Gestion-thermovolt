@@ -19,6 +19,7 @@ from gestion_mantenimiento.Activos.models import (
 )
 from gestion_mantenimiento.solicitudes.forms import SolicitudForm
 from gestion_mantenimiento.solicitudes.utils import enviar_correo_solicitud
+from gestion_mantenimiento.notificaciones.models import Notificacion
 
 
 @override_settings(
@@ -268,6 +269,34 @@ class CrearSolicitudCoTests(TestCase):
         self.assertEqual(response.status_code, 302)
         solicitud = Solicitud.objects.get(equipo=equipo_sin_ubicacion)
         self.assertEqual(solicitud.co, '')
+
+    def test_client_created_request_notifies_administrators(self):
+        centro = CentroOperaciones.objects.create(
+            nombre='Centro de notificaciones',
+            codigo='CO-TEST',
+        )
+        self.ubicacion.centro_operaciones = centro
+        self.ubicacion.save(update_fields=['centro_operaciones'])
+        self.user.groups.add(Group.objects.get_or_create(name='Cliente')[0])
+        session = self.client.session
+        session['co'] = 'CO-TEST'
+        session.save()
+
+        admin = get_user_model().objects.create_user(
+            username='admin-solicitud-notification',
+            password='test-password',
+        )
+        admin.groups.add(Group.objects.get_or_create(name='Admin')[0])
+
+        response = self._post_solicitud(self.equipo)
+
+        self.assertEqual(response.status_code, 302)
+        notification = Notificacion.objects.get(
+            usuario=admin,
+            tipo=Notificacion.SOLICITUD,
+        )
+        self.assertIn('Equipo con CO', notification.mensaje)
+        self.assertIn('Ubicación con CO', notification.mensaje)
 
     def test_creation_uses_session_co_when_equipment_has_no_location(self):
         equipo_sin_ubicacion = Equipo.objects.create(

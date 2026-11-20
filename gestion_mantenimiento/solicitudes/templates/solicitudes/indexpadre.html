@@ -25,6 +25,7 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="{% static 'css/styles/forms.css' %}">
     <link rel="stylesheet" href="{% static 'css/design-system.css' %}">
+    <link rel="stylesheet" href="{% static 'css/notificaciones.css' %}">
     <link rel="stylesheet" href="https://unpkg.com/browse/ionicons@4.5.10-2/dist/css/ionicons.min.css">
     {% block extra_css %}{% endblock %}
 </head>
@@ -247,6 +248,21 @@
                 </label>
             </div>
 
+            {% if user.is_authenticated %}
+            <a class="notification-bell"
+               href="{% url 'notificaciones:lista' %}"
+               aria-label="Notificaciones"
+               title="Notificaciones">
+                <ion-icon name="notifications-outline" aria-hidden="true"></ion-icon>
+                <span class="notification-bell-count"
+                      data-notification-count
+                      data-count-url="{% url 'notificaciones:contador_no_leidas' %}"
+                      aria-live="polite"
+                      aria-atomic="true"
+                      hidden></span>
+            </a>
+            {% endif %}
+
             <div class="user-dropdown">
                 <div class="user-icon">
                     {% if user.profile.image %}
@@ -291,6 +307,7 @@
     
     <script src="{% static 'dist/main.bundle.js' %}?v=20260924"></script>
     <script src="{% static 'fullcalendar/lib/main.js' %}"></script>
+    <script src="{% static 'js/notificaciones.js' %}" defer></script>
 
     {% block extra_js %}{% endblock %}
 

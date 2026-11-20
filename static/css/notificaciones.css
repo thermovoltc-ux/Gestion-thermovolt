@@ -1,0 +1,205 @@
+.notifications-page {
+  display: grid;
+  gap: var(--ds-space-6);
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--ds-space-6);
+  color: var(--ds-color-text);
+}
+
+.notifications-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--ds-space-4);
+}
+
+.notifications-header h1 {
+  margin: 0;
+  font-size: var(--ds-font-size-h1);
+}
+
+.notifications-header p {
+  margin: var(--ds-space-2) 0 0;
+  color: var(--ds-color-text-muted);
+}
+
+.notifications-header form {
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+
+.notifications-header form button[type="submit"] {
+  width: auto;
+}
+
+.notifications-filter {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-4);
+}
+
+.notifications-filter label {
+  display: grid;
+  flex: 1 1 16rem;
+  gap: var(--ds-space-2);
+  font-weight: 600;
+}
+
+.notifications-filter select {
+  width: 100%;
+}
+
+.notifications-list {
+  display: grid;
+  gap: var(--ds-space-3);
+}
+
+.notification-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--ds-space-4);
+  padding: var(--ds-space-4);
+}
+
+.notification-card--unread {
+  background: var(--ds-color-info-surface);
+  border-left: 4px solid var(--ds-color-info);
+}
+
+.notification-card--read {
+  background: var(--ds-color-surface);
+}
+
+.notification-icon {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  color: var(--ds-color-primary);
+  background: var(--ds-color-surface);
+  border-radius: var(--ds-radius-pill);
+  font-size: var(--ds-font-size-xl);
+}
+
+.notification-content {
+  min-width: 0;
+}
+
+.notification-title-row {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2) var(--ds-space-4);
+}
+
+.notification-title-row h2 {
+  margin: 0;
+  font-size: var(--ds-font-size-lg);
+}
+
+.notification-title-row time,
+.notification-type {
+  color: var(--ds-color-text-muted);
+  font-size: var(--ds-font-size-sm);
+}
+
+.notification-content p {
+  margin: var(--ds-space-2) 0;
+  line-height: var(--ds-line-height-body);
+}
+
+.notification-type {
+  display: inline-block;
+  padding: var(--ds-space-1) var(--ds-space-2);
+  background: var(--ds-color-surface-muted);
+  border-radius: var(--ds-radius-pill);
+}
+
+.notification-open-link {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  color: var(--ds-color-primary);
+  font-size: var(--ds-font-size-lg);
+}
+
+.notifications-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-8);
+  color: var(--ds-color-text-muted);
+  text-align: center;
+}
+
+.notifications-empty ion-icon {
+  color: var(--ds-color-success);
+  font-size: var(--ds-font-size-3xl);
+}
+
+.notification-bell {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-right: var(--ds-space-3);
+  color: var(--ds-color-text);
+  background: var(--ds-color-surface-muted);
+  border-radius: var(--ds-radius-pill);
+  font-size: var(--ds-font-size-xl);
+  text-decoration: none;
+}
+
+.notification-bell-count {
+  position: absolute;
+  top: -0.2rem;
+  right: -0.25rem;
+  display: grid;
+  place-items: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.2rem;
+  color: #fff;
+  background: var(--ds-color-danger);
+  border: 2px solid var(--ds-color-surface);
+  border-radius: var(--ds-radius-pill);
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.notification-bell-count[hidden] {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .notifications-page {
+    padding: var(--ds-space-4);
+  }
+
+  .notifications-filter {
+    align-items: stretch;
+  }
+
+  .notifications-filter > .ds-button,
+  .notifications-filter > a {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .notification-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .notification-open-link {
+    grid-column: 2;
+    justify-self: end;
+  }
+}

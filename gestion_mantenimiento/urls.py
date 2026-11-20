@@ -8,6 +8,10 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('pwa.urls')),
+    path(
+        'notificaciones/',
+        include('gestion_mantenimiento.notificaciones.urls'),
+    ),
     path('solicitudes/', include('gestion_mantenimiento.solicitudes.urls')),
     path('users/', include('gestion_mantenimiento.users.urls')),
     path('accounts/login/', lambda request: redirect('custom_login', permanent=False)),

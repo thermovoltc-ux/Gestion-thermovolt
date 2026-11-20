@@ -115,16 +115,16 @@ class CustomLoginCentroOperacionesTests(TestCase):
         self.cliente.centros_operaciones.add(self.centro)
         self.url = reverse('custom_login')
 
-    def _login(self, co, tipo_cuenta='administrador'):
-        return self.client.post(
-            self.url,
-            {
-                'username': self.user.username,
-                'password': 'test-password',
-                'tipo_cuenta': tipo_cuenta,
-                'co': co,
-            },
-        )
+    def _login(self, co, tipo_cuenta='administrador', remember_me=False):
+        data = {
+            'username': self.user.username,
+            'password': 'test-password',
+            'tipo_cuenta': tipo_cuenta,
+            'co': co,
+        }
+        if remember_me:
+            data['remember_me'] = 'on'
+        return self.client.post(self.url, data)
 
     def test_authenticated_administrator_sees_warehouse_sidebar_link(self):
         self.client.force_login(self.user)
@@ -156,6 +156,21 @@ class CustomLoginCentroOperacionesTests(TestCase):
         session = self.client.session
         self.assertEqual(session['centro_operaciones_id'], self.centro.pk)
         self.assertNotIn('co', session)
+
+    def test_login_without_remember_expires_when_browser_closes(self):
+        response = self._login(self.centro.codigo)
+
+        self.assertRedirects(response, reverse('dashboard'))
+        session = self.client.session
+        self.assertTrue(session.get_expire_at_browser_close())
+
+    def test_login_with_remember_expires_after_thirty_days(self):
+        response = self._login(self.centro.codigo, remember_me=True)
+
+        self.assertRedirects(response, reverse('dashboard'))
+        session = self.client.session
+        self.assertEqual(session.get_expiry_age(), 30 * 24 * 60 * 60)
+        self.assertFalse(session.get_expire_at_browser_close())
 
     def test_admin_with_registered_center_sees_assets_navigation(self):
         self._login(self.centro.codigo)

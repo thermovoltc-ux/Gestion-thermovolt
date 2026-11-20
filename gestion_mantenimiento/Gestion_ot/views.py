@@ -33,6 +33,9 @@ from .forms import (
 )
 from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.solicitudes.utils import enviar_correo_solicitud
+from gestion_mantenimiento.notificaciones.utils import (
+    notificar_mantenimiento_preventivo,
+)
 from gestion_mantenimiento.users.access import (
     obtener_alcance,
     obtener_codigo_co_actual,
@@ -1060,32 +1063,39 @@ def asignar_tarea_preventiva(request, tarea_id):
         estado_nombre = 'en proceso' if estado == 'en_progreso' else estado
         estado_obj, _ = Estado.objects.get_or_create(nombre=estado_nombre)
 
-        solicitud = Solicitud.objects.create(
-            creado_por=request.user.username,
-            descripcion_problema=descripcion,
-            equipo=equipo,
-            fecha_creacion=timezone.now(),
-            estado=estado_obj,
-            solicitado_por=request.user.username,
-            prioridad='media',
-            ubicacion=ubicacion,
-            co=co_solicitud,
-        )
-
         fecha_dt = datetime.datetime.strptime(fecha, '%Y-%m-%d')
         fecha_dt = timezone.make_aware(fecha_dt, timezone.get_current_timezone())
 
-        OrdenTrabajo.objects.create(
-            solicitud=solicitud,
-            tecnico_asignado=tecnico,
-            fecha_actividad=fecha_dt,
-            estado=estado_obj
-        )
+        with transaction.atomic():
+            solicitud = Solicitud.objects.create(
+                creado_por=request.user.username,
+                descripcion_problema=descripcion,
+                equipo=equipo,
+                fecha_creacion=timezone.now(),
+                estado=estado_obj,
+                solicitado_por=request.user.username,
+                prioridad='media',
+                ubicacion=ubicacion,
+                co=co_solicitud,
+            )
 
-        tarea.tecnico = User.objects.filter(username=tecnico).first()
-        tarea.estado = 'convertido'
-        tarea.observaciones = f"Convertido en solicitud {solicitud.consecutivo}"
-        tarea.save()
+            OrdenTrabajo.objects.create(
+                solicitud=solicitud,
+                tecnico_asignado=tecnico,
+                fecha_actividad=fecha_dt,
+                estado=estado_obj,
+            )
+
+            tarea.tecnico = User.objects.filter(username=tecnico).first()
+            tarea.estado = 'convertido'
+            tarea.observaciones = f"Convertido en solicitud {solicitud.consecutivo}"
+            tarea.save()
+
+            notificar_mantenimiento_preventivo(
+                solicitud,
+                tarea.plan,
+                fecha_dt.date(),
+            )
 
         return JsonResponse({'status': 'ok', 'message': 'Preventivo convertido en solicitud correctamente.', 'consecutivo': solicitud.consecutivo})
 

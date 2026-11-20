@@ -38,6 +38,8 @@ from gestion_mantenimiento.Gestion_ot.models import (
     ServicioOT,
     TareaMantenimiento,
 )
+from gestion_mantenimiento.notificaciones.models import Notificacion
+from gestion_mantenimiento.users.models import Cliente, PerfilUsuario
 from gestion_mantenimiento.Gestion_ot import views
 from gestion_mantenimiento.Gestion_ot.plantilla_utils import _obtener_imagen_temporal
 from gestion_mantenimiento.Gestion_ot.storage import GoogleDriveMediaStorage
@@ -833,6 +835,53 @@ class PreventiveRequestCoTests(TestCase):
         self.assertEqual(response.status_code, 200)
         solicitud = Solicitud.objects.get(consecutivo=response.json()['consecutivo'])
         self.assertEqual(solicitud.co, '')
+
+    def test_preventive_request_notifies_center_client_and_admin(self):
+        centro = CentroOperaciones.objects.create(
+            nombre='Centro preventivo notificaciones',
+            codigo='CO-PREV',
+        )
+        self.ubicacion.centro_operaciones = centro
+        self.ubicacion.save(update_fields=['centro_operaciones'])
+
+        cliente_usuario = get_user_model().objects.create_user(
+            username='cliente-preventivo',
+            password='test-password',
+        )
+        cliente = Cliente.objects.create(
+            nombre='Cliente preventivo',
+            codigo='CLI-PREV',
+        )
+        cliente.centros_operaciones.add(centro)
+        PerfilUsuario.objects.create(
+            user=cliente_usuario,
+            cliente=cliente,
+        )
+
+        admin = get_user_model().objects.create_user(
+            username='admin-preventivo',
+            password='test-password',
+        )
+        admin.groups.add(Group.objects.get_or_create(name='Admin')[0])
+
+        response = self._asignar_tarea()
+
+        self.assertEqual(response.status_code, 200)
+        customer_notification = Notificacion.objects.get(
+            usuario=cliente_usuario,
+            tipo=Notificacion.MANTENIMIENTO_PREVENTIVO,
+        )
+        admin_notification = Notificacion.objects.get(
+            usuario=admin,
+            tipo=Notificacion.MANTENIMIENTO_PREVENTIVO,
+        )
+        self.assertIn('Equipo preventivo CO', customer_notification.mensaje)
+        self.assertIn(
+            timezone.localdate().strftime('%d/%m/%Y'),
+            customer_notification.mensaje,
+        )
+        self.assertIn('Plan preventivo CO', admin_notification.mensaje)
+        self.assertIn('CO', admin_notification.mensaje)
 
 
 class ProcesoInformeRetryTests(TestCase):

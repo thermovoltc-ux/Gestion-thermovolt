@@ -1,0 +1,75 @@
+{% extends "solicitudes/indexpadre.html" %}
+{% load static %}
+
+{% block title %}Notificaciones{% endblock %}
+
+{% block content %}
+<main class="notifications-page ds-fade-in">
+    <header class="notifications-header">
+        <div>
+            <h1>Notificaciones</h1>
+            <p>Tienes {{ no_leidas }} notificación(es) sin leer.</p>
+        </div>
+        {% if no_leidas %}
+        <form method="post" action="{% url 'notificaciones:marcar_todas_leidas' %}">
+            {% csrf_token %}
+            <button type="submit" class="ds-button ds-button--secondary">Marcar todas como leídas</button>
+        </form>
+        {% endif %}
+    </header>
+
+    <form method="get" class="ds-card notifications-filter">
+        <label for="notification-type">Filtrar por tipo</label>
+        <select id="notification-type" name="tipo" class="form-control">
+            <option value="">Todos los tipos</option>
+            {% for value, label in tipos %}
+            <option value="{{ value }}" {% if tipo_seleccionado == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="ds-button">Filtrar</button>
+        {% if tipo_seleccionado %}
+        <a class="ds-button ds-button--secondary" href="{% url 'notificaciones:lista' %}">Limpiar</a>
+        {% endif %}
+    </form>
+
+    <section class="notifications-list" aria-label="Tus notificaciones">
+        {% for notificacion in notificaciones %}
+        <article class="ds-card notification-card{% if notificacion.leida %} notification-card--read{% else %} notification-card--unread{% endif %}">
+            <span class="notification-icon" aria-hidden="true">
+                {% if notificacion.tipo == 'MANTENIMIENTO_PREVENTIVO' or notificacion.tipo == 'RECORDATORIO_MANTENIMIENTO' %}
+                    <ion-icon name="calendar-outline"></ion-icon>
+                {% elif notificacion.tipo == 'STOCK_BAJO' %}
+                    <ion-icon name="cube-outline"></ion-icon>
+                {% elif 'OT' in notificacion.tipo %}
+                    <ion-icon name="construct-outline"></ion-icon>
+                {% else %}
+                    <ion-icon name="notifications-outline"></ion-icon>
+                {% endif %}
+            </span>
+            <div class="notification-content">
+                <div class="notification-title-row">
+                    <h2>{{ notificacion.titulo }}</h2>
+                    <time datetime="{{ notificacion.fecha_creacion|date:'c' }}">{{ notificacion.fecha_creacion|date:"d/m/Y H:i" }}</time>
+                </div>
+                <p>{{ notificacion.mensaje }}</p>
+                <span class="notification-type">{{ notificacion.get_tipo_display }}</span>
+            </div>
+            {% if notificacion.url_destino %}
+            <a class="notification-open-link" href="{{ notificacion.url_destino }}" aria-label="Abrir {{ notificacion.titulo }}">
+                <ion-icon name="open-outline"></ion-icon>
+            </a>
+            {% endif %}
+        </article>
+        {% empty %}
+        <div class="ds-card notifications-empty">
+            <ion-icon name="checkmark-circle-outline" aria-hidden="true"></ion-icon>
+            <p>No hay notificaciones{% if tipo_seleccionado %} de este tipo{% endif %}.</p>
+        </div>
+        {% endfor %}
+    </section>
+</main>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/notificaciones.css' %}">
+{% endblock %}

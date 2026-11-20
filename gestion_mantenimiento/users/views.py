@@ -95,6 +95,10 @@ def custom_login(request):
 
             if not form.errors:
                 auth_login(request, user)
+                if form.cleaned_data.get('remember_me'):
+                    request.session.set_expiry(30 * 24 * 60 * 60)
+                else:
+                    request.session.set_expiry(0)
                 request.session.pop('co', None)
                 request.session.pop('centro_operaciones_id', None)
                 if centro_operaciones:
