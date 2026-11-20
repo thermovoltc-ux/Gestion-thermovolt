@@ -6,7 +6,7 @@
 
 {% block content %}
 <link rel="stylesheet" href="{% static 'css/materiales_ot.css' %}">
-<div class="assigned-ot-page" data-vista-inicial="{{ vista_calendario|yesno:'calendar,table' }}">
+<div class="assigned-ot-page ds-fade-in" data-vista-inicial="{{ vista_calendario|yesno:'calendar,table' }}">
     <div class="page-header">
         <div>
             <h1>Órdenes de Trabajo Asignadas</h1>
@@ -16,8 +16,8 @@
             {% endif %}
         </div>
         <div class="view-toggle-group">
-            <button id="table-view-button" class="view-toggle active">Vista de Tabla</button>
-            <button id="calendar-view-button" class="view-toggle">Vista de Calendario</button>
+            <button type="button" id="table-view-button" class="view-toggle ds-button active">Vista de Tabla</button>
+            <button type="button" id="calendar-view-button" class="view-toggle ds-button ds-button--secondary">Vista de Calendario</button>
         </div>
     </div>
 
@@ -29,8 +29,8 @@
     </div>
     {% endif %}
 
-    <div id="table-view" class="list-container table-card">
-        <table class="assigned-ot-table">
+    <div id="table-view" class="list-container table-card ds-card ds-fade-in">
+        <table class="assigned-ot-table ds-table">
             <thead>
                 <tr>
                     <th>Número de OT</th>
@@ -50,7 +50,7 @@
                     <td data-label="Acciones">
                         {% if puede_cargar_materiales and ot.estado.nombre == 'en proceso' and ot.tecnico_asignado == request.user.username %}
                         <button type="button"
-                            class="action-link btn-abrir-modal-material"
+                            class="action-link btn-abrir-modal-material ds-button ds-button--small"
                             data-material-add-url="{% url 'agregar_material_rapido_ot' ot.id %}"
                             data-material-create-url="{% url 'crear_material_rapido_ajax' ot.id %}"
                             data-material-count="{{ ot.materiales_count }}"
@@ -68,7 +68,7 @@
                             <ion-icon name="eye-outline" style="font-size:1.3em; vertical-align:middle;"></ion-icon>
                         </button>
                         {% if puede_gestionar %}
-                        <a class="action-link" href="{% url 'cierre_ot' ot.id %}" data-gestionar-url="{% url 'cierre_ot' ot.id %}">Gestionar</a>
+                        <a class="action-link ds-button ds-button--small" href="{% url 'cierre_ot' ot.id %}" data-gestionar-url="{% url 'cierre_ot' ot.id %}">Gestionar</a>
                         {% endif %}
                     </td>
                 </tr>
@@ -105,7 +105,7 @@
         </div>
         {% if puede_gestionar %}
         <div style="text-align:right; margin-top:18px;">
-            <a id="gestionarOtBtn" href="#" class="action-link" style="background:#2563eb; color:#fff; padding:10px 18px; border-radius:8px; font-weight:600; text-decoration:none;">Gestionar</a>
+            <a id="gestionarOtBtn" href="#" class="action-link ds-button">Gestionar</a>
         </div>
         {% endif %}
     </div>

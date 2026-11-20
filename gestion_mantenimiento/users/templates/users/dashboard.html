@@ -145,57 +145,57 @@
 </section>
 {% endif %}
 
-<div class="cardBox">
+<div class="cardBox ds-fade-in">
     {% if tipo_cuenta == 'tecnico' %}
-        <a href="{% url 'lista_solicitudes' %}" class="card" style="display:flex; text-decoration:none; color:inherit;">
+        <a href="{% url 'lista_solicitudes' %}" class="card ds-card ds-card--interactive" style="display:flex; text-decoration:none; color:inherit;">
     {% else %}
-        <a href="{% url 'gestion_ot' %}?estado=solicitado" class="card" style="display:flex; text-decoration:none; color:inherit;">
+        <a href="{% url 'gestion_ot' %}?estado=solicitado" class="card ds-card ds-card--interactive" style="display:flex; text-decoration:none; color:inherit;">
     {% endif %}
         <div>
-            <div class="numbers">{{ solicitudes_solicitadas }}</div>
-            <div class="cardName">Solicitudes</div>
+            <div class="numbers ds-text-primary">{{ solicitudes_solicitadas }}</div>
+            <div class="cardName ds-text-secondary">Solicitudes</div>
         </div>
-        <div class="iconBx">📥</div>
+        <div class="iconBx ds-text-secondary">📥</div>
     </a>
     {% if tipo_cuenta == 'jefe_de_area' %}
-        <a href="{% url 'gestion_ot' %}" class="card" style="display:flex; text-decoration:none; color:inherit;">
+        <a href="{% url 'gestion_ot' %}" class="card ds-card ds-card--interactive" style="display:flex; text-decoration:none; color:inherit;">
     {% else %}
-        <a href="{% url 'listar_ot' %}?estado=en%20proceso" class="card" style="display:flex; text-decoration:none; color:inherit;">
+        <a href="{% url 'listar_ot' %}?estado=en%20proceso" class="card ds-card ds-card--interactive" style="display:flex; text-decoration:none; color:inherit;">
     {% endif %}
         <div>
-            <div class="numbers">{{ ot_en_proceso }}</div>
-            <div class="cardName">OTs en Proceso</div>
+            <div class="numbers ds-text-primary">{{ ot_en_proceso }}</div>
+            <div class="cardName ds-text-secondary">OTs en Proceso</div>
         </div>
-        <div class="iconBx">🟦</div>
+        <div class="iconBx ds-text-secondary">🟦</div>
     </a>
     {% if tipo_cuenta == 'jefe_de_area' %}
-        <a href="{% url 'gestion_ot' %}" class="card" style="display:flex; text-decoration:none; color:inherit;">
+        <a href="{% url 'gestion_ot' %}" class="card ds-card ds-card--interactive" style="display:flex; text-decoration:none; color:inherit;">
     {% else %}
-        <a href="{% url 'listar_ot' %}?estado=en%20revision" class="card" style="display:flex; text-decoration:none; color:inherit;">
+        <a href="{% url 'listar_ot' %}?estado=en%20revision" class="card ds-card ds-card--interactive" style="display:flex; text-decoration:none; color:inherit;">
     {% endif %}
         <div>
-            <div class="numbers">{{ ot_en_revision }}</div>
-            <div class="cardName">OTs en Revisión</div>
+            <div class="numbers ds-text-primary">{{ ot_en_revision }}</div>
+            <div class="cardName ds-text-secondary">OTs en Revisión</div>
         </div>
-        <div class="iconBx">🟣</div>
+        <div class="iconBx ds-text-secondary">🟣</div>
     </a>
     {% if tipo_cuenta == 'jefe_de_area' %}
-        <a href="{% url 'gestion_ot' %}" class="card" style="display:flex; text-decoration:none; color:inherit;">
+        <a href="{% url 'gestion_ot' %}" class="card ds-card ds-card--interactive" style="display:flex; text-decoration:none; color:inherit;">
     {% else %}
-        <a href="{% url 'listar_ot' %}?estado=finalizada" class="card" style="display:flex; text-decoration:none; color:inherit;">
+        <a href="{% url 'listar_ot' %}?estado=finalizada" class="card ds-card ds-card--interactive" style="display:flex; text-decoration:none; color:inherit;">
     {% endif %}
         <div>
-            <div class="numbers">{{ ot_finalizada }}</div>
-            <div class="cardName">OTs Finalizadas</div>
+            <div class="numbers ds-text-primary">{{ ot_finalizada }}</div>
+            <div class="cardName ds-text-secondary">OTs Finalizadas</div>
         </div>
-        <div class="iconBx">🟢</div>
+        <div class="iconBx ds-text-secondary">🟢</div>
     </a>
-    <a href="{% url 'gestion_ot' %}?estado=pendiente&atrasadas=1" class="card" style="display:flex; text-decoration:none; color:inherit;">
+    <a href="{% url 'gestion_ot' %}?estado=pendiente&atrasadas=1" class="card ds-card ds-card--interactive" style="display:flex; text-decoration:none; color:inherit;">
         <div>
-            <div class="numbers">{{ tareas_atrasadas }}</div>
-            <div class="cardName">Tareas en atraso</div>
+            <div class="numbers ds-text-primary">{{ tareas_atrasadas }}</div>
+            <div class="cardName ds-text-secondary">Tareas en atraso</div>
         </div>
-        <div class="iconBx">⚠️</div>
+        <div class="iconBx ds-text-secondary">⚠️</div>
     </a>
 </div>
 
