@@ -115,14 +115,18 @@ class NotificacionPushTests(TestCase):
             p256dh='public-key',
         )
         PushInformation.objects.create(user=user, subscription=subscription)
-        with self.captureOnCommitCallbacks(execute=True):
-            notification = crear_notificacion(
-                user,
-                Notificacion.SOLICITUD,
-                'Nueva solicitud',
-                'Se creó una solicitud.',
-                '/solicitudes/',
-            )
+        with self.assertLogs(
+            'gestion_mantenimiento.notificaciones.utils',
+            level='INFO',
+        ) as logs:
+            with self.captureOnCommitCallbacks(execute=True):
+                notification = crear_notificacion(
+                    user,
+                    Notificacion.SOLICITUD,
+                    'Nueva solicitud',
+                    'Se creó una solicitud.',
+                    '/solicitudes/',
+                )
 
         send_push.assert_called_once_with(
             user=user,
@@ -134,6 +138,10 @@ class NotificacionPushTests(TestCase):
             ttl=86400,
         )
         self.assertEqual(notification.usuario, user)
+        self.assertTrue(any('[PUSH] Iniciando envío' in line for line in logs.output))
+        self.assertTrue(
+            any('[PUSH] send_user_notification terminó sin excepción' in line for line in logs.output)
+        )
 
     @override_settings(WEBPUSH_SETTINGS={
         'VAPID_PUBLIC_KEY': 'public-key',
@@ -169,7 +177,7 @@ class NotificacionPushTests(TestCase):
                 )
 
         self.assertTrue(
-            any('Falló send_user_notification' in line for line in logs.output)
+            any('[PUSH] Falló send_user_notification' in line for line in logs.output)
         )
         send_push.assert_called_once()
 

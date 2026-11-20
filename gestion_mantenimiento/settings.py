@@ -441,6 +441,10 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
+        'gestion_mantenimiento.notificaciones': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
-

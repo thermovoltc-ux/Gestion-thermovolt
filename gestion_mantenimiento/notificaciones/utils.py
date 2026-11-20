@@ -35,7 +35,7 @@ def crear_notificacion(usuario, tipo, titulo, mensaje, url_destino=''):
         )
     else:
         logger.info(
-            'Se omitió Web Push para la notificación %s: faltan variables VAPID.',
+            '[PUSH] Se omitió la notificación %s: faltan variables VAPID.',
             notificacion.pk,
         )
     return notificacion
@@ -60,20 +60,20 @@ def enviar_push_usuario(usuario, titulo, mensaje, url_destino='', referencia='ma
         'url': url_destino or '/',
     }
     logger.info(
-        'Iniciando Web Push (user_id=%s, suscripciones=%s, referencia=%s).',
+        '[PUSH] Iniciando envío (user_id=%s, suscripciones=%s, referencia=%s).',
         usuario.pk,
         suscripciones,
         referencia,
     )
     if not webpush_configurado():
         logger.error(
-            'No se envió Web Push (user_id=%s): faltan variables VAPID.',
+            '[PUSH] No se envió (user_id=%s): faltan variables VAPID.',
             usuario.pk,
         )
         return False
     if not suscripciones:
         logger.error(
-            'No se envió Web Push (user_id=%s): el usuario no tiene suscripciones.',
+            '[PUSH] No se envió (user_id=%s): el usuario no tiene suscripciones.',
             usuario.pk,
         )
         return False
@@ -86,14 +86,14 @@ def enviar_push_usuario(usuario, titulo, mensaje, url_destino='', referencia='ma
         )
     except Exception:
         logger.exception(
-            'Falló send_user_notification (user_id=%s, referencia=%s).',
+            '[PUSH] Falló send_user_notification (user_id=%s, referencia=%s).',
             usuario.pk,
             referencia,
         )
         return False
 
     logger.info(
-        'send_user_notification terminó sin excepción '
+        '[PUSH] send_user_notification terminó sin excepción '
         '(user_id=%s, suscripciones=%s, referencia=%s). '
         'Esto confirma la llamada, no la recepción en el dispositivo.',
         usuario.pk,
