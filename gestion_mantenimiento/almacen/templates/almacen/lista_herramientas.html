@@ -176,34 +176,52 @@
                 <button type="button" class="warehouse-dialog-close" data-close-dialog aria-label="Cerrar">×</button>
             </header>
             <div class="warehouse-ajax-feedback" role="status" aria-live="polite" data-form-feedback></div>
-            <div class="warehouse-form-field">
-                <label for="tool-product-search">Producto</label>
-                <input id="tool-product-search" class="form-control" type="search"
-                       list="tool-products" autocomplete="off"
-                       placeholder="Busca por código o nombre"
-                       data-product-search
-                       data-product-id-field="id_producto"
-                       required>
-                {{ herramienta_form.producto }}
-                <datalist id="tool-products">
-                    {% for producto in productos %}
-                    <option value="{{ producto.codigo }} — {{ producto.nombre }}" data-id="{{ producto.pk }}"></option>
-                    {% endfor %}
-                </datalist>
-                {% for error in herramienta_form.producto.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
-            </div>
-            {% for field in herramienta_form %}
-                {% if field.name != 'producto' %}
+            <section class="warehouse-form-section" aria-labelledby="tool-identity-heading">
+                <h3 id="tool-identity-heading">Identificación de la herramienta</h3>
                 <div class="warehouse-form-field">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% for error in field.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                    <label for="tool-product-search">Producto</label>
+                    <div class="warehouse-search-input">
+                        <svg class="warehouse-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="11" cy="11" r="7"></circle>
+                            <path d="m16 16 4 4"></path>
+                        </svg>
+                        <input id="tool-product-search" class="form-control" type="search"
+                               list="tool-products" autocomplete="off"
+                               placeholder="Busca por código o nombre"
+                               data-product-search
+                               data-product-id-field="id_producto"
+                               aria-describedby="tool-product-error">
+                    </div>
+                    {{ herramienta_form.producto }}
+                    <small id="tool-product-error" class="warehouse-inline-error" data-product-error hidden>
+                        Selecciona un producto de la lista.
+                    </small>
+                    <datalist id="tool-products">
+                        {% for producto in productos %}
+                        <option value="{{ producto.codigo }} — {{ producto.nombre }}" data-id="{{ producto.pk }}"></option>
+                        {% endfor %}
+                    </datalist>
+                    {% for error in herramienta_form.producto.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
                 </div>
-                {% endif %}
-            {% endfor %}
+                <div class="warehouse-product-form-grid warehouse-tool-form-grid">
+                    <div class="warehouse-form-field">
+                        <label for="{{ herramienta_form.identificador_unico.id_for_label }}">{{ herramienta_form.identificador_unico.label }}</label>
+                        {{ herramienta_form.identificador_unico }}
+                        {% for error in herramienta_form.identificador_unico.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                    </div>
+                    <div class="warehouse-form-field warehouse-tool-notes">
+                        <label for="{{ herramienta_form.observaciones.id_for_label }}">{{ herramienta_form.observaciones.label }}</label>
+                        {{ herramienta_form.observaciones }}
+                        {% for error in herramienta_form.observaciones.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                    </div>
+                </div>
+            </section>
             <footer class="warehouse-form-actions">
-                <button type="submit" class="ds-button">Guardar herramienta</button>
                 <button type="button" class="ds-button ds-button--secondary" data-close-dialog>Cancelar</button>
+                <button type="submit" class="ds-button ds-button--primary">
+                    <ion-icon name="checkmark-outline" aria-hidden="true"></ion-icon>
+                    Guardar herramienta
+                </button>
             </footer>
         </form>
     </dialog>

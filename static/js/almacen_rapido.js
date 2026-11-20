@@ -2,9 +2,52 @@
     const showDialog = (id) => {
         const dialog = document.getElementById(id);
         if (dialog instanceof HTMLDialogElement && !dialog.open) {
+            dialog.classList.remove('is-closing');
             dialog.showModal();
+            requestAnimationFrame(() => dialog.classList.add('is-visible'));
+            dialog.classList.add('ds-modal-enter');
+            window.setTimeout(
+                () => dialog.classList.remove('ds-modal-enter'),
+                220,
+            );
+            dialog.querySelector('input:not([type=hidden]), select, textarea')?.focus({
+                preventScroll: true,
+            });
         }
     };
+
+    const closeDialog = (dialog) => {
+        if (!(dialog instanceof HTMLDialogElement) || !dialog.open) {
+            return;
+        }
+        dialog.classList.remove('is-visible', 'ds-modal-enter');
+        dialog.classList.add('is-closing');
+        const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? 0
+            : 220;
+        window.setTimeout(() => {
+            if (dialog.open) {
+                dialog.close();
+            }
+        }, delay);
+    };
+
+    document.querySelectorAll('.warehouse-dialog').forEach((dialog) => {
+        dialog.addEventListener('cancel', (event) => {
+            event.preventDefault();
+            closeDialog(dialog);
+        });
+        dialog.addEventListener('click', (event) => {
+            if (event.target === dialog) {
+                closeDialog(dialog);
+            }
+        });
+        dialog.addEventListener('close', () => {
+            dialog.classList.remove('is-visible', 'is-closing', 'ds-modal-enter');
+            dialog.querySelector('form')?.reset();
+            dialog.querySelector('[data-form-feedback]')?.replaceChildren();
+        });
+    });
 
     document.addEventListener('click', (event) => {
         const openButton = event.target.closest('[data-open-dialog]');
@@ -15,13 +58,16 @@
 
         const closeButton = event.target.closest('[data-close-dialog]');
         if (closeButton) {
-            closeButton.closest('dialog')?.close();
+            closeDialog(closeButton.closest('dialog'));
         }
     });
 
     document.querySelectorAll('[data-product-search]').forEach((input) => {
         const hiddenProduct = document.getElementById(input.dataset.productIdField);
         const datalist = document.getElementById(input.getAttribute('list'));
+        const errorMessage = input
+            .closest('.warehouse-form-field')
+            ?.querySelector('[data-product-error]');
         if (!hiddenProduct || !datalist) {
             return;
         }
@@ -31,11 +77,17 @@
                 (item) => item.value === input.value,
             );
             hiddenProduct.value = option?.dataset.id || '';
-            input.setCustomValidity(
-                input.value && !hiddenProduct.value
-                    ? 'Selecciona un producto de la lista.'
-                    : '',
-            );
+            if (hiddenProduct.value) {
+                input.removeAttribute('aria-invalid');
+                if (errorMessage) {
+                    errorMessage.hidden = true;
+                }
+            } else if (input.dataset.selectionAttempted === 'true') {
+                input.setAttribute('aria-invalid', 'true');
+                if (errorMessage) {
+                    errorMessage.hidden = false;
+                }
+            }
         };
 
         input.addEventListener('input', updateSelection);
@@ -68,6 +120,17 @@
         element.textContent = message;
         element.classList.toggle('is-error', isError);
         element.classList.toggle('is-success', !isError && Boolean(message));
+        if (element.matches('[data-page-feedback]')) {
+            element.classList.toggle('warehouse-message', Boolean(message));
+            element.classList.toggle(
+                'warehouse-message--error',
+                isError && Boolean(message),
+            );
+            element.classList.toggle(
+                'warehouse-message--success',
+                !isError && Boolean(message),
+            );
+        }
     };
 
     const formErrorsToText = (errors) => Object.values(errors || {})
@@ -175,24 +238,35 @@
         }
     };
 
-    document.querySelectorAll('[data-ajax-form]').forEach((form) => {
+    document.querySelectorAll('[data-ajax-form], [data-product-selection-required]').forEach((form) => {
         form.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const feedback = form.querySelector('[data-form-feedback]');
-            const submit = form.querySelector('[type=submit]');
             const search = document.getElementById(form.dataset.productSearchId);
             const hiddenProduct = document.getElementById(form.dataset.productHiddenId);
-
             if (
-                form.dataset.ajaxForm === 'tool'
+                (form.dataset.ajaxForm === 'tool' || form.dataset.productSelectionRequired !== undefined)
                 && search
                 && hiddenProduct
                 && !hiddenProduct.value
             ) {
-                search.setCustomValidity('Selecciona un producto de la lista.');
-                search.reportValidity();
+                event.preventDefault();
+                search.dataset.selectionAttempted = 'true';
+                search.setAttribute('aria-invalid', 'true');
+                const errorMessage = search
+                    .closest('.warehouse-form-field')
+                    ?.querySelector('[data-product-error]');
+                if (errorMessage) {
+                    errorMessage.hidden = false;
+                }
+                search.focus();
                 return;
             }
+
+            if (!form.matches('[data-ajax-form]')) {
+                return;
+            }
+            event.preventDefault();
+            const feedback = form.querySelector('[data-form-feedback]');
+            const submit = form.querySelector('[type=submit]');
 
             submit.disabled = true;
             showFeedback(feedback, '');
@@ -222,10 +296,10 @@
                     if (search && hiddenProduct) {
                         search.value = product.label;
                         hiddenProduct.value = product.id;
-                        search.setCustomValidity('');
+                        search.removeAttribute('aria-invalid');
+                        search.dataset.selectionAttempted = 'false';
                     }
-                    form.closest('dialog')?.close();
-                    form.reset();
+                    closeDialog(form.closest('dialog'));
                     showFeedback(
                         document.querySelector('[data-page-feedback]'),
                         result.message,
@@ -239,8 +313,9 @@
                         id: result.producto_id,
                         label: result.producto_label,
                     }, form.dataset.productDatalist);
-                    form.reset();
-                    form.closest('dialog')?.close();
+                    closeDialog(form.closest('dialog'));
+                    const row = document.querySelector('[data-tools-table-body] tr');
+                    row?.classList.add('ds-fade-in');
                     showFeedback(
                         document.querySelector('[data-page-feedback]'),
                         result.message,

@@ -13,10 +13,13 @@
         <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_productos' %}">Volver al inventario</a>
     </header>
 
+    <div class="warehouse-messages" aria-live="polite" data-page-feedback></div>
+
     <form method="post" class="ds-card warehouse-form"
           data-product-datalist="warehouse-products"
           data-product-search-id="movement-product-search"
-          data-product-hidden-id="id_producto">
+          data-product-hidden-id="id_producto"
+          data-product-selection-required>
         {% csrf_token %}
         {% if form.non_field_errors %}
             <div class="warehouse-form-errors" role="alert">{{ form.non_field_errors }}</div>
@@ -27,17 +30,26 @@
             <div class="warehouse-form-field">
                 <label for="movement-product-search">{{ field.label }}</label>
                 <div class="warehouse-quick-search">
-                    <input id="movement-product-search" class="form-control" type="search"
+                    <div class="warehouse-search-input">
+                        <svg class="warehouse-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="11" cy="11" r="7"></circle>
+                            <path d="m16 16 4 4"></path>
+                        </svg>
+                        <input id="movement-product-search" class="form-control" type="search"
                            list="warehouse-products" autocomplete="off"
                            placeholder="Busca por código o nombre"
                            value="{% if selected_product %}{{ selected_product.codigo }} — {{ selected_product.nombre }}{% endif %}"
                            data-product-search
                            data-product-id-field="id_producto"
-                           required>
-                    <button class="ds-button ds-button--secondary" type="button"
+                           aria-describedby="movement-product-error">
+                    </div>
+                    <button class="ds-button ds-button--secondary warehouse-create-button" type="button"
                             data-open-dialog="quick-product-dialog">Crear producto</button>
                 </div>
                 {{ field }}
+                <small id="movement-product-error" class="warehouse-inline-error" data-product-error hidden>
+                    Selecciona un producto de la lista.
+                </small>
                 <datalist id="warehouse-products">
                     {% for producto in productos %}
                     <option value="{{ producto.codigo }} — {{ producto.nombre }}" data-id="{{ producto.pk }}"></option>
@@ -79,19 +91,72 @@
                 <button type="button" class="warehouse-dialog-close" data-close-dialog aria-label="Cerrar">×</button>
             </header>
             <div class="warehouse-ajax-feedback" role="status" aria-live="polite" data-form-feedback></div>
-            <div class="warehouse-product-form-grid">
-                {% for field in producto_form %}
-                <div class="warehouse-form-field">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
-                    {% for error in field.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+            <section class="warehouse-form-section" aria-labelledby="product-basic-heading">
+                <h3 id="product-basic-heading">Información básica</h3>
+                <div class="warehouse-product-form-grid">
+                    <div class="warehouse-form-field">
+                        <label for="{{ producto_form.codigo.id_for_label }}">{{ producto_form.codigo.label }}</label>
+                        {{ producto_form.codigo }}
+                        {% for error in producto_form.codigo.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                    </div>
+                    <div class="warehouse-form-field">
+                        <label for="{{ producto_form.nombre.id_for_label }}">{{ producto_form.nombre.label }}</label>
+                        {{ producto_form.nombre }}
+                        {% for error in producto_form.nombre.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                    </div>
+                    <div class="warehouse-form-field">
+                        <label for="{{ producto_form.categoria.id_for_label }}">{{ producto_form.categoria.label }}</label>
+                        {{ producto_form.categoria }}
+                        {% for error in producto_form.categoria.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                    </div>
+                    <div class="warehouse-form-field">
+                        <label for="{{ producto_form.unidad_medida.id_for_label }}">{{ producto_form.unidad_medida.label }}</label>
+                        {{ producto_form.unidad_medida }}
+                        {% for error in producto_form.unidad_medida.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                    </div>
                 </div>
-                {% endfor %}
-            </div>
+            </section>
+            <section class="warehouse-form-section" aria-labelledby="product-stock-heading">
+                <h3 id="product-stock-heading">Inventario</h3>
+                <div class="warehouse-product-form-grid">
+                    <div class="warehouse-form-field">
+                        <label for="{{ producto_form.stock_minimo.id_for_label }}">{{ producto_form.stock_minimo.label }}</label>
+                        {{ producto_form.stock_minimo }}
+                        {% for error in producto_form.stock_minimo.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                    </div>
+                    <div class="warehouse-form-field">
+                        <label for="{{ producto_form.costo_base.id_for_label }}">{{ producto_form.costo_base.label }}</label>
+                        {{ producto_form.costo_base }}
+                        {% for error in producto_form.costo_base.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                    </div>
+                </div>
+            </section>
+            <section class="warehouse-form-section" aria-labelledby="product-link-heading">
+                <h3 id="product-link-heading">Vinculación</h3>
+                <div class="warehouse-product-form-grid">
+                    <div class="warehouse-form-field">
+                        <label for="{{ producto_form.material_asociado.id_for_label }}">{{ producto_form.material_asociado.label }}</label>
+                        {{ producto_form.material_asociado }}
+                        {% for error in producto_form.material_asociado.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                    </div>
+                    <div class="warehouse-form-field">
+                        <label for="{{ producto_form.nombre_material.id_for_label }}">{{ producto_form.nombre_material.label }}</label>
+                        {{ producto_form.nombre_material }}
+                        {% for error in producto_form.nombre_material.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                    </div>
+                    <div class="warehouse-form-field">
+                        <label for="{{ producto_form.precio_venta_sugerido.id_for_label }}">{{ producto_form.precio_venta_sugerido.label }}</label>
+                        {{ producto_form.precio_venta_sugerido }}
+                        {% for error in producto_form.precio_venta_sugerido.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                    </div>
+                </div>
+            </section>
             <footer class="warehouse-form-actions">
-                <button type="submit" class="ds-button">Guardar producto</button>
                 <button type="button" class="ds-button ds-button--secondary" data-close-dialog>Cancelar</button>
+                <button type="submit" class="ds-button ds-button--primary">
+                    <ion-icon name="checkmark-outline" aria-hidden="true"></ion-icon>
+                    Guardar producto
+                </button>
             </footer>
         </form>
     </dialog>

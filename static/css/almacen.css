@@ -122,6 +122,10 @@
   outline: 3px solid rgb(29 78 216 / 0.15);
 }
 
+.warehouse-form-field .form-control[aria-invalid="true"] {
+  border-color: var(--ds-color-danger);
+}
+
 .warehouse-form-field small {
   color: var(--ds-color-text-muted);
 }
@@ -256,30 +260,98 @@
 .warehouse-quick-search {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--ds-space-2);
+  align-items: center;
+  gap: var(--ds-space-3);
+}
+
+.warehouse-search-input {
+  position: relative;
+  min-width: 0;
+}
+
+.warehouse-search-input .form-control {
+  padding-left: 2.75rem;
+}
+
+.warehouse-search-icon {
+  position: absolute;
+  top: 50%;
+  left: var(--ds-space-3);
+  width: 1.125rem;
+  height: 1.125rem;
+  fill: none;
+  stroke: var(--ds-color-text-muted);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.warehouse-create-button {
+  margin-left: var(--ds-space-1);
+  white-space: nowrap;
+}
+
+.warehouse-inline-error {
+  color: var(--ds-color-danger) !important;
+  font-size: var(--ds-font-size-sm);
+}
+
+.warehouse-inline-error[hidden] {
+  display: none;
 }
 
 .warehouse-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
   width: min(680px, calc(100vw - 2rem));
   max-height: min(90vh, 900px);
+  overflow: visible;
   padding: 0;
   color: var(--ds-color-text);
   background: var(--ds-color-surface);
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-lg);
   box-shadow: var(--ds-shadow-md);
+  opacity: 0;
+  transform: translateY(0.5rem) scale(0.99);
+  transition:
+    opacity var(--ds-transition-normal),
+    transform var(--ds-transition-normal);
+}
+
+.warehouse-dialog[open] {
+  display: block;
+}
+
+.warehouse-dialog.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.warehouse-dialog.is-closing {
+  opacity: 0;
+  transform: translateY(0.35rem) scale(0.985);
 }
 
 .warehouse-dialog::backdrop {
+  background: rgb(15 23 42 / 0);
+  transition: background-color var(--ds-transition-normal);
+}
+
+.warehouse-dialog.is-visible::backdrop {
   background: rgb(15 23 42 / 0.55);
 }
 
 .warehouse-dialog-content {
   display: grid;
-  max-height: inherit;
+  max-height: min(90vh, 900px);
   gap: var(--ds-space-4);
   overflow-y: auto;
   padding: var(--ds-space-6);
+  border-radius: inherit;
 }
 
 .warehouse-dialog-header {
@@ -299,14 +371,76 @@
   color: var(--ds-color-text-muted);
 }
 
+.warehouse-form-section {
+  display: grid;
+  gap: var(--ds-space-3);
+  padding-top: var(--ds-space-2);
+}
+
+.warehouse-form-section + .warehouse-form-section {
+  border-top: 1px solid var(--ds-color-border);
+}
+
+.warehouse-form-section h3 {
+  margin: 0;
+  color: var(--ds-color-text);
+  font-size: var(--ds-font-size-base);
+  font-weight: 700;
+}
+
+.warehouse-tool-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.warehouse-tool-notes {
+  grid-column: 1 / -1;
+}
+
+.warehouse-form-actions {
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--ds-space-3);
+}
+
+.warehouse-button--primary,
+.ds-button--primary {
+  color: #ffffff;
+  background: var(--ds-color-primary);
+}
+
+.warehouse-button--primary:hover,
+.ds-button--primary:hover {
+  color: #ffffff;
+  background: var(--ds-color-primary-hover);
+}
+
+.ds-button--primary:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .warehouse-dialog-close {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
   padding: 0 var(--ds-space-2);
   color: var(--ds-color-text-muted);
-  background: transparent;
+  background: var(--ds-color-surface-muted);
   border: 0;
-  font-size: 1.75rem;
-  line-height: 1;
+  border-radius: var(--ds-radius-md);
+  font: inherit;
+  font-size: var(--ds-font-size-lg);
   cursor: pointer;
+  transition:
+    background-color var(--ds-transition-fast),
+    color var(--ds-transition-fast);
+}
+
+.warehouse-dialog-close:hover {
+  color: var(--ds-color-text);
+  background: var(--ds-color-border);
 }
 
 .warehouse-ajax-feedback {
@@ -355,7 +489,36 @@
     grid-template-columns: 1fr;
   }
 
+  .warehouse-create-button {
+    margin-left: 0;
+  }
+
+  .warehouse-tool-form-grid {
+    grid-template-columns: 1fr;
+  }
+
   .warehouse-dialog-content {
     padding: var(--ds-space-4);
+  }
+
+  .warehouse-dialog .warehouse-form-actions {
+    width: 100%;
+  }
+
+  .warehouse-dialog .warehouse-form-actions .ds-button {
+    flex: 1 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .warehouse-dialog,
+  .warehouse-dialog::backdrop,
+  .warehouse-dialog-close {
+    transition: none;
+  }
+
+  .warehouse-dialog.is-closing {
+    opacity: 0;
+    transform: none;
   }
 }
