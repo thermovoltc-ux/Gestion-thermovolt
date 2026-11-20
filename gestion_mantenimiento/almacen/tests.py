@@ -302,9 +302,11 @@ class AlmacenViewsTests(TestCase):
         self.assertContains(response, 'movement-product-search')
         self.assertContains(response, 'warehouse-products')
         self.assertContains(response, 'quick-product-dialog')
-        self.assertContains(response, 'Información básica')
-        self.assertContains(response, 'Inventario')
-        self.assertContains(response, 'Vinculación')
+        self.assertContains(response, 'Datos del producto')
+        self.assertContains(response, 'Material del catálogo')
+        self.assertContains(response, 'warehouse-dialog-body')
+        self.assertContains(response, 'warehouse-dialog-header')
+        self.assertContains(response, 'warehouse-form-actions')
         self.assertContains(response, 'data-product-error')
         self.assertContains(response, 'almacen_rapido.js')
 
@@ -347,7 +349,7 @@ class AlmacenViewsTests(TestCase):
         self.assertContains(list_response, 'PATRIMONIAL-123')
         self.assertContains(list_response, 'Agregar herramienta')
         self.assertContains(list_response, 'new-tool-dialog')
-        self.assertContains(list_response, 'Identificación de la herramienta')
+        self.assertContains(list_response, 'warehouse-dialog-body--tool')
         self.assertContains(list_response, 'warehouse-search-icon')
 
     def test_quick_tool_creation_rejects_duplicate_identifier(self):

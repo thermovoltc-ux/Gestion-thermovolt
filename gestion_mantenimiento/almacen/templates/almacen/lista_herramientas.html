@@ -160,7 +160,7 @@
         {% endfor %}
     </select>
 
-    <dialog id="new-tool-dialog" class="warehouse-dialog" aria-labelledby="new-tool-title">
+    <dialog id="new-tool-dialog" class="warehouse-dialog warehouse-dialog--tool" aria-labelledby="new-tool-title">
         <form method="post" action="{% url 'almacen:crear_herramienta' %}"
               class="warehouse-dialog-content" data-ajax-form="tool"
               data-product-datalist="tool-products"
@@ -175,9 +175,8 @@
                 </div>
                 <button type="button" class="warehouse-dialog-close" data-close-dialog aria-label="Cerrar">×</button>
             </header>
-            <div class="warehouse-ajax-feedback" role="status" aria-live="polite" data-form-feedback></div>
-            <section class="warehouse-form-section" aria-labelledby="tool-identity-heading">
-                <h3 id="tool-identity-heading">Identificación de la herramienta</h3>
+            <div class="warehouse-dialog-body warehouse-dialog-body--tool">
+                <div class="warehouse-ajax-feedback" role="status" aria-live="polite" data-form-feedback></div>
                 <div class="warehouse-form-field">
                     <label for="tool-product-search">Producto</label>
                     <div class="warehouse-search-input">
@@ -203,19 +202,17 @@
                     </datalist>
                     {% for error in herramienta_form.producto.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
                 </div>
-                <div class="warehouse-product-form-grid warehouse-tool-form-grid">
-                    <div class="warehouse-form-field">
-                        <label for="{{ herramienta_form.identificador_unico.id_for_label }}">{{ herramienta_form.identificador_unico.label }}</label>
-                        {{ herramienta_form.identificador_unico }}
-                        {% for error in herramienta_form.identificador_unico.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
-                    </div>
-                    <div class="warehouse-form-field warehouse-tool-notes">
-                        <label for="{{ herramienta_form.observaciones.id_for_label }}">{{ herramienta_form.observaciones.label }}</label>
-                        {{ herramienta_form.observaciones }}
-                        {% for error in herramienta_form.observaciones.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
-                    </div>
+                <div class="warehouse-form-field">
+                    <label for="{{ herramienta_form.identificador_unico.id_for_label }}">{{ herramienta_form.identificador_unico.label }}</label>
+                    {{ herramienta_form.identificador_unico }}
+                    {% for error in herramienta_form.identificador_unico.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
                 </div>
-            </section>
+                <div class="warehouse-form-field">
+                    <label for="{{ herramienta_form.observaciones.id_for_label }}">{{ herramienta_form.observaciones.label }}</label>
+                    {{ herramienta_form.observaciones }}
+                    {% for error in herramienta_form.observaciones.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+                </div>
+            </div>
             <footer class="warehouse-form-actions">
                 <button type="button" class="ds-button ds-button--secondary" data-close-dialog>Cancelar</button>
                 <button type="submit" class="ds-button ds-button--primary">

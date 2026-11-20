@@ -306,9 +306,9 @@
   position: fixed;
   inset: 0;
   margin: auto;
-  width: min(680px, calc(100vw - 2rem));
-  max-height: min(90vh, 900px);
-  overflow: visible;
+  width: min(600px, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: hidden;
   padding: 0;
   color: var(--ds-color-text);
   background: var(--ds-color-surface);
@@ -320,6 +320,14 @@
   transition:
     opacity var(--ds-transition-normal),
     transform var(--ds-transition-normal);
+}
+
+.warehouse-dialog--product {
+  height: min(780px, calc(100dvh - 2rem));
+}
+
+.warehouse-dialog--tool {
+  height: auto;
 }
 
 .warehouse-dialog[open] {
@@ -347,18 +355,22 @@
 
 .warehouse-dialog-content {
   display: grid;
-  max-height: min(90vh, 900px);
-  gap: var(--ds-space-4);
-  overflow-y: auto;
-  padding: var(--ds-space-6);
+  width: 100%;
+  height: 100%;
+  max-height: inherit;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 0;
+  overflow: hidden;
   border-radius: inherit;
 }
 
 .warehouse-dialog-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--ds-space-4);
+  padding: var(--ds-space-6) var(--ds-space-6) var(--ds-space-4);
+  border-bottom: 1px solid var(--ds-color-border);
 }
 
 .warehouse-dialog-header h2 {
@@ -369,37 +381,109 @@
 .warehouse-dialog-header p {
   margin: var(--ds-space-2) 0 0;
   color: var(--ds-color-text-muted);
+  line-height: var(--ds-line-height-body);
+}
+
+.warehouse-dialog-body {
+  display: grid;
+  align-content: start;
+  gap: var(--ds-space-4);
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--ds-space-4) var(--ds-space-6);
+  overscroll-behavior: contain;
+}
+
+.warehouse-dialog-body--tool {
+  gap: var(--ds-space-5);
 }
 
 .warehouse-form-section {
   display: grid;
   gap: var(--ds-space-3);
-  padding-top: var(--ds-space-2);
 }
 
 .warehouse-form-section + .warehouse-form-section {
+  padding-top: var(--ds-space-4);
   border-top: 1px solid var(--ds-color-border);
 }
 
 .warehouse-form-section h3 {
   margin: 0;
-  color: var(--ds-color-text);
-  font-size: var(--ds-font-size-base);
+  color: var(--ds-color-secondary);
+  font-size: var(--ds-font-size-sm);
   font-weight: 700;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
 }
 
-.warehouse-tool-form-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.warehouse-form-section h3 span {
+  color: var(--ds-color-text-muted);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
-.warehouse-tool-notes {
+.warehouse-form-section-note {
+  margin: calc(-1 * var(--ds-space-2)) 0 0;
+  color: var(--ds-color-text-muted);
+  font-size: var(--ds-font-size-sm);
+  line-height: var(--ds-line-height-body);
+}
+
+.warehouse-dialog-body .warehouse-product-form-grid {
+  gap: var(--ds-space-4);
+}
+
+.warehouse-field--wide {
   grid-column: 1 / -1;
 }
 
-.warehouse-form-actions {
+.warehouse-dialog-body .warehouse-form-field {
+  min-width: 0;
+}
+
+.warehouse-dialog-body .warehouse-form-field label {
+  line-height: var(--ds-line-height-body);
+}
+
+.warehouse-dialog-body .warehouse-form-field .form-control {
+  background-color: var(--ds-color-surface);
+  border-color: var(--ds-color-border);
+}
+
+.warehouse-dialog-body .warehouse-form-field .form-control:focus {
+  background-color: var(--ds-color-surface);
+  border-color: var(--ds-color-primary);
+}
+
+.warehouse-dialog-body--tool .warehouse-form-field textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.warehouse-dialog .warehouse-form-actions {
+  width: auto;
   justify-content: flex-end;
-  align-items: center;
   gap: var(--ds-space-3);
+  margin: 0;
+  padding: var(--ds-space-4) var(--ds-space-6);
+  border-top: 1px solid var(--ds-color-border);
+  background: var(--ds-color-surface);
+}
+
+.warehouse-dialog .warehouse-form-actions .ds-button {
+  flex: 0 0 9rem;
+  min-height: 2.75rem;
+}
+
+.warehouse-dialog .warehouse-form-actions .ds-button--primary {
+  flex-basis: 10rem;
+}
+
+.warehouse-dialog-body .warehouse-tool-notes {
+  grid-column: 1 / -1;
 }
 
 .warehouse-button--primary,
@@ -493,16 +577,27 @@
     margin-left: 0;
   }
 
-  .warehouse-tool-form-grid {
-    grid-template-columns: 1fr;
+  .warehouse-dialog-content {
+    padding: 0;
   }
 
-  .warehouse-dialog-content {
+  .warehouse-dialog-header {
+    padding: var(--ds-space-4);
+  }
+
+  .warehouse-dialog-body {
     padding: var(--ds-space-4);
   }
 
   .warehouse-dialog .warehouse-form-actions {
-    width: 100%;
+    width: auto;
+    padding: var(--ds-space-3) var(--ds-space-4);
+  }
+
+  .warehouse-dialog .warehouse-form-actions .ds-button,
+  .warehouse-dialog .warehouse-form-actions .ds-button--primary {
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   .warehouse-dialog .warehouse-form-actions .ds-button {
