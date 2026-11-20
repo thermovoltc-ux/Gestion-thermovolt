@@ -1,0 +1,43 @@
+{% extends "solicitudes/indexpadre.html" %}
+{% load static %}
+
+{% block title %}Registrar {{ tipo_movimiento|lower }}{% endblock %}
+
+{% block content %}
+<main class="warehouse-page warehouse-form-page ds-fade-in">
+    <header class="warehouse-header">
+        <div>
+            <h1>Registrar {{ tipo_movimiento|lower }}</h1>
+            <p>El movimiento quedará guardado en el kardex y no podrá editarse ni eliminarse.</p>
+        </div>
+        <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_productos' %}">Volver al inventario</a>
+    </header>
+
+    <form method="post" class="ds-card warehouse-form">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="warehouse-form-errors" role="alert">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        {% for field in form %}
+            <div class="warehouse-form-field{% if field.name == 'costo_unitario' and not es_entrada %} warehouse-cost-optional{% endif %}">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                {% for error in field.errors %}<span class="warehouse-field-error">{{ error }}</span>{% endfor %}
+            </div>
+        {% endfor %}
+
+        <div class="warehouse-form-actions">
+            <button type="submit" class="ds-button">
+                Guardar {{ tipo_movimiento|lower }}
+            </button>
+            <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_productos' %}">Cancelar</a>
+        </div>
+    </form>
+</main>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/almacen.css' %}">
+{% endblock %}

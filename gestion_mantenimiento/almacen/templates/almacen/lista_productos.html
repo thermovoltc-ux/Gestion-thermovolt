@@ -1,0 +1,68 @@
+{% extends "solicitudes/indexpadre.html" %}
+{% load static %}
+
+{% block title %}Inventario{% endblock %}
+
+{% block content %}
+<main class="warehouse-page ds-fade-in">
+    <header class="warehouse-header">
+        <div>
+            <h1>Inventario</h1>
+            <p>Consulta existencias y productos por debajo del stock mínimo.</p>
+        </div>
+        <nav class="warehouse-actions" aria-label="Acciones de inventario">
+            <a class="ds-button" href="{% url 'almacen:registrar_entrada' %}">Registrar entrada</a>
+            <a class="ds-button ds-button--secondary" href="{% url 'almacen:registrar_salida' %}">Registrar salida</a>
+            <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_movimientos' %}">Ver kardex</a>
+        </nav>
+    </header>
+
+    <section class="ds-card warehouse-table-card" aria-label="Productos en inventario">
+        <div class="warehouse-table-scroll">
+            <table class="ds-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Código</th>
+                        <th scope="col">Nombre</th>
+                        <th scope="col">Categoría</th>
+                        <th scope="col">Unidad</th>
+                        <th scope="col">Stock actual</th>
+                        <th scope="col">Stock mínimo</th>
+                        <th scope="col">Movimientos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for producto in productos %}
+                    <tr>
+                        <td>{{ producto.codigo }}</td>
+                        <td>{{ producto.nombre }}</td>
+                        <td>{{ producto.categoria.nombre }}</td>
+                        <td>{{ producto.unidad_medida }}</td>
+                        <td>
+                            <span class="{% if producto.stock_actual <= producto.stock_minimo %}warehouse-stock-low{% else %}warehouse-stock-ok{% endif %}">
+                                {{ producto.stock_actual|floatformat:3 }}
+                            </span>
+                        </td>
+                        <td>{{ producto.stock_minimo|floatformat:3 }}</td>
+                        <td>
+                            <a class="ds-button ds-button--secondary ds-button--small"
+                               href="{% url 'almacen:lista_movimientos' %}?producto={{ producto.pk }}">
+                                Ver movimientos
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="warehouse-empty">No hay productos registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/almacen.css' %}">
+{% endblock %}

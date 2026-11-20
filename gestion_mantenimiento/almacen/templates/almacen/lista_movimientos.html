@@ -1,0 +1,69 @@
+{% extends "solicitudes/indexpadre.html" %}
+{% load static %}
+
+{% block title %}Kardex de inventario{% endblock %}
+
+{% block content %}
+<main class="warehouse-page ds-fade-in">
+    <header class="warehouse-header">
+        <div>
+            <h1>Kardex de inventario</h1>
+            {% if producto_filtrado %}
+                <p>Movimientos de {{ producto_filtrado.codigo }} — {{ producto_filtrado.nombre }}</p>
+            {% else %}
+                <p>Historial cronológico de entradas, salidas y ajustes.</p>
+            {% endif %}
+        </div>
+        <nav class="warehouse-actions" aria-label="Acciones de inventario">
+            <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_productos' %}">Inventario</a>
+            <a class="ds-button" href="{% url 'almacen:registrar_entrada' %}">Registrar entrada</a>
+            <a class="ds-button ds-button--secondary" href="{% url 'almacen:registrar_salida' %}">Registrar salida</a>
+        </nav>
+    </header>
+
+    <section class="ds-card warehouse-table-card" aria-label="Movimientos de inventario">
+        <div class="warehouse-table-scroll">
+            <table class="ds-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Fecha</th>
+                        <th scope="col">Producto</th>
+                        <th scope="col">Tipo</th>
+                        <th scope="col">Cantidad</th>
+                        <th scope="col">Usuario</th>
+                        <th scope="col">Referencia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for movimiento in movimientos %}
+                    <tr>
+                        <td>{{ movimiento.fecha|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            <a href="{% url 'almacen:lista_movimientos' %}?producto={{ movimiento.producto_id }}">
+                                {{ movimiento.producto.codigo }} — {{ movimiento.producto.nombre }}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="warehouse-type warehouse-type--{{ movimiento.tipo|lower }}">
+                                {{ movimiento.get_tipo_display }}
+                            </span>
+                        </td>
+                        <td>{{ movimiento.cantidad|floatformat:3 }} {{ movimiento.producto.unidad_medida }}</td>
+                        <td>{{ movimiento.usuario.get_full_name|default:movimiento.usuario.username }}</td>
+                        <td>{{ movimiento.documento_referencia|default:"—" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="warehouse-empty">No hay movimientos registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/almacen.css' %}">
+{% endblock %}

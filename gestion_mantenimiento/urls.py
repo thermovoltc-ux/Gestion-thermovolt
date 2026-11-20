@@ -13,6 +13,7 @@ urlpatterns = [
     path('accounts/', include('allauth.urls')),  # Asegúrate de incluir esta línea
     path('Activos/', include('gestion_mantenimiento.Activos.urls')),
     path('Gestion_ot/', include('gestion_mantenimiento.Gestion_ot.urls')),
+    path('almacen/', include('gestion_mantenimiento.almacen.urls')),
     path('', lambda request: redirect('custom_login', permanent=False)),  # Redirige la raíz al login personalizado
 ]
 
