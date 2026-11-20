@@ -113,6 +113,7 @@ INSTALLED_APPS = [
     'gestion_mantenimiento.solicitudes',
     'gestion_mantenimiento.Activos',
     'gestion_mantenimiento.Gestion_ot',
+    'gestion_mantenimiento.almacen.apps.AlmacenConfig',
     'crispy_forms',
     'mptt',
     'gestion_mantenimiento.users',
@@ -404,7 +405,6 @@ LOGGING = {
         },
     },
 }
-
 
 
 
