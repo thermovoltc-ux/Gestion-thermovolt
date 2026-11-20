@@ -3,9 +3,10 @@ from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -171,6 +172,55 @@ class CustomLoginCentroOperacionesTests(TestCase):
         session = self.client.session
         self.assertEqual(session.get_expiry_age(), 30 * 24 * 60 * 60)
         self.assertFalse(session.get_expire_at_browser_close())
+        self.assertEqual(
+            response.cookies['sessionid']['max-age'],
+            30 * 24 * 60 * 60,
+        )
+        self.assertTrue(
+            response.cookies['sessionid']['max-age']
+            or response.cookies['sessionid']['expires'],
+        )
+
+    def test_railway_https_proxy_and_csrf_origin_are_configured(self):
+        self.assertIn(
+            'https://web-production-f2af9.up.railway.app',
+            settings.CSRF_TRUSTED_ORIGINS,
+        )
+        self.assertEqual(
+            settings.SECURE_PROXY_SSL_HEADER,
+            ('HTTP_X_FORWARDED_PROTO', 'https'),
+        )
+
+    @override_settings(
+        ALLOWED_HOSTS=['web-production-f2af9.up.railway.app'],
+        SESSION_COOKIE_SECURE=True,
+        CSRF_COOKIE_SECURE=True,
+    )
+    def test_https_login_from_railway_origin_passes_csrf(self):
+        client = Client(enforce_csrf_checks=True)
+        host = 'web-production-f2af9.up.railway.app'
+        response = client.get(self.url, secure=True, HTTP_HOST=host)
+        csrf_token = response.cookies['csrftoken'].value
+
+        response = client.post(
+            self.url,
+            {
+                'username': self.user.username,
+                'password': 'test-password',
+                'tipo_cuenta': 'administrador',
+                'co': self.centro.codigo,
+                'remember_me': 'on',
+                'csrfmiddlewaretoken': csrf_token,
+            },
+            secure=True,
+            HTTP_HOST=host,
+            HTTP_ORIGIN=f'https://{host}',
+            HTTP_X_FORWARDED_PROTO='https',
+        )
+
+        self.assertRedirects(response, reverse('dashboard'))
+        self.assertTrue(response.wsgi_request.is_secure())
+        self.assertTrue(response.cookies['sessionid']['secure'])
         self.assertEqual(
             response.cookies['sessionid']['max-age'],
             30 * 24 * 60 * 60,

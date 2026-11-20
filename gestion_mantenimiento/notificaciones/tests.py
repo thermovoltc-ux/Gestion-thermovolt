@@ -1,8 +1,11 @@
+from io import StringIO
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from webpush.models import PushInformation, SubscriptionInfo
 
 from .models import Notificacion
 from .utils import crear_notificacion
@@ -105,6 +108,13 @@ class NotificacionPushTests(TestCase):
         user = get_user_model().objects.create_user(
             username='push-notification-user',
         )
+        subscription = SubscriptionInfo.objects.create(
+            browser='Chrome',
+            endpoint='https://push.example.test/subscription',
+            auth='auth-secret',
+            p256dh='public-key',
+        )
+        PushInformation.objects.create(user=user, subscription=subscription)
         with self.captureOnCommitCallbacks(execute=True):
             notification = crear_notificacion(
                 user,
@@ -124,3 +134,68 @@ class NotificacionPushTests(TestCase):
             ttl=86400,
         )
         self.assertEqual(notification.usuario, user)
+
+    @override_settings(WEBPUSH_SETTINGS={
+        'VAPID_PUBLIC_KEY': 'public-key',
+        'VAPID_PRIVATE_KEY': 'private-key',
+        'VAPID_ADMIN_EMAIL': 'admin@example.com',
+    })
+    @patch(
+        'gestion_mantenimiento.notificaciones.utils.send_user_notification',
+        side_effect=RuntimeError('test send error'),
+    )
+    def test_push_failure_is_logged_and_reported(self, send_push):
+        user = get_user_model().objects.create_user(
+            username='push-failure-user',
+        )
+        subscription = SubscriptionInfo.objects.create(
+            browser='Chrome',
+            endpoint='https://push.example.test/subscription',
+            auth='auth-secret',
+            p256dh='public-key',
+        )
+        PushInformation.objects.create(user=user, subscription=subscription)
+
+        with self.assertLogs(
+            'gestion_mantenimiento.notificaciones.utils',
+            level='ERROR',
+        ) as logs:
+            with self.captureOnCommitCallbacks(execute=True):
+                crear_notificacion(
+                    user,
+                    Notificacion.SOLICITUD,
+                    'Falla esperada',
+                    'Mensaje de prueba.',
+                )
+
+        self.assertTrue(
+            any('Falló send_user_notification' in line for line in logs.output)
+        )
+        send_push.assert_called_once()
+
+    @override_settings(WEBPUSH_SETTINGS={
+        'VAPID_PUBLIC_KEY': 'public-key',
+        'VAPID_PRIVATE_KEY': 'private-key',
+        'VAPID_ADMIN_EMAIL': 'admin@example.com',
+    })
+    @patch(
+        'gestion_mantenimiento.notificaciones.management.commands.'
+        'send_test_push.enviar_push_usuario',
+        return_value=True,
+    )
+    def test_send_test_push_command_targets_username(self, send_push):
+        user = get_user_model().objects.create_user(
+            username='push-command-user',
+        )
+        output = StringIO()
+
+        call_command('send_test_push', user.username, stdout=output)
+
+        send_push.assert_called_once_with(
+            user,
+            'Prueba de notificaciones',
+            'Esta es una notificación push de prueba.',
+            '/',
+            referencia='send_test_push',
+        )
+        self.assertIn('does not confirm device delivery', output.getvalue())

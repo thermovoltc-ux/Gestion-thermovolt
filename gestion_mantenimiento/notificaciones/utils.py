@@ -5,8 +5,6 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
-from pywebpush import WebPushException
-from requests import RequestException
 from webpush import send_user_notification
 
 from gestion_mantenimiento.Activos.models import CentroOperaciones
@@ -25,38 +23,84 @@ def crear_notificacion(usuario, tipo, titulo, mensaje, url_destino=''):
         mensaje=mensaje,
         url_destino=url_destino,
     )
-    webpush_settings = settings.WEBPUSH_SETTINGS
-    if all(
-        webpush_settings.get(key)
+    if webpush_configurado():
+        transaction.on_commit(
+            lambda: enviar_push_usuario(
+                notificacion.usuario,
+                notificacion.titulo,
+                notificacion.mensaje,
+                notificacion.url_destino,
+                referencia=f'notificacion:{notificacion.pk}',
+            ),
+        )
+    else:
+        logger.info(
+            'Se omitió Web Push para la notificación %s: faltan variables VAPID.',
+            notificacion.pk,
+        )
+    return notificacion
+
+
+def webpush_configurado():
+    return all(
+        settings.WEBPUSH_SETTINGS.get(key)
         for key in (
             'VAPID_PUBLIC_KEY',
             'VAPID_PRIVATE_KEY',
             'VAPID_ADMIN_EMAIL',
         )
-    ):
-        transaction.on_commit(
-            lambda: _enviar_push(notificacion),
+    )
+
+
+def enviar_push_usuario(usuario, titulo, mensaje, url_destino='', referencia='manual'):
+    suscripciones = usuario.webpush_info.count()
+    payload = {
+        'head': titulo,
+        'body': mensaje,
+        'url': url_destino or '/',
+    }
+    logger.info(
+        'Iniciando Web Push (user_id=%s, suscripciones=%s, referencia=%s).',
+        usuario.pk,
+        suscripciones,
+        referencia,
+    )
+    if not webpush_configurado():
+        logger.error(
+            'No se envió Web Push (user_id=%s): faltan variables VAPID.',
+            usuario.pk,
         )
-    return notificacion
+        return False
+    if not suscripciones:
+        logger.error(
+            'No se envió Web Push (user_id=%s): el usuario no tiene suscripciones.',
+            usuario.pk,
+        )
+        return False
 
-
-def _enviar_push(notificacion):
     try:
         send_user_notification(
-            user=notificacion.usuario,
-            payload={
-                'head': notificacion.titulo,
-                'body': notificacion.mensaje,
-                'url': notificacion.url_destino or '/',
-            },
+            user=usuario,
+            payload=payload,
             ttl=86400,
         )
-    except (WebPushException, RequestException):
+    except Exception:
         logger.exception(
-            'No se pudo enviar push para la notificación %s del usuario %s.',
-            notificacion.pk,
-            notificacion.usuario_id,
+            'Falló send_user_notification (user_id=%s, referencia=%s).',
+            usuario.pk,
+            referencia,
         )
+        return False
+
+    logger.info(
+        'send_user_notification terminó sin excepción '
+        '(user_id=%s, suscripciones=%s, referencia=%s). '
+        'Esto confirma la llamada, no la recepción en el dispositivo.',
+        usuario.pk,
+        suscripciones,
+        referencia,
+    )
+    return True
 
 
 def notificar_usuarios(usuarios, tipo, titulo, mensaje, url_destino=''):
