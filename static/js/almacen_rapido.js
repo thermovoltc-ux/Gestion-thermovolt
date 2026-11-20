@@ -287,7 +287,10 @@
                     return;
                 }
 
-                if (form.dataset.ajaxForm === 'product') {
+                if (
+                    form.dataset.ajaxForm === 'product'
+                    || form.dataset.ajaxForm === 'tool-product'
+                ) {
                     const product = {
                         id: result.id,
                         label: result.label,
@@ -300,10 +303,17 @@
                         search.dataset.selectionAttempted = 'false';
                     }
                     closeDialog(form.closest('dialog'));
-                    showFeedback(
-                        document.querySelector('[data-page-feedback]'),
-                        result.message,
-                    );
+                    if (form.dataset.ajaxForm === 'tool-product') {
+                        showFeedback(
+                            document.querySelector('#new-tool-dialog [data-form-feedback]'),
+                            result.message,
+                        );
+                    } else {
+                        showFeedback(
+                            document.querySelector('[data-page-feedback]'),
+                            result.message,
+                        );
+                    }
                     return;
                 }
 

@@ -21,6 +21,8 @@ from .forms import (
     HerramientaDevolucionForm,
     MovimientoInventarioForm,
     ProductoForm,
+    ProductoHerramientaRapidaForm,
+    ProductoRapidoForm,
 )
 from .models import (
     HerramientaUnidad,
@@ -150,10 +152,13 @@ def editar_producto(request, producto_id):
 def lista_herramientas(request):
     estado = request.GET.get('estado', '').strip()
     tecnico_id = request.GET.get('tecnico', '').strip()
+    tipo_producto = request.GET.get('tipo_producto', '').strip()
     estados_permitidos = {choice[0] for choice in HerramientaUnidad.ESTADO_CHOICES}
 
     if estado and estado not in estados_permitidos:
         return HttpResponseBadRequest('El filtro de estado no es válido.')
+    if tipo_producto not in {'', Producto.HERRAMIENTA}:
+        return HttpResponseBadRequest('El filtro de tipo de producto no es válido.')
 
     herramientas = HerramientaUnidad.objects.select_related(
         'producto',
@@ -167,6 +172,10 @@ def lista_herramientas(request):
     )
     if estado:
         herramientas = herramientas.filter(estado=estado)
+    if tipo_producto == Producto.HERRAMIENTA:
+        herramientas = herramientas.filter(
+            producto__tipo_producto=Producto.HERRAMIENTA,
+        )
     if tecnico_id:
         try:
             tecnico_id = int(tecnico_id)
@@ -182,13 +191,14 @@ def lista_herramientas(request):
 
     return render(request, 'almacen/lista_herramientas.html', {
         'herramientas': herramientas,
-        'productos': Producto.objects.select_related('categoria').order_by(
-            'nombre',
-            'codigo',
-        ),
+        'productos': Producto.objects.filter(
+            Q(tipo_producto=Producto.HERRAMIENTA)
+            | Q(herramientas_unidad__isnull=False),
+        ).select_related('categoria').distinct().order_by('nombre', 'codigo'),
         'herramienta_form': HerramientaCreacionForm(),
         'estados': HerramientaUnidad.ESTADO_CHOICES,
         'estado_seleccionado': estado,
+        'tipo_producto_seleccionado': tipo_producto,
         'tecnicos': get_user_model().objects.order_by(
             'first_name',
             'last_name',
@@ -429,7 +439,7 @@ def registrar_movimiento(request, tipo):
             'codigo',
         ),
         'selected_product': selected_product,
-        'producto_form': ProductoForm(),
+        'producto_form': ProductoRapidoForm(),
         'tipo_movimiento': tipo_movimiento,
         'es_entrada': tipo_movimiento == MovimientoInventario.ENTRADA,
     })
@@ -438,7 +448,7 @@ def registrar_movimiento(request, tipo):
 @login_required
 @require_POST
 def crear_producto_rapido(request):
-    form = ProductoForm(request.POST)
+    form = ProductoRapidoForm(request.POST)
     if not form.is_valid():
         if _es_peticion_ajax(request):
             return JsonResponse(_errores_formulario(form), status=400)
@@ -449,10 +459,13 @@ def crear_producto_rapido(request):
         with transaction.atomic():
             producto = form.save()
     except IntegrityError:
-        form.add_error('codigo', 'Ya existe un producto con este código.')
+        form.add_error(
+            None,
+            'No fue posible generar un código único para el producto. Intenta de nuevo.',
+        )
         if _es_peticion_ajax(request):
             return JsonResponse(_errores_formulario(form), status=400)
-        messages.error(request, 'Ya existe un producto con ese código.')
+        messages.error(request, 'No fue posible generar un código único para el producto.')
         return redirect('almacen:registrar_entrada')
 
     if _es_peticion_ajax(request):
@@ -473,3 +486,29 @@ def crear_producto_rapido(request):
     ):
         destino = reverse('almacen:registrar_entrada')
     return redirect(destino)
+
+
+@login_required
+@require_POST
+def crear_producto_herramienta_rapido(request):
+    form = ProductoHerramientaRapidaForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse(_errores_formulario(form), status=400)
+
+    try:
+        with transaction.atomic():
+            producto = form.save()
+    except IntegrityError:
+        form.add_error(
+            None,
+            'No se pudo generar un código único para el producto. Intenta de nuevo.',
+        )
+        return JsonResponse(_errores_formulario(form), status=400)
+
+    return JsonResponse({
+        'id': producto.pk,
+        'codigo': producto.codigo,
+        'nombre': producto.nombre,
+        'label': f'{producto.codigo} — {producto.nombre}',
+        'message': 'Producto creado y seleccionado correctamente.',
+    }, status=201)

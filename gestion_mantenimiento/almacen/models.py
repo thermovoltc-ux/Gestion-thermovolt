@@ -22,8 +22,21 @@ class CategoriaProducto(models.Model):
 
 
 class Producto(models.Model):
-    codigo = models.CharField(max_length=50, unique=True)
+    REPUESTO = 'REPUESTO'
+    HERRAMIENTA = 'HERRAMIENTA'
+    TIPO_PRODUCTO_CHOICES = [
+        (REPUESTO, 'Repuesto'),
+        (HERRAMIENTA, 'Herramienta'),
+    ]
+
+    codigo = models.CharField(max_length=50, unique=True, blank=True)
     nombre = models.CharField(max_length=200)
+    tipo_producto = models.CharField(
+        max_length=15,
+        choices=TIPO_PRODUCTO_CHOICES,
+        default=REPUESTO,
+        db_index=True,
+    )
     material_asociado = models.OneToOneField(
         'Gestion_ot.Material',
         on_delete=models.SET_NULL,
@@ -52,6 +65,31 @@ class Producto(models.Model):
 
     def __str__(self):
         return f'{self.codigo} - {self.nombre}'
+
+    def save(self, *args, **kwargs):
+        if not self.codigo:
+            prefijo = 'HER-' if self.tipo_producto == self.HERRAMIENTA else 'REP-'
+            codigos = self.__class__.objects.filter(
+                codigo__startswith=prefijo,
+            ).values_list('codigo', flat=True)
+            consecutivo = max(
+                (
+                    int(codigo[len(prefijo):])
+                    for codigo in codigos
+                    if codigo[len(prefijo):].isdigit()
+                ),
+                default=0,
+            ) + 1
+            self.codigo = f'{prefijo}{consecutivo:03d}'
+            while self.__class__.objects.filter(codigo=self.codigo).exists():
+                consecutivo += 1
+                self.codigo = f'{prefijo}{consecutivo:03d}'
+
+            update_fields = kwargs.get('update_fields')
+            if update_fields is not None:
+                kwargs['update_fields'] = set(update_fields) | {'codigo'}
+
+        super().save(*args, **kwargs)
 
     @property
     def stock(self):

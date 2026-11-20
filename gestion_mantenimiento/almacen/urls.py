@@ -23,4 +23,9 @@ urlpatterns = [
     path('entrada/', views.registrar_movimiento, {'tipo': 'entrada'}, name='registrar_entrada'),
     path('salida/', views.registrar_movimiento, {'tipo': 'salida'}, name='registrar_salida'),
     path('producto/crear-rapido/', views.crear_producto_rapido, name='crear_producto_rapido'),
+    path(
+        'producto/crear-herramienta-rapido/',
+        views.crear_producto_herramienta_rapido,
+        name='crear_producto_herramienta_rapido',
+    ),
 ]

@@ -5,7 +5,12 @@ from django.contrib.auth import get_user_model
 
 from gestion_mantenimiento.Gestion_ot.models import Material
 
-from .models import HerramientaUnidad, MovimientoInventario, Producto
+from .models import (
+    CategoriaProducto,
+    HerramientaUnidad,
+    MovimientoInventario,
+    Producto,
+)
 
 
 class HerramientaAsignacionForm(forms.Form):
@@ -153,6 +158,93 @@ class ProductoForm(forms.ModelForm):
                         'Este campo es obligatorio para el material asociado.',
                     )
         return cleaned_data
+
+
+class ProductoRapidoForm(forms.ModelForm):
+    class Meta:
+        model = Producto
+        fields = [
+            'nombre',
+            'tipo_producto',
+            'unidad_medida',
+            'stock_minimo',
+            'material_asociado',
+        ]
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            'tipo_producto': forms.Select(attrs={'class': 'form-control'}),
+            'unidad_medida': forms.TextInput(attrs={'class': 'form-control'}),
+            'stock_minimo': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'step': '0.001',
+            }),
+            'material_asociado': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['material_asociado'].queryset = Material.objects.order_by(
+            'nombre',
+            'codigo',
+        )
+        self.fields['material_asociado'].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('material_asociado') or not cleaned_data.get('nombre'):
+            return cleaned_data
+
+        coincidencias = Material.objects.filter(
+            nombre__iexact=cleaned_data['nombre'].strip(),
+            producto_almacen__isnull=True,
+        )
+        if coincidencias.count() == 1:
+            cleaned_data['material_asociado'] = coincidencias.first()
+        return cleaned_data
+
+    def save(self, commit=True):
+        producto = super().save(commit=False)
+        nombre_categoria = (
+            'Herramientas'
+            if producto.tipo_producto == Producto.HERRAMIENTA
+            else 'Repuestos'
+        )
+        producto.categoria, _ = CategoriaProducto.objects.get_or_create(
+            nombre=nombre_categoria,
+        )
+        if commit:
+            producto.save()
+            self.save_m2m()
+        return producto
+
+
+class ProductoHerramientaRapidaForm(forms.ModelForm):
+    class Meta:
+        model = Producto
+        fields = ['nombre', 'tipo_producto', 'unidad_medida']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            'tipo_producto': forms.Select(attrs={'class': 'form-control'}),
+            'unidad_medida': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['tipo_producto'].choices = [
+            (Producto.HERRAMIENTA, 'Herramienta'),
+        ]
+        self.initial.setdefault('tipo_producto', Producto.HERRAMIENTA)
+
+    def save(self, commit=True):
+        producto = super().save(commit=False)
+        producto.categoria, _ = CategoriaProducto.objects.get_or_create(
+            nombre='Herramientas',
+        )
+        if commit:
+            producto.save()
+            self.save_m2m()
+        return producto
 
 
 class MovimientoInventarioForm(forms.ModelForm):

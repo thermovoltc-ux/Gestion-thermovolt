@@ -67,6 +67,22 @@ class ProductoStockTests(TestCase):
     def test_new_product_has_zero_stock(self):
         self.assertEqual(self.producto.stock, Decimal('0'))
 
+    def test_product_code_is_generated_from_product_type(self):
+        repuesto = Producto.objects.create(
+            nombre='Filtro de aire',
+            categoria=self.categoria,
+            unidad_medida='Unidad',
+        )
+        herramienta = Producto.objects.create(
+            nombre='Taladro',
+            tipo_producto=Producto.HERRAMIENTA,
+            categoria=self.categoria,
+            unidad_medida='Unidad',
+        )
+
+        self.assertEqual(repuesto.codigo, 'REP-002')
+        self.assertEqual(herramienta.codigo, 'HER-001')
+
     def test_movements_cannot_be_changed_or_deleted(self):
         movimiento = self.crear_movimiento(MovimientoInventario.ENTRADA, '2.000')
 
@@ -252,18 +268,21 @@ class AlmacenViewsTests(TestCase):
         self.assertEqual(self.producto.stock, Decimal('3'))
 
     def test_quick_product_creation_returns_json_and_can_be_used_for_entry(self):
+        material = Material.objects.create(
+            codigo='REP-QUICK-01',
+            categoria='repuestos',
+            nombre='Producto rápido',
+            costo_base=Decimal('100.00'),
+            precio_venta_sugerido=Decimal('140.00'),
+        )
         response = self.client.post(
             reverse('almacen:crear_producto_rapido'),
             {
-                'codigo': 'QUICK-001',
                 'nombre': 'Producto rápido',
-                'categoria': self.categoria.pk,
+                'tipo_producto': Producto.REPUESTO,
                 'unidad_medida': 'Unidad',
                 'stock_minimo': '0',
                 'material_asociado': '',
-                'nombre_material': '',
-                'costo_base': '',
-                'precio_venta_sugerido': '',
             },
             HTTP_X_REQUESTED_WITH='XMLHttpRequest',
         )
@@ -271,7 +290,9 @@ class AlmacenViewsTests(TestCase):
         self.assertEqual(response.status_code, 201)
         payload = response.json()
         producto = Producto.objects.get(pk=payload['id'])
-        self.assertEqual(payload['label'], 'QUICK-001 — Producto rápido')
+        self.assertEqual(payload['label'], 'REP-001 — Producto rápido')
+        self.assertEqual(producto.tipo_producto, Producto.REPUESTO)
+        self.assertEqual(producto.material_asociado, material)
         self.assertEqual(producto.stock, Decimal('0'))
 
         entrada_response = self.client.post(
@@ -303,7 +324,10 @@ class AlmacenViewsTests(TestCase):
         self.assertContains(response, 'warehouse-products')
         self.assertContains(response, 'quick-product-dialog')
         self.assertContains(response, 'Datos del producto')
-        self.assertContains(response, 'Material del catálogo')
+        self.assertContains(response, 'Vincular material')
+        self.assertContains(response, 'name="tipo_producto"')
+        self.assertNotContains(response, 'precio_venta_sugerido')
+        self.assertNotContains(response, 'nombre_material')
         self.assertContains(response, 'warehouse-dialog-body')
         self.assertContains(response, 'warehouse-dialog-header')
         self.assertContains(response, 'warehouse-form-actions')
@@ -351,6 +375,64 @@ class AlmacenViewsTests(TestCase):
         self.assertContains(list_response, 'new-tool-dialog')
         self.assertContains(list_response, 'warehouse-dialog-body--tool')
         self.assertContains(list_response, 'warehouse-search-icon')
+        self.assertContains(list_response, 'new-tool-product-dialog')
+        self.assertContains(list_response, 'Solo herramientas')
+
+    def test_quick_tool_modal_can_create_product_and_select_it(self):
+        response = self.client.post(
+            reverse('almacen:crear_producto_herramienta_rapido'),
+            {
+                'nombre': 'Taladro inalámbrico',
+                'tipo_producto': Producto.HERRAMIENTA,
+                'unidad_medida': 'Unidad',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        producto = Producto.objects.get(pk=payload['id'])
+        self.assertEqual(producto.codigo, 'HER-001')
+        self.assertEqual(producto.tipo_producto, Producto.HERRAMIENTA)
+        self.assertEqual(producto.categoria.nombre, 'Herramientas')
+        self.assertEqual(payload['label'], 'HER-001 — Taladro inalámbrico')
+
+    def test_quick_tool_modal_rejects_non_tool_product_type(self):
+        response = self.client.post(
+            reverse('almacen:crear_producto_herramienta_rapido'),
+            {
+                'nombre': 'Repuesto no herramienta',
+                'tipo_producto': Producto.REPUESTO,
+                'unidad_medida': 'Unidad',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('tipo_producto', response.json()['errors'])
+
+    def test_tool_list_filter_shows_only_products_marked_as_tools(self):
+        herramienta_producto = Producto.objects.create(
+            codigo='HER-MANUAL-001',
+            nombre='Llave de impacto',
+            tipo_producto=Producto.HERRAMIENTA,
+            categoria=self.categoria,
+            unidad_medida='Unidad',
+        )
+        self.crear_herramienta('SERIE-REPUESTO')
+        HerramientaUnidad.objects.create(
+            producto=herramienta_producto,
+            identificador_unico='SERIE-HERRAMIENTA',
+        )
+
+        response = self.client.get(
+            reverse('almacen:lista_herramientas'),
+            {'tipo_producto': Producto.HERRAMIENTA},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'SERIE-HERRAMIENTA')
+        self.assertNotContains(response, 'SERIE-REPUESTO')
 
     def test_quick_tool_creation_rejects_duplicate_identifier(self):
         self.crear_herramienta('SERIE-DUPLICADA')

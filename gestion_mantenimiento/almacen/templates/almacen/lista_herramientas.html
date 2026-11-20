@@ -35,6 +35,13 @@
                 </select>
             </div>
             <div class="warehouse-form-field">
+                <label for="herramienta-tipo-producto">Tipo de producto</label>
+                <select id="herramienta-tipo-producto" class="form-control" name="tipo_producto">
+                    <option value="">Todas</option>
+                    <option value="HERRAMIENTA" {% if tipo_producto_seleccionado == "HERRAMIENTA" %}selected{% endif %}>Solo herramientas</option>
+                </select>
+            </div>
+            <div class="warehouse-form-field">
                 <label for="herramienta-tecnico">Técnico asignado</label>
                 <select id="herramienta-tecnico" class="form-control" name="tecnico">
                     <option value="">Todos los técnicos</option>
@@ -47,7 +54,7 @@
             </div>
             <div class="warehouse-actions warehouse-tool-filter-actions">
                 <button type="submit" class="ds-button">Filtrar</button>
-                {% if estado_seleccionado or tecnico_seleccionado %}
+                {% if estado_seleccionado or tecnico_seleccionado or tipo_producto_seleccionado %}
                 <a class="ds-button ds-button--secondary" href="{% url 'almacen:lista_herramientas' %}">Limpiar</a>
                 {% endif %}
             </div>
@@ -179,17 +186,21 @@
                 <div class="warehouse-ajax-feedback" role="status" aria-live="polite" data-form-feedback></div>
                 <div class="warehouse-form-field">
                     <label for="tool-product-search">Producto</label>
-                    <div class="warehouse-search-input">
-                        <svg class="warehouse-search-icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <circle cx="11" cy="11" r="7"></circle>
-                            <path d="m16 16 4 4"></path>
-                        </svg>
-                        <input id="tool-product-search" class="form-control" type="search"
-                               list="tool-products" autocomplete="off"
-                               placeholder="Busca por código o nombre"
-                               data-product-search
-                               data-product-id-field="id_producto"
-                               aria-describedby="tool-product-error">
+                    <div class="warehouse-tool-product-search">
+                        <div class="warehouse-search-input">
+                            <svg class="warehouse-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <circle cx="11" cy="11" r="7"></circle>
+                                <path d="m16 16 4 4"></path>
+                            </svg>
+                            <input id="tool-product-search" class="form-control" type="search"
+                                   list="tool-products" autocomplete="off"
+                                   placeholder="Busca una herramienta"
+                                   data-product-search
+                                   data-product-id-field="id_producto"
+                                   aria-describedby="tool-product-error">
+                        </div>
+                        <button type="button" class="ds-button ds-button--secondary warehouse-create-button"
+                                data-open-dialog="new-tool-product-dialog">+ Crear producto</button>
                     </div>
                     {{ herramienta_form.producto }}
                     <small id="tool-product-error" class="warehouse-inline-error" data-product-error hidden>
@@ -219,6 +230,44 @@
                     <ion-icon name="checkmark-outline" aria-hidden="true"></ion-icon>
                     Guardar herramienta
                 </button>
+            </footer>
+        </form>
+    </dialog>
+
+    <dialog id="new-tool-product-dialog" class="warehouse-dialog warehouse-dialog--tool-product" aria-labelledby="new-tool-product-title">
+        <form method="post" action="{% url 'almacen:crear_producto_herramienta_rapido' %}"
+              class="warehouse-dialog-content" data-ajax-form="tool-product"
+              data-product-datalist="tool-products"
+              data-product-search-id="tool-product-search"
+              data-product-hidden-id="id_producto">
+            {% csrf_token %}
+            <header class="warehouse-dialog-header">
+                <div>
+                    <h2 id="new-tool-product-title">Crear producto</h2>
+                    <p>Se agregará al buscador de herramientas.</p>
+                </div>
+                <button type="button" class="warehouse-dialog-close" data-close-dialog aria-label="Cerrar">×</button>
+            </header>
+            <div class="warehouse-dialog-body warehouse-dialog-body--tool">
+                <div class="warehouse-ajax-feedback" role="status" aria-live="polite" data-form-feedback></div>
+                <div class="warehouse-form-field">
+                    <label for="tool-product-name">Nombre</label>
+                    <input id="tool-product-name" class="form-control" type="text" name="nombre" maxlength="200" required>
+                </div>
+                <div class="warehouse-form-field">
+                    <label for="tool-product-type">Tipo</label>
+                    <select id="tool-product-type" class="form-control" name="tipo_producto" required>
+                        <option value="HERRAMIENTA" selected>Herramienta</option>
+                    </select>
+                </div>
+                <div class="warehouse-form-field">
+                    <label for="tool-product-unit">Unidad</label>
+                    <input id="tool-product-unit" class="form-control" type="text" name="unidad_medida" maxlength="30" value="Unidad" required>
+                </div>
+            </div>
+            <footer class="warehouse-form-actions">
+                <button type="button" class="ds-button ds-button--secondary" data-close-dialog>Cancelar</button>
+                <button type="submit" class="ds-button ds-button--primary">Crear y seleccionar</button>
             </footer>
         </form>
     </dialog>
