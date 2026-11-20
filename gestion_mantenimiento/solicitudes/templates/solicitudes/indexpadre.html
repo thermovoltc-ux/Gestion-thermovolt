@@ -69,6 +69,16 @@
                             </a>
                         </li>
                     {% endif %}
+                    {% if is_admin or request.session.tipo_cuenta == 'administrador' %}
+                        <li>
+                            <a href="{% url 'almacen:lista_productos' %}" class="{% if 'almacen' in request.path %}active{% endif %}">
+                                <span class="icon">
+                                    <ion-icon name="cube-outline"></ion-icon>
+                                </span>
+                                <span class="title">Almacén</span>
+                            </a>
+                        </li>
+                    {% endif %}
                     {% if request.session.tipo_cuenta == 'administrador' %}
                         <!-- Elementos accesibles solo para administradores -->
                         <li>
@@ -203,6 +213,7 @@
                             </a>
                         </li>
                     {% endif %}
+
                 {% endif %}
 
                 <li>

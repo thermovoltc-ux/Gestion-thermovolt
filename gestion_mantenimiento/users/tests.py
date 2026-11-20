@@ -126,6 +126,22 @@ class CustomLoginCentroOperacionesTests(TestCase):
             },
         )
 
+    def test_authenticated_administrator_sees_warehouse_sidebar_link(self):
+        self.client.force_login(self.user)
+        session = self.client.session
+        session['tipo_cuenta'] = 'administrador'
+        session['centro_operaciones_id'] = self.centro.pk
+        session.save()
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'href="{reverse("almacen:lista_productos")}"',
+        )
+        self.assertContains(response, 'Almacén')
+
     def test_login_restores_account_type_selector_and_hides_co_initially(self):
         response = self.client.get(self.url)
 
