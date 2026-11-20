@@ -8,6 +8,7 @@ cryptography==46.0.6
 dj-database-url==3.0.1
 psycopg2-binary==2.9.9
 Django==4.2.7
+django-pwa==2.0.1
 django-allauth==0.63.3
 django-cloudinary-storage==0.3.0
 django-crispy-forms==2.1

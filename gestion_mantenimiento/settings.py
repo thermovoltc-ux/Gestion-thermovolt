@@ -108,6 +108,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
+    'pwa',
 
 
     'gestion_mantenimiento.solicitudes',
@@ -266,6 +267,37 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
+PWA_APP_NAME = 'Thermovolt'
+PWA_APP_DESCRIPTION = 'Gestión de Mantenimiento Thermovolt'
+PWA_APP_THEME_COLOR = '#1d4ed8'
+PWA_APP_BACKGROUND_COLOR = '#ffffff'
+PWA_APP_DISPLAY = 'standalone'
+PWA_APP_SCOPE = '/'
+PWA_APP_ORIENTATION = 'portrait'
+PWA_APP_START_URL = '/'
+PWA_APP_LANG = 'es-CO'
+PWA_APP_DEBUG_MODE = False
+PWA_APP_ICONS = [
+    {
+        'src': '/static/images/pwa-icon-192.png',
+        'sizes': '192x192',
+        'type': 'image/png',
+    },
+    {
+        'src': '/static/images/pwa-icon-512.png',
+        'sizes': '512x512',
+        'type': 'image/png',
+    },
+]
+PWA_APP_ICONS_APPLE = [
+    {
+        'src': '/static/images/pwa-icon-180.png',
+        'sizes': '180x180',
+    },
+]
+PWA_APP_SPLASH_SCREEN = []
+PWA_SERVICE_WORKER_PATH = str(BASE_DIR / 'gestion_mantenimiento' / 'serviceworker.js')
+
 # Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -405,7 +437,6 @@ LOGGING = {
         },
     },
 }
-
 
 
 

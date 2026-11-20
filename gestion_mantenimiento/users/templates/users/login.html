@@ -1,12 +1,14 @@
 <!-- filepath: /c:/Users/Juan Esteban/OneDrive - Divina Providencia/Documents/gestion_mantenimiento/users/templates/users/login.html -->
 {% load static %}
 {% load socialaccount %}
+{% load pwa %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inicio de Sesión - Gestión de Mantenimiento</title>
+    {% progressive_web_app_meta %}
     <link rel="stylesheet" href="{% static 'css/login_page.css' %}">
 </head>
 <body>
