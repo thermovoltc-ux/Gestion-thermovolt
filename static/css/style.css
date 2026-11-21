@@ -1683,16 +1683,17 @@ tr:hover {
   }
 
   #table-view table.assigned-ot-table tbody td::before {
-    display: block !important;
+    display: inline-block !important;
     position: static !important;
     float: none !important;
     width: auto !important;
-    margin: 0 0 0.25rem;
+    margin: 0 0.25rem 0 0;
     padding: 0 !important;
     color: #475569;
     font-size: 0.78rem;
     white-space: normal;
-    content: attr(data-label) !important;
+    font-weight: 700;
+    content: attr(data-label) ": " !important;
   }
 
   #table-view table.assigned-ot-table tbody td[data-label="Acciones"] {
@@ -1702,7 +1703,7 @@ tr:hover {
 
   #table-view table.assigned-ot-table tbody td[data-label="Acciones"]::before {
     display: block;
-    margin-bottom: 0.5rem;
+    margin: 0 0 0.5rem;
   }
 
   #table-view table.assigned-ot-table tbody td[data-label="Acciones"] button,
