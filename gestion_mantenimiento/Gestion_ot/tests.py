@@ -2051,6 +2051,11 @@ class MaterialOTAjaxTests(TestCase):
         response = self.client.get(reverse('listar_ot'))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'css/style.css?v=20261121')
+        self.assertContains(response, 'data-label="Número de OT"')
+        self.assertContains(response, 'data-label="Técnico"')
+        self.assertContains(response, 'data-label="Fecha de actividad"')
+        self.assertContains(response, 'data-label="Estado"')
         self.assertContains(
             response,
             reverse('agregar_material_rapido_ot', args=[self.ot.pk]),
