@@ -55,6 +55,75 @@ class NotificacionViewsTests(TestCase):
         )
         self.assertContains(response, 'Nueva solicitud')
         self.assertNotContains(response, 'Existencia baja.')
+        self.assertContains(
+            response,
+            reverse(
+                'notificaciones:eliminar_y_redirigir',
+                args=[self.own_unread.pk],
+            ),
+        )
+
+    def test_list_marks_only_current_users_notifications_as_read(self):
+        response = self.client.get(reverse('notificaciones:lista'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['no_leidas'], 0)
+        self.own_unread.refresh_from_db()
+        self.own_read.refresh_from_db()
+        self.foreign_unread.refresh_from_db()
+        self.assertTrue(self.own_unread.leida)
+        self.assertTrue(self.own_read.leida)
+        self.assertFalse(self.foreign_unread.leida)
+
+    def test_opening_notification_deletes_it_and_redirects_to_its_destination(self):
+        response = self.client.get(
+            reverse(
+                'notificaciones:eliminar_y_redirigir',
+                args=[self.own_unread.pk],
+            ),
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('lista_solicitudes'),
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(
+            Notificacion.objects.filter(pk=self.own_unread.pk).exists(),
+        )
+
+    def test_opening_another_users_notification_returns_not_found(self):
+        response = self.client.get(
+            reverse(
+                'notificaciones:eliminar_y_redirigir',
+                args=[self.foreign_unread.pk],
+            ),
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(
+            Notificacion.objects.filter(pk=self.foreign_unread.pk).exists(),
+        )
+
+    def test_opening_notification_does_not_redirect_to_external_url(self):
+        self.own_unread.url_destino = 'https://example.org/'
+        self.own_unread.save(update_fields=['url_destino'])
+
+        response = self.client.get(
+            reverse(
+                'notificaciones:eliminar_y_redirigir',
+                args=[self.own_unread.pk],
+            ),
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('notificaciones:lista'),
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(
+            Notificacion.objects.filter(pk=self.own_unread.pk).exists(),
+        )
 
     def test_list_can_filter_by_notification_type(self):
         response = self.client.get(

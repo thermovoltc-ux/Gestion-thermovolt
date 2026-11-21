@@ -5,7 +5,7 @@
 {% block title %}Notificaciones{% endblock %}
 
 {% block content %}
-<main class="notifications-page ds-fade-in">
+<main class="notifications-page ds-fade-in" data-notifications-page>
     <header class="notifications-header">
         <div>
             <h1>Notificaciones</h1>
@@ -58,11 +58,9 @@
                 <p>{{ notificacion.mensaje }}</p>
                 <span class="notification-type">{{ notificacion.get_tipo_display }}</span>
             </div>
-            {% if notificacion.url_destino %}
-            <a class="notification-open-link" href="{{ notificacion.url_destino }}" aria-label="Abrir {{ notificacion.titulo }}">
+            <a class="notification-open-link" href="{% url 'notificaciones:eliminar_y_redirigir' notificacion.pk %}" aria-label="Abrir {{ notificacion.titulo }}">
                 <ion-icon name="open-outline"></ion-icon>
             </a>
-            {% endif %}
         </article>
         {% empty %}
         <div class="ds-card notifications-empty">
