@@ -72,7 +72,7 @@
                             </a>
                         </li>
                     {% endif %}
-                    {% if is_admin or request.session.tipo_cuenta == 'administrador' %}
+                    {% if is_admin or request.session.tipo_cuenta == 'tecnico' %}
                         <li>
                             <a href="{% url 'almacen:lista_productos' %}" class="{% if 'almacen' in request.path %}active{% endif %}">
                                 <span class="icon">

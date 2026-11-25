@@ -1,10 +1,11 @@
 from decimal import Decimal
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
+from django.http import HttpResponseForbidden
 from django.db.models import Case, DecimalField, F, Prefetch, Q, Sum, When
 from django.db.models.functions import Coalesce
 from django.http import HttpResponseBadRequest, JsonResponse
@@ -75,6 +76,25 @@ def _stock_expression():
 
 @login_required
 def lista_productos(request):
+    if not (
+        request.user.is_staff
+        or request.user.is_superuser
+        or (
+            request.session.get('tipo_cuenta') == 'administrador'
+            and not request.user.groups.filter(name='Cliente').exists()
+        )
+        or request.user.groups.filter(
+            name__in=[
+                'Admin',
+                'Supervisor',
+                'Jefe de Área',
+                'Jefe de Area',
+                'Tecnico',
+            ],
+        ).exists()
+    ):
+        return HttpResponseForbidden()
+
     busqueda = request.GET.get('q', '').strip()
     productos = Producto.objects.select_related(
         'categoria',

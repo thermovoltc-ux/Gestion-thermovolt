@@ -127,7 +127,48 @@ class CustomLoginCentroOperacionesTests(TestCase):
             data['remember_me'] = 'on'
         return self.client.post(self.url, data)
 
+    def test_authenticated_client_cannot_see_or_open_warehouse(self):
+        self.client.force_login(self.user)
+        session = self.client.session
+        session['tipo_cuenta'] = 'administrador'
+        session['centro_operaciones_id'] = self.centro.pk
+        session.save()
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(
+            response,
+            f'href="{reverse("almacen:lista_productos")}"',
+        )
+        self.assertEqual(
+            self.client.get(reverse('almacen:lista_productos')).status_code,
+            403,
+        )
+
+    def test_authenticated_technician_sees_and_can_open_warehouse(self):
+        self.user.groups.clear()
+        self.user.groups.add(Group.objects.get_or_create(name='Tecnico')[0])
+        self.client.force_login(self.user)
+        session = self.client.session
+        session['tipo_cuenta'] = 'tecnico'
+        session.save()
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'href="{reverse("almacen:lista_productos")}"',
+        )
+        self.assertEqual(
+            self.client.get(reverse('almacen:lista_productos')).status_code,
+            200,
+        )
+
     def test_authenticated_administrator_sees_warehouse_sidebar_link(self):
+        self.user.groups.clear()
+        self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
         self.client.force_login(self.user)
         session = self.client.session
         session['tipo_cuenta'] = 'administrador'

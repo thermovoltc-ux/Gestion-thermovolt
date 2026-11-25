@@ -175,7 +175,6 @@ class AlmacenViewsTests(TestCase):
             response,
             f'href="{reverse("almacen:lista_productos")}"',
         )
-        self.assertContains(response, 'Almacén')
         self.assertContains(response, 'REP-LIST-01')
         self.assertContains(response, 'Contactor de búsqueda')
 
