@@ -32,7 +32,6 @@ from gestion_mantenimiento.solicitudes.models import Solicitud
 from gestion_mantenimiento.Activos.models import CentroOperaciones, Equipo, Ubicacion
 from gestion_mantenimiento.users.access import (
     obtener_alcance,
-    obtener_cliente_actual,
     obtener_scope_ots,
     obtener_scope_solicitudes,
 )
@@ -76,27 +75,6 @@ def custom_login(request):
                     form.add_error('co', 'El Centro de Operaciones no existe.')
                 elif not centro_operaciones.activo:
                     form.add_error('co', 'El Centro de Operaciones está inactivo.')
-
-            es_cliente = (
-                not user.is_superuser
-                and user.groups.filter(name='Cliente').exists()
-            )
-            if (
-                not form.errors
-                and es_cliente
-                and centro_operaciones is not None
-            ):
-                cliente = obtener_cliente_actual(user)
-                if (
-                    cliente is None
-                    or not cliente.centros_operaciones.filter(
-                        pk=centro_operaciones.pk,
-                    ).exists()
-                ):
-                    form.add_error(
-                        'co',
-                        'El Centro de Operaciones seleccionado no está asociado a tu cuenta.',
-                    )
 
             if not form.errors:
                 alcance = obtener_alcance(
