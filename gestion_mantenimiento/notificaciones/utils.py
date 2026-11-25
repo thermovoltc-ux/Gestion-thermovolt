@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -15,7 +16,46 @@ from .models import Notificacion
 logger = logging.getLogger(__name__)
 
 
+def _rutas_seguras_para_clientes():
+    return {
+        '/solicitudes/',
+        reverse('lista_solicitudes'),
+        reverse('dashboard'),
+        reverse('notificaciones:lista'),
+    }
+
+
+def _es_usuario_cliente(usuario):
+    return (
+        usuario.groups.filter(name='Cliente').exists()
+        or PerfilUsuario.objects.filter(
+            user=usuario,
+            cliente__isnull=False,
+        ).exists()
+    )
+
+
+def destino_seguro_para_usuario(usuario, url_destino):
+    if (
+        _es_usuario_cliente(usuario)
+        and url_destino not in _rutas_seguras_para_clientes()
+    ):
+        ruta_intentada = urlsplit(url_destino or '').path
+        url_segura = reverse('lista_solicitudes')
+        logger.warning(
+            '[PUSH] URL insegura para cliente (user_id=%s, path=%r); '
+            'se corrigió a %s.',
+            usuario.pk,
+            ruta_intentada,
+            url_segura,
+        )
+        return url_segura
+    return url_destino
+
+
 def crear_notificacion(usuario, tipo, titulo, mensaje, url_destino=''):
+    url_destino = destino_seguro_para_usuario(usuario, url_destino)
+
     notificacion = Notificacion.objects.create(
         usuario=usuario,
         tipo=tipo,

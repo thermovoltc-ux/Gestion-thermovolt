@@ -334,7 +334,7 @@ class CustomLoginCentroOperacionesTests(TestCase):
         self.assertRedirects(response, reverse('dashboard'))
         self.assertEqual(self.client.session['tipo_cuenta'], 'jefe_de_area')
 
-    def test_client_can_use_center_unassociated_with_its_profile(self):
+    def test_client_login_rejects_center_unassociated_with_its_profile(self):
         otro_cliente = Cliente.objects.create(
             nombre='Otro cliente login',
             codigo='OTRO-CLIENTE-LOGIN-CO',
@@ -352,16 +352,31 @@ class CustomLoginCentroOperacionesTests(TestCase):
 
         response = self._login(centro_ajeno.codigo)
 
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.wsgi_request.user.is_authenticated)
+        self.assertIn(
+            'El Centro de Operaciones seleccionado no está asociado a tu cuenta.',
+            response.context['form'].errors['co'],
+        )
+
+        self.client.force_login(self.user)
+        session = self.client.session
+        session['centro_operaciones_id'] = centro_ajeno.pk
+        session.save()
+        response = self.client.get(reverse('api_arbol_json'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(ubicacion_ajena.nombre, str(response.json()))
+
+    def test_client_login_accepts_center_associated_with_its_profile(self):
+        response = self._login(self.centro.codigo)
+
         self.assertRedirects(response, reverse('dashboard'))
         self.assertTrue(response.wsgi_request.user.is_authenticated)
         self.assertEqual(
             self.client.session['centro_operaciones_id'],
-            centro_ajeno.pk,
+            self.centro.pk,
         )
-
-        response = self.client.get(reverse('api_arbol_json'))
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(ubicacion_ajena.nombre, str(response.json()))
 
     def test_posted_account_type_does_not_change_server_role(self):
         self._login(self.centro.codigo, tipo_cuenta='jefe_de_area')
@@ -371,6 +386,8 @@ class CustomLoginCentroOperacionesTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_admin_login_stores_existing_center_without_client_assignment(self):
+        self.user.groups.clear()
+        self.user.groups.add(Group.objects.get_or_create(name='Admin')[0])
         centro_huerfano = CentroOperaciones.objects.create(
             nombre='Centro sin clientes',
             codigo='CO-LOGIN-ORPHAN',

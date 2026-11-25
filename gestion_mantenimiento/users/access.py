@@ -95,6 +95,20 @@ def obtener_alcance(request, user=None, centro_operaciones=_UNSET):
     ):
         return Alcance(rol, set())
 
+    if (
+        'Cliente' in grupos
+        and not user.is_superuser
+        and centro_seleccionado is not None
+    ):
+        cliente = obtener_cliente_actual(user)
+        if (
+            cliente is None
+            or not cliente.centros_operaciones.filter(
+                pk=centro_seleccionado.pk,
+            ).exists()
+        ):
+            return Alcance(rol, set())
+
     if centro_seleccionado is None:
         if rol == 'jefe_de_area':
             return Alcance(rol, None)

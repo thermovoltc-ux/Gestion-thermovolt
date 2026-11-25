@@ -6,6 +6,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 from django.utils.http import url_has_allowed_host_and_scheme
 
+from .utils import destino_seguro_para_usuario
 from .models import Notificacion
 
 
@@ -60,7 +61,7 @@ def eliminar_y_redirigir(request, notificacion_id):
         pk=notificacion_id,
         usuario=request.user,
     )
-    destino = notificacion.url_destino
+    destino = destino_seguro_para_usuario(request.user, notificacion.url_destino)
     notificacion.delete()
 
     if not url_has_allowed_host_and_scheme(
